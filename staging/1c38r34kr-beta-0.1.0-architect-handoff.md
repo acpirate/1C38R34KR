@@ -48,16 +48,18 @@ Begin implementation with a fresh coding-agent context. Inspect both repositorie
 
 ## 0.4 Execution model
 
-**Proposed**, pending the director's call — per established practice the split is a per-build decision, not standing policy.
+**There is no Senior/Junior split.** Director ruling, 2026-08-20: one mode from here on.
 
-This build divides unusually cleanly, because the differential harness (§10) creates a hard interface early:
+One coding agent owns the whole build:
 
-- **Senior:** logic-layer architecture (§4–§8), the RNG port and its 32-bit arithmetic hazards (§9), the differential harness and trace format (§10–§11), the content loader and validation port (§12–§14), save architecture (§19).
-- **Junior:** scene construction and layout (§15), event playback animations (§16), touch input (§17), test fixtures, and the per-rule test cases once the harness exists.
-
-The senior stage must complete §9–§11 before junior work begins; everything downstream depends on the trace format being settled.
-
-If the director declines the split, one agent owns the whole build.
+- repository inspection across both repos
+- implementation plan
+- implementation
+- integration
+- tests, fixtures, and the differential harness
+- device verification
+- README update
+- final diff review, commit, push, and final report
 
 ## 0.5 README and source control
 
@@ -338,7 +340,62 @@ Port the content fingerprint. It gates save compatibility (§19) and is the head
 
 ---
 
-# Part VI — Presentation
+# Part VI — Presentation and Development Tooling
+
+## 14.1 The visual target for beta 0.1
+
+**The Godot port is a visual redesign** (director ruling, 2026-08-20) — but the redesign does not happen in beta 0.1. This build produces a **whitebox**: the minimum that legibly represents every element the alpha has, built the cheapest correct way, to be refined from there.
+
+This is the right call and the doc should be explicit about why it changes almost nothing: **the alpha has no art assets.** Not one image, font, or sprite. Every Packet is a `COLOR_HEX` fill with a 1px `DARK_HEX` border and a white shape glyph drawn as a canvas vector path; all text is system sans-serif. There is nothing to "reuse" and nothing to port — only geometry to transcribe.
+
+So the economical path is neither "recreate the alpha's look" nor "design something new". It is:
+
+**Use the alpha's values as defaults**, because copying twelve hex constants costs nothing and gives a legible starting board — but treat them as placeholders, not as a target to reproduce faithfully:
+
+| | |
+| --- | --- |
+| Packet palette | `Red #e04343`, `Yellow #ddcf3d`, `Magenta #cf52cf`, `Green #43b953`, `Cyan #3fc4c4`, `Blue #4a72e8` |
+| Border/glyph outline | `Red #79201f`, `Yellow #776e1a`, `Magenta #6f2570`, `Green #1f5f28`, `Cyan #1c6666`, `Blue #22397e` |
+| Shape geometry | the six vector paths in `src/render/view.ts:122-170` |
+| Board background | `#1b1b22` |
+
+**The shape glyphs in particular are expected to be replaced** (director, 2026-08-20). Do not invest effort matching the alpha's rendering of them. If a Godot primitive reads more distinctly than a transcribed path, use the primitive — six visually unambiguous shapes at thumb size is the entire requirement.
+
+## 14.2 The presentation registry
+
+Because the shapes and colors *will* change while their gameplay meaning does not, the mapping from identity to appearance must be a single swappable indirection — not a decision scattered across the renderer.
+
+**Frozen** (gameplay-load-bearing, never changes):
+
+- `Color` and `Shape` are enums `0..5`. Six of each, exactly.
+- **Enum ordering is load-bearing**, because weak sets derive as the enum-order complement of authored strong sets. Reordering silently changes every System's and Hacker's weaknesses.
+- The CSV tokens (`RED`, `GRE`, `TRI`, `STR`, …) are content identity and are frozen with the datasets.
+
+**Swappable** (presentation only):
+
+Exactly one file — `scenes/battle/packet_style.gd` — maps enum to appearance:
+
+```gdscript
+const COLOR_FILL   : Array[Color]   = [...]  # indexed by Color enum
+const COLOR_BORDER : Array[Color]   = [...]  # indexed by Color enum
+const SHAPE_DRAW   : Array[Callable] = [...] # indexed by Shape enum
+```
+
+Nothing outside this file may hard-code a hex value or a shape path. Every renderer, every diagnostic, every icon in a Program row or character sheet resolves through it.
+
+**This table is the alpha→final translation matrix.** When the art pass happens, replacing shape 3's `Callable` with a sprite is a one-line change and the mapping from "what the alpha called a Diamond" to "whatever it becomes" is readable in one place, in order. That is the requirement, and it costs nothing to satisfy now versus considerable effort to retrofit later.
+
+A test asserts both arrays have exactly six entries and that no hex literal appears elsewhere under `scenes/`.
+
+**Build with Godot primitives** wherever they are cheaper than transcribing:
+
+- Packet shapes: `draw_circle()` and `draw_colored_polygon()` in a `Node2D._draw()`. All six shapes are a handful of points each; the alpha's star is already a loop and the cross is an explicit 12-point path.
+- Every panel, button, list, and label: **Godot's default theme, unstyled.** Do not author a custom theme, do not import fonts, do not draw custom widgets. A default `Button` that works is worth more in this build than a styled one that has to be redone.
+- Any alpha affordance with a cheaper Godot-native equivalent — scrolling lists, modals, collapsible panels — uses the native one without argument.
+
+**The one constraint:** no layout, palette, or animation assumption may leak into `logic/`. The redesign that follows must be able to replace all of Part VI without touching a rule. §4's enforcement test is what protects this.
+
+Do not polish. Do not spend time on transitions, easing curves, or spacing. Effort saved here is effort available for the differential harness, which is where this build's risk actually lives.
 
 ## 15. Scene structure
 
@@ -359,9 +416,9 @@ scenes/
     ice_bar.tscn
 ```
 
-One `Packet` node per cell, 64 total. This is cheap and makes per-Packet animation (falls, swaps, shakes, detonation flashes, countdown ticks) straightforward with `create_tween()`. A `TileMapLayer` would be faster and considerably harder to animate; at 64 cells the performance argument does not apply.
+One `Packet` node per cell, 64 total, each drawing itself in `_draw()`. This is cheap and makes per-Packet animation (falls, swaps, shakes, detonation flashes, countdown ticks) straightforward with `create_tween()`. A `TileMapLayer` would be faster and considerably harder to animate; at 64 cells the performance argument does not apply.
 
-`Control`-based layout throughout, with the Datastream in an `AspectRatioContainer` so it stays square on any phone.
+`Control`-based layout throughout, with the Datastream in an `AspectRatioContainer` so it stays square on any phone. Everything else is plain `VBoxContainer`/`HBoxContainer` under the default theme.
 
 ## 16. Event playback
 
@@ -402,6 +459,27 @@ Project is configured 1080×2340 portrait, `canvas_items` stretch, `expand` aspe
 The verification device (Galaxy S25 Ultra) has a **display cutout at the top center and 42px rounded corners**, confirmed from its display metrics. Query `DisplayServer.get_display_safe_area()` and keep the ICE bars, Program rows, and any status text inside it. Do not hardcode insets — a cutout is per-device.
 
 The alpha's narrow-viewport target was 390×844 CSS pixels. Layout must hold from that aspect ratio through 20:9.
+
+## 18.1 Diagnostic tooling
+
+Included in beta 0.1 on the director's delegation (2026-08-20), selected on one criterion: **does it save more development time than it costs to build?** Each item below is minutes of work and removes a recurring multi-minute tax from every device test.
+
+| Tool | Why it earns its place |
+| --- | --- |
+| **Seed display and seed entry** | The highest-leverage item by a wide margin. Showing the active battle seed on screen turns "I saw something odd on the phone" into a seed that feeds §10 directly, reproducing the exact battle in the headless harness with a full event trace. Without it, device bugs are anecdotes. |
+| **Restart battle with the same seed** | Replays an identical battle instantly. Visual bugs are almost never reproducible otherwise, because a fresh seed means a fresh board. |
+| **Force win / force lose** | Reaching the Result screen otherwise costs a full battle played by hand on a touchscreen, every time. Both outcomes are needed and neither is interesting to reach manually. |
+| **Grant full charge** | Fills every Program pool. Function activation, targeting mode, cancel-without-spend, composites, and fizzles are the densest cluster of rules in the game, and they are unreachable until charge accumulates. |
+| **Event log overlay** | On-screen tail of the last ~20 emitted events. Diagnoses most playback and ordering problems without a cable, and cross-checks against §11 traces. |
+| **Playback speed control** | The skip/fast-forward path is already required by §16; expose slow-motion on the same control. Animation-ordering bugs are invisible at speed and obvious at quarter rate. |
+
+Deliberately **excluded**, as costing more than they return in this build:
+
+- **Find Sync hint** — a player-facing feature in the alpha, not a diagnostic, and its README notes it overlaps status text on narrow viewports. Port it when the hint system is designed for touch, not now.
+- **Arbitrary board-state injection / board editor** — expensive to build and made largely redundant by §10, which verifies rules far more thoroughly than hand-placed boards ever could.
+- **Performance overlay** — Godot's built-in monitors already cover this.
+
+All diagnostics sit behind `OS.is_debug_build()` and must be unreachable in a release build. They live in `app/debug/` and are subject to §4: a diagnostic may **read** `GameState` and call ordinary logic-layer entry points, never mutate state directly. A force-win that sets ICE to zero behind the rules' back will eventually produce a bug report about the rules.
 
 ---
 
@@ -506,24 +584,34 @@ Sequenced so that each phase is verifiable before the next depends on it.
 `tools/trace.gd`, the alpha's trace entry point, the normalizer, the comparison runner. **Expect this phase to find real bugs in Phase C** — that is its purpose, and it is cheaper than finding them in Phase F. Iterate C and D until Gate 2 passes.
 
 ### Phase E — Presentation
-Scenes, event playback, touch input, screen flow, save/resume. The first build that runs on the phone.
+Whitebox scenes per §14.1, event playback, touch input, screen flow, save/resume, and the §18.1 diagnostics. The first build that runs on the phone. Timeboxed by intent — this phase is deliberately cheap, and effort saved here belongs to Phase D.
 
 ### Phase F — Integration
 Metrics and logging, the headless batch harness, the full gate, README, commit, push.
 
 ---
 
-# Part XI — Open Decisions for the Director
+# Part XI — Director Decisions
 
-Four questions this document does not resolve. None blocks Phase A.
+## Resolved, 2026-08-20
 
-1. **Is the Senior/Junior split on for this build?** (§0.4) The proposed division is unusually clean here because §10 creates a hard interface early.
+1. **Execution model** — no Senior/Junior split. One agent, one mode, from this build onward. Folded into §0.4.
 
-2. **Is the alpha trace entry point acceptable?** (§10) It requires one commit to the otherwise-frozen alpha repo. It adds a script and touches no rules. The differential gate is not possible without it, and the differential gate is the strongest argument this document makes.
+2. **Diagnostic tooling** — included, with the specific set delegated to the implementing agent's judgment on development-time-saved versus build cost. Selection and exclusions in §18.1.
 
-3. **Should beta 0.1 include the wizard/debug controls?** The alpha has force-win, restart-battle, and restart-run controls plus a Find Sync hint. They make manual device testing dramatically faster. Recommendation: include force-win and restart-battle, skip the rest until Runs exist.
+3. **Visual approach** — the Godot port *is* a visual redesign, but beta 0.1 ships whatever minimal representation covers the alpha's elements, refined from there. Reusing alpha visuals or substituting Godot primitives are both acceptable; economize. Folded into §14.1, which notes the alpha has no art assets at all, so the choice is narrower and cheaper than it first appears.
 
-4. **How faithful should the visual design be?** This document assumes the alpha's canvas layout is reproduced approximately, treating visual redesign as post-beta. If the intent is instead to take the Godot port as the moment to redesign the look, that changes Phase E substantially and should be said now rather than after it is built.
+    Follow-on ruling the same day: the **shape glyphs specifically are expected to be replaced**, so effort spent replicating the alpha's rendering is wasted. This is answered architecturally rather than as a note — §14.2 requires a single presentation registry mapping the frozen `Color`/`Shape` enums to appearance, which *is* the alpha→final translation matrix and makes the eventual swap a one-file change.
+
+## Still open
+
+4. **Is the alpha trace entry point acceptable?** (§10)
+
+    The differential gate requires the alpha to emit a normalized event trace, which means one commit to the otherwise-frozen alpha repo. It adds a script under `scripts/`, touches no rules, no logic, and no data.
+
+    This is the only sanctioned modification to the alpha, and it is worth the intrusion: it is the difference between verifying a 7,000-line rules translation by reading it and verifying it by running it. If the answer is no, §10 and §22 must be struck and the verification strategy falls back to hand-written per-rule tests — substantially weaker, and substantially more work.
+
+    Does not block Phase A, but blocks Phase D.
 
 ---
 
