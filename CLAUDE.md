@@ -27,6 +27,13 @@ Highest-value files there:
 | `src/render/`, `src/main.ts` | UI layer — **replaced wholesale**, not ported |
 | `scripts/harness.ts`, `batch.ts`, `bot.ts` | Deterministic headless simulation |
 
+## Build specification and decisions
+
+| Path | What it is |
+| --- | --- |
+| `staging/1c38r34kr-beta-0.1.0-architect-handoff.md` | Current build specification — scope, architecture, verification gates |
+| `staging/decisions.md` | Append-only decision log with rationale. Append new decisions here rather than burying them in commit messages. |
+
 ## Architecture rules
 
 1. **Game logic never touches `Node` or the scene tree.** Rules live in plain

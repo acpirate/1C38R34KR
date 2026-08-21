@@ -603,15 +603,18 @@ Metrics and logging, the headless batch harness, the full gate, README, commit, 
 
     Follow-on ruling the same day: the **shape glyphs specifically are expected to be replaced**, so effort spent replicating the alpha's rendering is wasted. This is answered architecturally rather than as a note — §14.2 requires a single presentation registry mapping the frozen `Color`/`Shape` enums to appearance, which *is* the alpha→final translation matrix and makes the eventual swap a one-file change.
 
-## Still open
+4. **Alpha trace entry point** — **approved**, delegated to the agent's discretion. See `staging/decisions.md` D-010 for the full record.
 
-4. **Is the alpha trace entry point acceptable?** (§10)
+    Verified before deciding: `Game`'s public methods (`startPlayerPhase`, `fireProgram`, `fireDeckFunction`, `runEnemyPhase`) already return `GameEvent[]`, so the event stream is the public API's return value rather than internal state. The emitter is one new file, `scripts/trace.ts`, importing the same `scripts/harness.ts` glue that `batch.ts`, `smoke.ts`, and `hpladder.ts` already import — **zero modifications to any existing file**. It is a sixth headless script in a directory holding five.
 
-    The differential gate requires the alpha to emit a normalized event trace, which means one commit to the otherwise-frozen alpha repo. It adds a script under `scripts/`, touches no rules, no logic, and no data.
+    "Read-only" is therefore read as *do not change its behavior*, which this does not. Constraints: committed to the alpha repo as its own commit describing it as a behavior-neutral instrument; the alpha's existing test suite must pass unchanged before and after; and this remains the **only** sanctioned modification to the alpha — any future proposal needs a new decision-log entry.
 
-    This is the only sanctioned modification to the alpha, and it is worth the intrusion: it is the difference between verifying a 7,000-line rules translation by reading it and verifying it by running it. If the answer is no, §10 and §22 must be struck and the verification strategy falls back to hand-written per-rule tests — substantially weaker, and substantially more work.
+## Decision record
 
-    Does not block Phase A, but blocks Phase D.
+Every decision shaping this build, including the ones resolved above, is
+recorded with its rationale in **`staging/decisions.md`** (D-001 … D-014).
+Decisions taken during implementation should be appended there rather than
+buried in commit messages.
 
 ---
 
