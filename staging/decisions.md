@@ -371,3 +371,123 @@ other's slice, so both are required. Do not re-propose dropping either.
 2016-or-earlier Android device below API 24 cannot run Godot 4 builds at all,
 and no export setting changes that — the floor is the engine's native-library
 requirement.
+
+---
+
+## D-017 — The auto-play driver is a frozen, fidelity-critical artifact
+
+**2026-08-21 · director · ACCEPTED**
+
+**Problem found during authorization review:** the differential gate needs
+something to play the Hacker across 5,250 unattended battles. That driver lives
+in `scripts/bot.ts` and `scripts/batch.ts`, which the handoff module map filed
+under "tests and tools". It is not a tool — its tie-breaks (highest-charge
+enemy slot resolved by lowest index; fullest row resolved topmost; leftmost
+occupied cell; ascending Program order; a 2000-iteration cap) determine every
+event in every trace.
+
+**Decision:** freeze and port literally, with the same fidelity requirement as
+the RNG (D-009). Full tie-break table in the authorization addendum §A1.
+
+**Why:** a correct rules port paired with a driver that iterates rows
+bottom-up diverges on essentially every battle, and presents as a rules bug.
+The alternative — writing a fresh, simpler shared policy — was rejected because
+it would break comparability with the alpha's existing balance harness.
+
+**Consequence:** the driver is verified independently against a committed
+decision fixture *before* the matrix runs, and a divergence traced to it is
+reported as a driver defect, never a rules defect.
+
+---
+
+## D-018 — The driver fires the Deck Function
+
+**2026-08-21 · director · ACCEPTED**
+
+**Problem found:** `botFireAbilities` iterates `state.units.player`, which holds
+Programs only. The Deck Function has its own separate charge pool and is
+deliberately not in `state.units`, so `batch.ts` never fires it. As specified,
+all 5,250 battles would have left `FNC_010` and the whole Deck charge-pool path
+with zero differential coverage — inside a gate described as exhaustive parity.
+
+**Decision:** extend the driver to fire it.
+
+**Consequence:** `botFireAbilities` stays frozen per D-017; Deck firing is a
+separate sibling function called between it and the move, using the same
+targeting policy. A deliberate, documented divergence from `batch.ts`, so
+balance figures from `npm run batch` and from the trace driver are not directly
+comparable and neither is presented as the other.
+
+---
+
+## D-019 — Hash-first differential comparison
+
+**2026-08-21 · director · ACCEPTED**
+
+**Problem found:** the literal reading of authorization §6 produces an estimated
+0.5–2 GB of trace JSONL per engine per matrix run. Runtime was never the
+constraint; storage and diff cost are.
+
+**Decision:** each engine emits one hash line per battle; the comparator diffs
+those; on mismatch it re-runs that single battle in both engines with full
+traces and reports the first differing record.
+
+**Why:** satisfies §6.2's reproduction requirement exactly, reduces storage to
+megabytes, and removes any incentive to shrink the matrix for performance
+reasons — which §6.1 explicitly forbids.
+
+---
+
+## D-020 — Device gate split: tablet routine, phone signs off
+
+**2026-08-21 · director · ACCEPTED**
+
+**Problem found:** authorization §1 says "physical Android phone", §13 says "the
+configured physical Android test device", and D-016 made the tablet primary.
+
+**Decision:** all development and repeated checks on the tablet; the §13
+completion checklist runs once on the S25 in a single announced window (D-015)
+before the build is called complete.
+
+**Consequence:** touch feel, thumb-reach layout, and portrait composition are
+phone judgements and must not be signed off on the tablet. The final report
+states which checks ran on which device.
+
+---
+
+## D-021 — Fingerprint parity forbids Godot's JSON serializer
+
+**2026-08-21 · agent · ACCEPTED (technical)**
+
+Authorization §15.3 requires the Godot fingerprint to match the alpha's. The
+alpha canonicalizes with JavaScript's `JSON.stringify` and hashes with djb2, so
+matching byte-for-byte means reproducing JS serialization exactly — key order,
+string escaping, number formatting.
+
+**Consequence:** Godot's `JSON.stringify()` cannot be used for the fingerprint;
+a hand-written JS-compatible serializer is required. Phase B's first task is to
+determine whether any fingerprinted value is non-integer — if all are integers,
+the float-formatting hazard disappears.
+
+**Requirement retained rather than relaxed:** an exact match is a cheap
+end-to-end proof that the whole parse, normalize, and resolve path ported
+faithfully.
+
+---
+
+## D-022 — Save serializer moves into Phase 4
+
+**2026-08-21 · agent · ACCEPTED**
+
+Authorization §14 sequences save at Phase 6, but §15.8 requires save/resume to
+preserve deterministic continuation — a differential property only the harness
+can prove.
+
+**Decision:** the logic-layer serializer and restorer land in Phase 4 with the
+harness, and a resume-determinism test joins the differential gate: run to turn
+K, serialize, restore, continue, and require the trace to equal the
+uninterrupted run byte-for-byte. Save/quit UI stays in Phases 5–6.
+
+**Why:** an incompletely captured RNG state, a dropped countdown overlay, or a
+lost stamped area pattern all pass a round-trip equality test and fail a
+continuation test.
