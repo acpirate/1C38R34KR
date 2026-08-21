@@ -48,8 +48,21 @@ Highest-value files there:
 godot --headless -s res://tools/run_tests.gd        # logic tests, no GPU
 godot --headless --export-debug "Android" build/1c38r34kr.apk
 adb install -r build/1c38r34kr.apk
+adb shell am start -n com.acpirate.ic38r34kr/com.godot.game.GodotAppLauncher
+adb logcat -d godot:V '*:S'                          # Godot's own output only
+adb shell screencap -p /sdcard/s.png && adb pull /sdcard/s.png
 godot-gui                                            # open the editor
 ```
+
+Notes that cost time to rediscover:
+
+- The launcher activity is `GodotAppLauncher`. `GodotApp` is what ends up
+  running but is not exported — starting it directly fails with a
+  `SecurityException`.
+- `adb logcat` without a tag filter is drowned in Samsung WindowManager spam.
+  Filter to `godot:V '*:S'`.
+- `adb screencap` works, so visual checks on real hardware are self-serve — no
+  need to ask a human to look at the phone.
 
 `godot` is a shim at `%USERPROFILE%\bin\godot.cmd` pinned to Godot **4.7.2**.
 

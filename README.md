@@ -20,6 +20,7 @@ the behavioral specification for this rewrite.
 | Ten authored CSV datasets | ✅ carried over, packed into the APK |
 | Headless test runner | ✅ 12 passing |
 | Android debug APK export from CLI | ✅ 54.9 MB, signed, arm64-v8a + armeabi-v7a |
+| Runs on hardware | ✅ Galaxy S25 Ultra, Android 16 / API 36, Adreno 830, OpenGL ES 3.2 |
 | Game logic | ⬜ not started — awaiting architect handoff |
 | UI / scenes | ⬜ not started |
 
@@ -39,7 +40,12 @@ required unless custom Gradle builds are enabled (Android plugins, GDExtension).
 godot --headless -s res://tools/run_tests.gd          # logic tests, no GPU
 godot --headless --export-debug "Android" build/1c38r34kr.apk
 adb install -r build/1c38r34kr.apk
+adb shell am start -n com.acpirate.ic38r34kr/com.godot.game.GodotAppLauncher
+adb shell screencap -p /sdcard/s.png && adb pull /sdcard/s.png
 ```
+
+The launcher activity is `GodotAppLauncher`. `GodotApp` is the activity that
+ends up running, but it is not exported and cannot be started directly.
 
 ## Layout
 
