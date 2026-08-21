@@ -1,0 +1,19 @@
+# Godot
+.godot/
+/android/
+/build/
+
+# Build artifacts
+*.apk
+*.aab
+
+# Signing material — NEVER commit. Godot writes keystore passwords here.
+export_credentials.cfg
+*.keystore
+*.jks
+*.p12
+*.pepk
+
+# OS
+Thumbs.db
+.DS_Store

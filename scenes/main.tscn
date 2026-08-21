@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[node name="Main" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Label" type="Label" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+text = "1C38R34KR
+beta 0.1
+environment smoke test"
+horizontal_alignment = 1
+vertical_alignment = 1

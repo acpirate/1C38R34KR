@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(godot:*)",
+      "Bash(adb devices)",
+      "Bash(adb logcat:*)",
+      "Bash(adb install:*)",
+      "Bash(adb shell:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "PowerShell(godot:*)",
+      "PowerShell(adb devices)",
+      "PowerShell(adb logcat:*)",
+      "PowerShell(adb install:*)"
+    ]
+  }
+}

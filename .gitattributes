@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+*.gd    text
+*.tscn  text
+*.tres  text
+*.godot text
+*.cfg   text
+*.csv   text
+*.md    text
+
+*.png   binary
+*.jpg   binary
+*.ogg   binary
+*.wav   binary
+*.apk   binary
+*.aab   binary
