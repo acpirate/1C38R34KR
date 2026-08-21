@@ -20,7 +20,18 @@ the behavioral specification for this rewrite.
 | Ten authored CSV datasets | ✅ carried over, packed into the APK |
 | Headless test runner | ✅ 12 passing |
 | Android debug APK export from CLI | ✅ 54.9 MB, signed, arm64-v8a + armeabi-v7a |
-| Runs on hardware | ✅ Galaxy S25 Ultra, Android 16 / API 36, Adreno 830, OpenGL ES 3.2 |
+| Runs on hardware | ✅ two devices — see below |
+
+Verified on both ends of the supported range:
+
+| Device | OS | GPU | ABI | Cold start |
+| --- | --- | --- | --- | --- |
+| Galaxy S25 Ultra | Android 16 / API 36 | Adreno 830 | arm64-v8a only | 238 ms |
+| Galaxy Tab A 10.1 (SM-T580, 2016) | Android 8.1 / API 27 | Mali-T830 | **armeabi-v7a only** | 2.4 s |
+
+Between them they justify shipping both ABI slices: neither device can run the
+other's. Dropping `armeabi-v7a` would drop the tablet, and dropping
+`arm64-v8a` would drop the phone.
 | Game logic | ⬜ not started — awaiting architect handoff |
 | UI / scenes | ⬜ not started |
 

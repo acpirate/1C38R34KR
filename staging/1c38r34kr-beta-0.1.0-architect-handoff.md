@@ -648,8 +648,9 @@ Verified working as of 2026-08-20.
 | Godot pins | compileSdk/targetSdk 36, minSdk 24, JDK 17 |
 | NDK | **not installed.** Only needed for custom Gradle builds — Android plugins or GDExtension. `ndk;29.0.14206865`, ~4 GB, if that changes. |
 | Keystore | `~/.android/debug.keystore`, wired into Godot's editor settings |
-| Device | Galaxy S25 Ultra, Android 16 / API 36, Adreno 830, OpenGL ES 3.2, arm64-v8a only |
-| Baseline APK | 54.9 MB debug, signed, arm64-v8a + armeabi-v7a |
+| Primary device | Galaxy Tab A 10.1 (SM-T580, 2016), Android 8.1 / API 27, Mali-T830, OpenGL ES 3.2, **armeabi-v7a only**, 1200×1920 @ 240 dpi, 1.9 GB RAM. Permanently connected. |
+| Target device | Galaxy S25 Ultra, Android 16 / API 36, Adreno 830, OpenGL ES 3.2, **arm64-v8a only**. Connected on request. |
+| Baseline APK | 54.9 MB debug, signed, arm64-v8a + armeabi-v7a — **both slices are required**, one per device |
 
 Toolchain notes that cost time to discover:
 

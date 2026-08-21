@@ -323,3 +323,51 @@ device again just to look at something.
 phone could sit on a charger across the room — at the cost of re-pairing after
 reboots. USB was chosen during setup (D-006) before this constraint was known.
 Worth revisiting if tethering proves annoying.
+
+**Largely resolved by D-016**, which adds a dedicated always-connected device.
+
+---
+
+## D-016 — Two-device strategy: tablet as primary, phone as target
+
+**2026-08-21 · director · ACCEPTED**
+
+The director had a spare Galaxy Tab A 10.1 (`SM-T580`, 2016) available as a
+dedicated test device.
+
+**Verified specs:** Android 8.1 / API 27, Exynos 7870, Mali-T830, OpenGL ES 3.2,
+**armeabi-v7a only**, 1200×1920 @ 240 dpi, 1.9 GB RAM. Cold start 2.4 s versus
+238 ms on the S25.
+
+**Roles:**
+
+| | |
+| --- | --- |
+| **Tablet — primary** | Permanently connected. Every routine device check. |
+| **S25 Ultra — target** | Connected on request, at Phase E milestones, under the D-015 window protocol. |
+
+**Why the old tablet is an asset rather than a compromise:** a Mali-T830 with
+1.9 GB of RAM surfaces performance problems an Adreno 830 hides entirely. A
+match-3 with cascades and tween-heavy playback that feels good on 2016 hardware
+feels good everywhere. Finding those problems during Phase E is cheap; finding
+them after launch is not.
+
+**What the tablet cannot settle:** touch feel, thumb-reach layout, and portrait
+composition. A 10-inch 16:10 tablet held in two hands is a genuinely different
+input regime from a phone. Those stay S25 questions and must not be signed off
+on the tablet.
+
+**Bonus:** testing both proves the stretch/aspect configuration holds across a
+wide range (handoff §18 requires 390×844 through 20:9), which no single device
+can demonstrate.
+
+**Corrects an earlier suggestion:** dropping the `armeabi-v7a` slice to halve
+APK size was floated when the S25 (arm64-only) was the sole device. That is now
+**wrong** — the tablet is `armeabi-v7a` **only**, because Samsung shipped the
+64-bit-capable Exynos 7870 with a 32-bit userland. Neither device can run the
+other's slice, so both are required. Do not re-propose dropping either.
+
+**Setup note:** API 27 clears Godot 4.7's minSdk 24 floor, but not by much. A
+2016-or-earlier Android device below API 24 cannot run Godot 4 builds at all,
+and no export setting changes that — the floor is the engine's native-library
+requirement.

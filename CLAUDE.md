@@ -34,20 +34,32 @@ Highest-value files there:
 | `staging/1c38r34kr-beta-0.1.0-architect-handoff.md` | Current build specification — scope, architecture, verification gates |
 | `staging/decisions.md` | Append-only decision log with rationale. Append new decisions here rather than burying them in commit messages. |
 
-## Device protocol
+## Devices
 
-The test phone is not permanently tethered. It is an ordinary phone in daily
-use, and time plugged in is a real cost.
+| Role | Device | Availability |
+| --- | --- | --- |
+| **Primary / daily** | Galaxy Tab A 10.1 (`SM-T580`) — Android 8.1, Mali-T830, **armeabi-v7a**, 1.9 GB RAM | permanently connected |
+| **Target / periodic** | Galaxy S25 Ultra (`SM-S938U`) — Android 16, Adreno 830, **arm64-v8a** | on request only |
 
-1. Run `adb devices` before assuming anything. If nothing is attached, continue
-   with headless work — do not stall.
-2. Batch every check that genuinely needs hardware into one window. Finish all
-   headless work first: tests, traces, export.
-3. Say **"plug the phone in now"** before the batch, and list what will run.
-4. Say **"the phone can come off now"** the moment the last device step
-   finishes. Never leave it ambiguous.
-5. Collect screenshots during the window — `adb screencap` is self-serve, so
-   there is no reason to need the device again later just to look at something.
+Both ABI slices ship because **neither device can run the other's**. Do not
+propose dropping either to save APK size.
+
+The tablet is the canary: 2016 hardware surfaces performance problems the
+flagship hides. If it feels good there, it feels good anywhere. What the tablet
+*cannot* settle is touch feel, thumb-reach layout, and portrait composition — a
+10-inch 16:10 tablet is a different input regime from a phone. Those remain S25
+questions.
+
+**Protocol for the S25** — it is the director's daily phone and tethering time
+is a real cost:
+
+1. Run `adb devices` first. Never assume it is attached.
+2. Batch every check that needs it into one window; finish headless work first.
+3. Say **"plug the phone in now"** and list what will run.
+4. Say **"the phone can come off now"** the moment the last step finishes.
+5. Capture screenshots during the window — `adb screencap` is self-serve.
+
+With both attached, target explicitly: `adb -s <serial> …`.
 
 ## Architecture rules
 
