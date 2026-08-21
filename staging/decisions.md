@@ -297,3 +297,29 @@ elsewhere under `scenes/`.
 replacing shape 3's drawn diamond with a sprite is a one-line change, and the
 mapping from "what the alpha called a Diamond" to whatever replaces it is
 readable in one place, in order.
+
+---
+
+## D-015 — Device work is batched into announced windows
+
+**2026-08-21 · director · ACCEPTED**
+
+The test phone cannot stay plugged in all day. It is the director's daily
+phone, not a dedicated test rig.
+
+**Protocol:** finish all headless work first (tests, differential traces,
+export), batch every check that genuinely needs hardware, announce *"plug the
+phone in now"* with the list of what will run, and announce *"the phone can come
+off now"* the moment the last device step finishes. Never leave the window
+open-ended. Run `adb devices` before assuming a connection, and if the device is
+absent, continue with headless work rather than stalling.
+
+**Consequence:** handoff §23 is restructured as a single announced window rather
+than checks interleaved through a build. Screenshots are gathered during the
+window, since `adb screencap` is self-serve and there is no reason to need the
+device again just to look at something.
+
+**Open alternative:** wireless ADB would remove most of this friction — the
+phone could sit on a charger across the room — at the cost of re-pairing after
+reboots. USB was chosen during setup (D-006) before this constraint was known.
+Worth revisiting if tethering proves annoying.

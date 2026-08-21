@@ -34,6 +34,21 @@ Highest-value files there:
 | `staging/1c38r34kr-beta-0.1.0-architect-handoff.md` | Current build specification — scope, architecture, verification gates |
 | `staging/decisions.md` | Append-only decision log with rationale. Append new decisions here rather than burying them in commit messages. |
 
+## Device protocol
+
+The test phone is not permanently tethered. It is an ordinary phone in daily
+use, and time plugged in is a real cost.
+
+1. Run `adb devices` before assuming anything. If nothing is attached, continue
+   with headless work — do not stall.
+2. Batch every check that genuinely needs hardware into one window. Finish all
+   headless work first: tests, traces, export.
+3. Say **"plug the phone in now"** before the batch, and list what will run.
+4. Say **"the phone can come off now"** the moment the last device step
+   finishes. Never leave it ambiguous.
+5. Collect screenshots during the window — `adb screencap` is self-serve, so
+   there is no reason to need the device again later just to look at something.
+
 ## Architecture rules
 
 1. **Game logic never touches `Node` or the scene tree.** Rules live in plain

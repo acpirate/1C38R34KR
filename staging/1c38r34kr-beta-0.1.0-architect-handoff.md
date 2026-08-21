@@ -534,6 +534,24 @@ The §10 acceptance set: 200 default-settings seeds across every System×HOST pa
 
 ## 23. Gate 3 — device
 
+**The phone is not permanently connected.** It is the director's daily phone, and
+tethering time is a real cost (D-015). Gate 3 is therefore a **single announced
+window**, not a series of interruptions:
+
+1. Complete Gates 1 and 2 and produce the APK first. Everything above this point
+   is headless and needs no hardware.
+2. Ask for the phone explicitly, listing what will run.
+3. Run the whole checklist below in one pass, capturing screenshots as you go —
+   `adb screencap` is self-serve, so nothing should require the device a second
+   time merely to look at it.
+4. State clearly that the phone can be disconnected the moment the last step
+   finishes.
+
+If the device is absent when a build reaches this gate, do not stall: report the
+build as verified through Gate 2, list the pending device checks, and hold them
+for the next window.
+
+
 ```bash
 godot --headless --export-debug "Android" build/1c38r34kr.apk
 adb install -r build/1c38r34kr.apk
