@@ -148,3 +148,72 @@ static func is_loaded() -> bool:
 ## cannot inherit another's content.
 static func clear() -> void:
 	_active = {}
+
+
+# ---------------------------------------------------------------------------
+# Accessors
+# ---------------------------------------------------------------------------
+#
+# Every lookup is by STABLE ID and every miss is an error rather than a null
+# return. Content is validated before it is installed, so a miss here means a
+# logic bug upstream — silently returning null would push the failure somewhere
+# far less diagnosable.
+
+static func _lookup(kind: String, id: String) -> Dictionary:
+	var c := active()
+	var table: Dictionary = c.get(kind, {})
+	if not table.has(id):
+		push_error("unknown %s id '%s'" % [kind, id])
+		return {}
+	return table[id]
+
+
+static func program(id: String) -> Dictionary:
+	return _lookup("programs", id)
+
+
+static func function(id: String) -> Dictionary:
+	return _lookup("functions", id)
+
+
+static func passive(id: String) -> Dictionary:
+	return _lookup("passives", id)
+
+
+static func hacker(id: String) -> Dictionary:
+	return _lookup("hackers", id)
+
+
+static func deck(id: String) -> Dictionary:
+	return _lookup("decks", id)
+
+
+static func system(id: String) -> Dictionary:
+	return _lookup("systems", id)
+
+
+static func host(id: String) -> Dictionary:
+	return _lookup("hosts", id)
+
+
+static func upgrade(id: String) -> Dictionary:
+	return _lookup("upgrades", id)
+
+
+static func boss(id: String) -> Dictionary:
+	return _lookup("bosses", id)
+
+
+static func fingerprint() -> String:
+	return active().get("fingerprint", "")
+
+
+## Programs belonging to one side, in content order — which is the order that
+## becomes charge-routing priority.
+static func programs_for(side: Types.Side) -> Array:
+	var out: Array = []
+	for id in active()["programs"]:
+		var p: Dictionary = active()["programs"][id]
+		if p["side"] == side:
+			out.append(p)
+	return out

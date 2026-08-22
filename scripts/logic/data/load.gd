@@ -808,7 +808,103 @@ func load_all() -> Dictionary:
 
 	if issues.has_errors():
 		return {"ok": false, "fingerprint": "", "issues": issues}
-	return {"ok": true, "fingerprint": compute_fingerprint(), "issues": issues}
+	return {
+		"ok": true,
+		"fingerprint": compute_fingerprint(),
+		"issues": issues,
+		"content": build_resolved(),
+	}
+
+
+## Turns validated rows into the immutable records the runtime reads.
+##
+## Everything here has already passed validation, so this stage resolves
+## references rather than checking them — a reference that could fail would have
+## been reported long before reaching this point.
+##
+## Cross-links are stored as resolved OBJECTS, not IDs, so combat never walks a
+## map mid-resolution. Stable IDs remain on each record for saves and logs,
+## which is the one place identity must survive as text.
+func build_resolved() -> Dictionary:
+	var fn_by_id := {}
+	for f in function_rows:
+		fn_by_id[f["id"]] = {
+			"id": f["id"],
+			"name": f["name"],
+			"cost": f["cost"],
+			"composite": payloads[f["id"]]["kind"] == "composite",
+			"plan": plans.get(f["id"], []),
+			"notes": f["notes"],
+			# A directly assigned owner starts each battle with charge equal to
+			# cost when true. Ignored when the Function only ever runs as a
+			# composite child, which pays nothing.
+			"start_charged": f["start_charged"],
+		}
+
+	var psv_by_id := {}
+	for s in passive_rows:
+		psv_by_id[s["id"]] = {
+			"id": s["id"],
+			"effect_type": s["effect_type"],
+			"activation": s["activation"],
+			"agent_scope": s["agent_scope"],
+			"color": s["color"],
+			"all_scope": s["all_scope"],
+			"magnitude": s["magnitude"],
+			"function_id": s["function_id"],
+			"display": s["display"],
+			"display_template": s["display_template"],
+			"param_tokens": s["param_tokens"],
+		}
+
+	var prg_by_id := {}
+	for p in program_rows:
+		var fn: Dictionary = fn_by_id[p["function_id"]]
+		prg_by_id[p["id"]] = {
+			"id": p["id"],
+			"side": Types.Side.PLAYER if p["dataset"] == DataIssues.DATASET_HACKER_PROGRAMS else Types.Side.ENEMY,
+			"name": p["name"],
+			"colors": p["colors"],
+			"shapes": p["shapes"],
+			"function_id": p["function_id"],
+			"fn": fn,
+			"cost": fn["cost"],
+			# A charge pool's capacity IS its Function's cost — which is exactly
+			# why a zero-cost Function may not be assigned here.
+			"charge_cap": fn["cost"],
+			"notes": p["notes"],
+		}
+
+	return {
+		"fingerprint": compute_fingerprint(),
+		"game_version": Content.GAME_VERSION,
+		"programs": prg_by_id,
+		"functions": fn_by_id,
+		"passives": psv_by_id,
+		"hackers": _resolve_identity(hacker_rows, psv_by_id, fn_by_id),
+		"decks": _resolve_identity(deck_rows, psv_by_id, fn_by_id),
+		"systems": _resolve_identity(system_rows, psv_by_id, fn_by_id),
+		"hosts": _resolve_identity(host_rows, psv_by_id, fn_by_id),
+		"upgrades": _resolve_identity(upgrade_rows, psv_by_id, fn_by_id),
+		"bosses": _resolve_identity(boss_rows, psv_by_id, fn_by_id),
+	}
+
+
+## Copies a row and attaches its resolved PASSIVE list and Deck Function.
+## Rows that carry neither are passed through unchanged.
+func _resolve_identity(rows: Array, psv_by_id: Dictionary, fn_by_id: Dictionary) -> Dictionary:
+	var out := {}
+	for r in rows:
+		var rec: Dictionary = r.duplicate(true)
+		if r.has("passive_ids"):
+			var resolved: Array = []
+			for pid in (r["passive_ids"] as Array):
+				resolved.append(psv_by_id[pid])
+			rec["passives"] = resolved
+		if r.has("function_id") and fn_by_id.has(r["function_id"]):
+			rec["fn"] = fn_by_id[r["function_id"]]
+		out[r["id"]] = rec
+	return out
 
 
 ## Reads all ten datasets. Every reader runs regardless of earlier failures, so
