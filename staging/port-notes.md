@@ -68,6 +68,84 @@ semantics. Revisit only if Phase 4 profiling shows the harness is RNG-bound.
 
 ---
 
+## Phase 2 — Content pipeline
+
+### P-006 · `load.ts` split into modules
+
+**Forced by:** nothing — this is a judgement call, recorded because authorization
+§16 asks for module-boundary deviations.
+
+The alpha's `load.ts` is 2,441 lines holding diagnostics, vocabularies, the
+table reader, per-dataset row models, validation, resolution, and the
+fingerprint. Ported as `issues.gd`, `vocab.gd`, `table.gd`, `effects.gd`,
+`passives.gd`, `fingerprint.gd`, and `load.gd`.
+
+**Impact:** boundaries only. No logic is reordered or merged, and the module map
+in the handoff still resolves — `load.gd` remains the entry point.
+
+### P-007 · CSV parser ported rather than substituted
+
+**Forced by:** `FileAccess.get_csv_line()` handles quoting but not the
+behaviours the pipeline depends on — 1-based line tracking that every
+validation diagnostic reports, skipping wholly empty rows rather than yielding
+`[""]`, BOM stripping, and reporting an unterminated quote as a structural
+error.
+
+**Note:** this reverses the handoff's own §12 guidance ("do not hand-roll a
+splitter"), which was written before those dependencies were traced. Diverging
+on any of them would change validation output or change what gets fingerprinted.
+
+### P-008 · Godot's JSON parser yields every number as a float
+
+**Forced by:** `JSON.parse_string` produces floats for all JSON numbers, and
+GDScript array equality is type-strict, so `[0, 0] != [0.0, 0.0]`.
+
+**Resolution:** fixture-side values are coerced to `int` at the comparison,
+rather than loosening the comparison itself.
+
+**Impact:** every test that compares JSON fixture data against integer game
+data — and, in Phase 4, the differential comparator. Worth remembering there.
+
+### P-009 · djb2 must iterate UTF-16 code units, not codepoints
+
+**Forced by:** JavaScript strings are UTF-16 and `charCodeAt` yields code units,
+so a character outside the BMP contributes **two**. GDScript strings are UTF-32.
+A codepoint-based loop diverges on any non-BMP character — and reports a
+different length, which is itself the base36 suffix of the fingerprint.
+
+**Resolution:** `Fingerprint.utf16_units()` computes surrogate pairs directly
+from codepoints. Pinned by a vector for `"🎮"`, whose UTF-16 length is 2.
+
+**Why it matters despite ASCII content:** it would go unnoticed until the day
+someone pastes an emoji into a notes column, and would then present as an
+unexplained save-invalidating fingerprint change.
+
+### P-010 · Godot's `JSON.stringify` cannot produce the canonical string
+
+**Forced by:** the fingerprint requires byte-equality with JavaScript's
+`JSON.stringify` — insertion-ordered keys, integral floats rendered without a
+decimal point, raw non-ASCII rather than `\u` escapes, and JS's exact escape
+set.
+
+**Resolution:** `Fingerprint.stringify()` is a hand-written serializer. Pinned
+against JS output for every value shape the canonical string contains.
+
+**Related, resolved favourably:** A5 asked whether any fingerprinted value is
+non-integer. **Zero are**, so JS float formatting never has to be reproduced.
+`_float_to_js` raises rather than guessing if that ever stops being true.
+
+### P-011 · GDScript strings cannot contain U+0000
+
+**Forced by:** GDScript strings are NUL-terminated internally, so an embedded
+NUL cannot round-trip through a fixture.
+
+**Resolution:** the control-character hash vector uses `U+0001`, `U+001F`, and
+`U+007F` instead. Authored content contains no control characters at all, so
+this is a test-coverage limitation rather than a behavioural gap — recorded so
+the omission is not mistaken for an oversight.
+
+---
+
 ## Tooling defects found and fixed
 
 ### P-005 · A parse error in a test suite hung the runner

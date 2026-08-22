@@ -1,0 +1,101 @@
+{
+  "_comment": "djb2 and JSON canonicalization vectors for the fingerprint port. Do not hand-edit.",
+  "algorithm": "djb2, h = ((h << 5) + h + charCodeAt(i)) >>> 0, seed 5381",
+  "format": "${hex8}-${length.toString(36)}",
+  "vectors": [
+    {
+      "input": "",
+      "utf16_length": 0,
+      "hash": "00001505-0"
+    },
+    {
+      "input": "a",
+      "utf16_length": 1,
+      "hash": "0002b606-1"
+    },
+    {
+      "input": "abc",
+      "utf16_length": 3,
+      "hash": "0b885c8b-3"
+    },
+    {
+      "input": "{}",
+      "utf16_length": 2,
+      "hash": "00597a9d-2"
+    },
+    {
+      "input": "{\"schema\":1}",
+      "utf16_length": 12,
+      "hash": "cf69455d-c"
+    },
+    {
+      "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "utf16_length": 1000,
+      "hash": "99315ec5-rs"
+    },
+    {
+      "input": "\u0001\u001f",
+      "utf16_length": 3,
+      "hash": "0b86bba4-3"
+    },
+    {
+      "input": "café",
+      "utf16_length": 4,
+      "hash": "7c9503b8-4"
+    },
+    {
+      "input": "naïve résumé",
+      "utf16_length": 12,
+      "hash": "50753057-c"
+    },
+    {
+      "input": "日本語",
+      "utf16_length": 3,
+      "hash": "0d45fd54-3"
+    },
+    {
+      "input": "🎮",
+      "utf16_length": 2,
+      "hash": "007629af-2"
+    },
+    {
+      "input": "a🎮b",
+      "utf16_length": 4,
+      "hash": "8046ed52-4"
+    },
+    {
+      "input": "{\"id\":\"AREA_SELF\",\"cells\":[{\"x\":0,\"y\":0}]}",
+      "utf16_length": 42,
+      "hash": "e69fcb74-16"
+    },
+    {
+      "input": "[{\"x\":-1,\"y\":-1},{\"x\":0,\"y\":-1}]",
+      "utf16_length": 32,
+      "hash": "04d746d5-w"
+    },
+    {
+      "input": "{\"a\":1,\"b\":[1,2,3],\"c\":{\"d\":\"e\"},\"f\":true,\"g\":null}",
+      "utf16_length": 51,
+      "hash": "a76b466b-1f"
+    }
+  ],
+  "serialization": {
+    "integer_one": "1",
+    "float_one": "1",
+    "negative": "-1",
+    "zero": "0",
+    "true_value": "true",
+    "false_value": "false",
+    "null_value": "null",
+    "empty_string": "\"\"",
+    "quote_in_string": "\"say \\\"hi\\\"\"",
+    "backslash": "\"a\\\\b\"",
+    "newline": "\"a\\nb\"",
+    "tab": "\"a\\tb\"",
+    "unicode": "\"café\"",
+    "empty_array": "[]",
+    "empty_object": "{}",
+    "nested": "{\"b\":2,\"a\":1}",
+    "array_of_objects": "[{\"x\":1,\"y\":2}]"
+  }
+}
