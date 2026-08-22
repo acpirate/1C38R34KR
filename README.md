@@ -21,6 +21,7 @@ the behavioral specification for this rewrite.
 | Headless test runner | ✅ 628 passing |
 | Phase 1 — foundation | ✅ exact-parity RNG, types, constants |
 | Phase 2 — content pipeline | ✅ fingerprint `49c229cd-8ma` matches the alpha |
+| Phase 3 — battle core | ✅ complete battles run headlessly, bot vs bot |
 | Android debug APK export from CLI | ✅ 54.9 MB, signed, arm64-v8a + armeabi-v7a |
 | Runs on hardware | ✅ two devices — see below |
 

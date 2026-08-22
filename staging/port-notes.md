@@ -172,6 +172,26 @@ The convention from P-002 — always qualify — is correct and easy to forget w
 writing a new module. Recorded because it is now the second occurrence, which
 makes it a pattern rather than an anecdote.
 
+### P-014 · A7 verified: logging cannot perturb the event stream
+
+**The concern (addendum §A7):** `Game.collect()` runs `consumeEvents(metrics)`
+and `logger.consume()` before returning the event list. If either mutated the
+stream, the differential gate would become silently sensitive to log level — a
+miserable class of bug, because the traces would differ for reasons unrelated to
+game logic.
+
+**Verified, and the answer is no.** Both iterate strictly read-only: they
+accumulate into their own structures and never assign to an event field, and
+never reorder or splice the array. The logger's `this.events` is its own
+accumulator of log entries, a separate array from the `GameEvent[]` stream.
+`collect` returns the original array, not the logger's return value.
+
+**Consequences:**
+
+- the differential gate is log-level independent, as intended
+- metrics and logging can be deferred to Phase 6, as the build sequencing
+  assumes, without weakening the Phase 4 gate
+
 ---
 
 ## Phase 2 result
