@@ -456,6 +456,456 @@ static func _total_charge(state: GameState, owner: Types.Side) -> int:
 	return n
 
 
+# ---------------------------------------------------------------------------
+# Gravity and refill
+# ---------------------------------------------------------------------------
+
+## Settles the Datastream: Packets fall to close gaps, then empty cells refill.
+##
+## `constrained` is the cascade cap: replacement Packets are rejection-rolled so
+## no Sync on the settled board contains a refill Packet, which is how a finite
+## cascade limit terminates without truncating a wave mid-resolution.
+static func apply_gravity_and_refill(state: GameState, events: Array, constrained := false, fresh_ids: Dictionary = {}) -> void:
+	var moves: Array = []
+	for x in Constants.BOARD_WIDTH:
+		var write := Constants.BOARD_HEIGHT - 1
+		for y in range(Constants.BOARD_HEIGHT - 1, -1, -1):
+			var t: Tile = state.board[y][x]
+			if t == null:
+				continue
+			if y != write:
+				state.board[write][x] = t
+				state.board[y][x] = null
+				moves.append({"from": Vector2i(x, y), "to": Vector2i(x, write)})
+			write -= 1
+	if not moves.is_empty():
+		events.append({"t": Types.EVT.FALL, "moves": moves})
+
+	# Column-major so the spawn order matches the alpha's, which matters because
+	# refill consumes RNG draws in exactly this sequence.
+	var empty: Array[Vector2i] = []
+	for x in Constants.BOARD_WIDTH:
+		for y in Constants.BOARD_HEIGHT:
+			if state.board[y][x] == null:
+				empty.append(Vector2i(x, y))
+	if empty.is_empty():
+		return
+
+	var gen := BoardOps.TileGen.new(state.rng, state.next_id)
+	if constrained:
+		_refill_constrained(state, empty, gen)
+	else:
+		for p in empty:
+			state.board[p.y][p.x] = BoardOps.random_tile(gen)
+	state.next_id = gen.next_id
+
+	var spawned: Array = []
+	for p in empty:
+		var t: Tile = state.board[p.y][p.x]
+		fresh_ids[t.id] = true
+		spawned.append({"p": p, "view": _tile_view(t)})
+	events.append({"t": Types.EVT.SPAWN, "tiles": spawned})
+
+
+## Rejection-rolls replacements until no Sync on the settled board involves a
+## refilled cell.
+##
+## The local left/up guard biases away from Syncs cheaply; the full-board check
+## is the authority, because it also catches right and below neighbours that the
+## local guard cannot see.
+static func _refill_constrained(state: GameState, cells: Array, gen: BoardOps.TileGen) -> void:
+	for attempt in 200:
+		for p in cells:
+			var t := BoardOps.random_tile(gen)
+			var guard := 0
+			while BoardOps.completes_run(state.board, p.x, p.y, t) and guard < 100:
+				t = BoardOps.random_tile(gen)
+				guard += 1
+			state.board[p.y][p.x] = t
+
+		var bad := false
+		for m in MatchFinder.detect(state.board):
+			for c in m.cells:
+				if cells.has(c):
+					bad = true
+					break
+			if bad:
+				break
+		if not bad:
+			return
+		for p in cells:
+			state.board[p.y][p.x] = null
+
+	# Practically unreachable at 37 Packet types; accept an unconstrained fill
+	# rather than loop forever.
+	for p in cells:
+		state.board[p.y][p.x] = BoardOps.random_tile(gen)
+
+
+static func _tile_view(t: Tile) -> Dictionary:
+	var v := {"kind": t.kind}
+	if not t.is_neutral():
+		v["color"] = t.color
+		v["shape"] = t.shape
+	if t.has_special():
+		v["special"] = {"type": t.special.type, "owner": t.special.owner, "countdown": t.special.countdown}
+	return v
+
+
+## Packets bound to a side's ACTIVE Programs, for the contention metric. Read
+## from the battle's own roster, so a Program sitting in inventory but not in
+## the build creates no contention.
+static func _bound_tokens(state: GameState, side: Types.Side, key: String) -> Dictionary:
+	var out := {}
+	for u in (state.units[side] as Array):
+		for v in (Content.program(u.program_id)[key] as Array):
+			out[v] = true
+	return out
+
+
+# ---------------------------------------------------------------------------
+# Cascade resolution
+# ---------------------------------------------------------------------------
+
+## Resolves every Sync step for one owner-side action until the Datastream
+## settles. Each iteration is one STEP: all simultaneous Syncs in the current
+## board state resolve together, with a single Buff application.
+##
+## `cause` is the INITIATING action's bucket, not the mechanism that finally
+## dealt the damage — everything descended from a Bomb is Bomb damage, however
+## many Syncs it sets off.
+##
+## Returns `{steps, stochastic_rounds}`.
+static func resolve_cascades(
+	state: GameState,
+	owner: Types.Side,
+	events: Array,
+	budget,
+	cause: Types.DamageSource,
+	fresh_ids: Dictionary,
+	cause_program_id := "",
+	origin: Dictionary = {}
+) -> Dictionary:
+	var steps := 0
+	var stochastic_rounds := 0
+	var damage_passives := Passives.affecting(state.identity, PassiveEffects.EXTRA_MATCH_DAMAGE, owner)
+	var charge_passives := Passives.affecting(state.identity, PassiveEffects.EXTRA_MATCH_CHARGE, owner)
+
+	while not state.has_winner():
+		var matches := MatchFinder.detect(state.board)
+		if matches.is_empty():
+			break
+		steps += 1
+
+		# Classified BEFORE destruction, because it needs the live Packets.
+		var stochastic: Array[bool] = []
+		var any_stochastic := false
+		for m in matches:
+			var is_stoch := false
+			for c in m.cells:
+				var t: Tile = state.board[c.y][c.x]
+				if t != null and fresh_ids.has(t.id):
+					is_stoch = true
+					break
+			stochastic.append(is_stoch)
+			if is_stoch:
+				any_stochastic = true
+		if any_stochastic:
+			stochastic_rounds += 1
+
+		var info := {}
+		# (1) DIRECT Sync footprints. Constituent match groups remain the
+		# authority for base damage, crit, charge, and PASSIVE triggers.
+		for mi in matches.size():
+			var m: MatchFinder.Match = matches[mi]
+			var mult := MatchFinder.multiplier(m)
+			for c in m.cells:
+				_bump_slice(info, c, mult, [m.condition], stochastic[mi])
+
+		# Snapshot before any collateral is added, so line-clear qualification
+		# reads the DIRECT footprint only — which is what makes it non-recursive.
+		var direct := info.duplicate()
+
+		_apply_line_clears(state, matches, direct, info, owner, events)
+
+		# Computed BEFORE removal, so a same-side Buff sliced in this step still
+		# counts toward this step's damage.
+		var bonus := buff_bonus(state, owner)
+		var opp_colors := _bound_tokens(state, Types.opponent_of(owner), "colors")
+		var opp_shapes := _bound_tokens(state, Types.opponent_of(owner), "shapes")
+
+		var acc := {
+			"raw": 0.0, "passive_raw": 0.0, "crit_extra": 0.0, "contested": 0,
+			"color_raw": 0.0, "shape_raw": 0.0, "cascade_raw": 0.0,
+			"shields_removed": 0, "neutral_sliced": 0,
+		}
+		var destroyed: Array[Vector2i] = []
+		var streams := {}
+
+		# A wave is a cascade once it is past the first step or involves any
+		# refilled Packet. The first wave may instead be labelled with the Effect
+		# that caused it, so generation stays attributable — allocation is
+		# untouched either way.
+		var is_cascade_wave := steps > 1 or any_stochastic
+		var stream_source: Types.ChargeStreamSource = Types.ChargeStreamSource.CASCADE if is_cascade_wave else origin.get("stream_source", Types.ChargeStreamSource.SYNC)
+		var stream_source_id: String = "" if is_cascade_wave else str(origin.get("source_id", ""))
+
+		for k in info:
+			var slice: Dictionary = info[k]
+			var p: Vector2i = slice["p"]
+			var t: Tile = state.board[p.y][p.x]
+			if t == null:
+				continue
+			destroyed.append(p)
+			if t.has_special() and t.special.type == Tile.Special.Type.SHIELD:
+				acc["shields_removed"] += 1
+			if t.is_neutral():
+				acc["neutral_sliced"] += 1
+
+			var mult: float = slice["m"]
+			var d := match_tile_damage(t, slice["axes"], owner, state)
+			var base: int = d["value"]
+			acc["raw"] += base * mult
+			if mult > 1.0:
+				acc["crit_extra"] += base * (mult - 1.0)
+			if d["axis"] == MatchFinder.Condition.COLOR:
+				acc["color_raw"] += base * mult
+			elif d["axis"] == MatchFinder.Condition.SHAPE:
+				acc["shape_raw"] += base * mult
+			if slice["stoch_only"]:
+				acc["cascade_raw"] += base * mult
+			if not t.is_neutral() and (opp_colors.has(t.color) or opp_shapes.has(t.shape)):
+				acc["contested"] += 1
+
+			accumulate_tile_charge(state, t, slice["axes"], streams, stream_source, stream_source_id)
+
+		_apply_match_passives(state, owner, matches, damage_passives, charge_passives, acc, streams, events)
+
+		# Dampening runs after ALL generation, so the order-independent
+		# max(0, base + bonuses − dampening) formula holds however the content
+		# happens to be arranged.
+		apply_charge_dampen(state, owner, streams, events)
+		route_streams(state, owner, streams, events)
+
+		_grant_neutral_deck_charge(state, owner, acc["neutral_sliced"], events)
+
+		events.append({"t": Types.EVT.TILE_STATS, "side": owner, "destroyed": destroyed.size(), "contested": acc["contested"]})
+		events.append({"t": Types.EVT.DESTROY, "cells": destroyed})
+		for p in destroyed:
+			state.board[p.y][p.x] = null
+		if acc["shields_removed"] > 0:
+			events.append({"t": Types.EVT.SHIELD_REMOVED, "count": acc["shields_removed"]})
+
+		_deal_wave_damage(state, owner, acc, bonus, cause, cause_program_id, origin, events)
+
+		apply_gravity_and_refill(state, events, budget != null and steps >= int(budget), fresh_ids)
+
+	# The cascade metric counts only stochastic-refill rounds — a deterministic
+	# chain is not a cascade in the sense being measured.
+	if stochastic_rounds > 0:
+		events.append({"t": Types.EVT.CASCADE_DEPTH, "side": owner, "depth": stochastic_rounds})
+	if not state.has_winner():
+		ensure_no_deadlock(state, events)
+	return {"steps": steps, "stochastic_rounds": stochastic_rounds}
+
+
+## Records one Packet's slice: the HIGHEST qualifying multiplier applied once,
+## the UNION of axes that sliced it, and whether EVERY Sync slicing it was
+## stochastic — mixed destruction counts as earned.
+static func _bump_slice(info: Dictionary, p: Vector2i, m: float, axes: Array, stoch: bool) -> void:
+	if not info.has(p):
+		var axis_set := {}
+		for a in axes:
+			axis_set[a] = true
+		info[p] = {"p": p, "m": m, "axes": axis_set, "stoch_only": stoch}
+		return
+	var cur: Dictionary = info[p]
+	if m > cur["m"]:
+		cur["m"] = m
+	for a in axes:
+		cur["axes"][a] = true
+	cur["stoch_only"] = cur["stoch_only"] and stoch
+
+
+## Line clears, qualified from the wave's COMBINED direct footprint.
+##
+## Collateral cells are swept at the plain tier with NO crit — no single
+## constituent group owns a combined line — and inherit the axis set of the
+## direct matches that formed that line, so charge attribution stays defined.
+## Cells already sliced directly keep their own multiplier and axes.
+static func _apply_line_clears(state: GameState, matches: Array, direct: Dictionary, info: Dictionary, owner: Types.Side, events: Array) -> void:
+	for line in MatchFinder.compute_line_clears(matches):
+		var line_cells: Array[Vector2i] = []
+		if line.orientation == MatchFinder.Orientation.HORIZONTAL:
+			for x in Constants.BOARD_WIDTH:
+				line_cells.append(Vector2i(x, line.index))
+		else:
+			for y in Constants.BOARD_HEIGHT:
+				line_cells.append(Vector2i(line.index, y))
+
+		var axes := {}
+		var any_direct := false
+		var all_stoch := true
+		for p in line_cells:
+			if not direct.has(p):
+				continue
+			any_direct = true
+			for a in (direct[p]["axes"] as Dictionary):
+				axes[a] = true
+			all_stoch = all_stoch and direct[p]["stoch_only"]
+
+		# Defensive: a qualifying line always contains direct Packets.
+		if not any_direct:
+			continue
+
+		events.append({
+			"t": Types.EVT.LINE_CLEAR, "side": owner,
+			"orientation": line.orientation, "index": line.index,
+		})
+		for p in line_cells:
+			if direct.has(p):
+				continue
+			_bump_slice(info, p, Constants.MATCH_4_MULTIPLIER, axes.keys(), all_stoch)
+
+
+## Match-triggered PASSIVEs, scoped to the RESOLUTION OWNER, once per qualifying
+## Sync event.
+##
+## Duplicate qualifying instances stack additively simply by iterating the list.
+## Repeats across sources are meaningful content and are never deduplicated.
+static func _apply_match_passives(state: GameState, owner: Types.Side, matches: Array, damage_passives: Array, charge_passives: Array, acc: Dictionary, streams: Dictionary, events: Array) -> void:
+	for inst in damage_passives:
+		for m in matches:
+			if not _passive_qualifies(inst, m):
+				continue
+			# The bonus joins RAW Sync damage BEFORE the crit multiplier,
+			# flooring, Buff addition, and Shield reduction — the same damage
+			# order the effect had when it was an inherent Hacker trait.
+			var mag_v = inst.passive["magnitude"]
+			var magnitude: int = 0 if mag_v == null else int(mag_v)
+			var mult := MatchFinder.multiplier(m)
+			var add := magnitude * mult
+			acc["passive_raw"] += add
+			if mult > 1.0:
+				acc["crit_extra"] += magnitude * (mult - 1.0)
+			events.append({
+				"t": Types.EVT.PASSIVE, "side": owner, "cause": inst.cause(),
+				"effect": inst.passive["effect_type"], "damage": add,
+			})
+
+	for inst in charge_passives:
+		for m in matches:
+			if not _passive_qualifies(inst, m):
+				continue
+			# Increases this event's existing qualifying colour stream BEFORE it
+			# is routed, then lets the ordinary top-to-bottom rule place it. It
+			# does NOT open a separate pool charging every compatible Program.
+			var mag_v = inst.passive["magnitude"]
+			var magnitude: int = 0 if mag_v == null else int(mag_v)
+			add_stream(streams, "color", int(inst.passive["color"]), magnitude, Types.ChargeStreamSource.PASSIVE_MODIFIED_SYNC, inst.passive["id"])
+			events.append({
+				"t": Types.EVT.PASSIVE, "side": owner, "cause": inst.cause(),
+				"effect": inst.passive["effect_type"], "charge": magnitude,
+			})
+
+
+## The qualifying match-event identity: a RESOLVED colour-axis Sync of the
+## PASSIVE's colour.
+##
+## Same-axis runs the engine merged into one player-visible blob count ONCE;
+## distinct blobs each qualify independently; a shape-axis Sync never qualifies
+## even when caused by moving a Packet of that colour; and line-clear collateral,
+## Bomb slices, and Function slices create no qualifying event at all, because
+## none of them is a detected Sync.
+static func _passive_qualifies(inst, m: MatchFinder.Match) -> bool:
+	return m.condition == MatchFinder.Condition.COLOR and m.value == inst.passive["color"]
+
+
+## Deck Function charge from neutral Packets sliced anywhere in this owned
+## resolution — the direct footprint, qualifying line clears, and same-side
+## cascades all count, since each cascade wave runs the loop again.
+##
+## Bomb destruction never reaches here, so it grants nothing.
+static func _grant_neutral_deck_charge(state: GameState, owner: Types.Side, neutral_sliced: int, events: Array) -> void:
+	if neutral_sliced <= 0:
+		return
+	var gain := neutral_sliced * Constants.DECK_CHARGE_PER_NEUTRAL_TILE
+	var wasted := add_deck_charge(state, owner, gain)
+	if owner == Types.Side.PLAYER:
+		events.append({"t": Types.EVT.DECK_CHARGE, "side": owner, "amount": gain - wasted, "wasted": wasted})
+
+
+## Applies the wave's accumulated damage.
+##
+## REINFORCED CONNECTION suppresses ordinary BASE Sync damage for both sides —
+## but the Sync event still exists, so match-triggered PASSIVE damage still
+## resolves into its own bucket. Charge, destruction, contention, Deck charge,
+## and cascading are untouched, and Bomb detonations are unaffected.
+##
+## The Buff bonus deliberately does NOT apply under suppression: it amplifies
+## base Sync damage, which is exactly what the mode suppresses.
+static func _deal_wave_damage(state: GameState, owner: Types.Side, acc: Dictionary, bonus: int, cause: Types.DamageSource, cause_program_id: String, origin: Dictionary, events: Array) -> void:
+	var suppress_base: bool = state.config["reinforced_connection"]
+	var causal_raw: float = acc["passive_raw"] if suppress_base else acc["raw"] + acc["passive_raw"]
+
+	# Fractional crit sums are floored. The PASSIVE portion is allocated as an
+	# integer so the disjoint buckets stay exact and base Sync damage records as
+	# a clean zero under suppression.
+	var total := int(floor(causal_raw))
+	var passive_portion := mini(total, int(floor(acc["passive_raw"])))
+
+	if total <= 0 and (suppress_base or bonus <= 0):
+		return
+
+	var info := {
+		"source": cause,
+		"label": "Hacker Sync" if owner == Types.Side.PLAYER else "System Sync",
+		# Under suppression the crit cross-cut reports 0: the multiplier's
+		# contribution to BASE Sync damage is exactly what is suppressed, and
+		# the surviving PASSIVE contribution has its own bucket. This never
+		# over-reports crit against damage that was not dealt.
+		"crit_extra": 0.0 if suppress_base else acc["crit_extra"],
+		"buff_bonus": 0 if suppress_base else bonus,
+		"cascade_raw": 0.0 if suppress_base else acc["cascade_raw"],
+		"passive_raw": float(passive_portion),
+	}
+	if cause != Types.DamageSource.MATCH:
+		info["program_id"] = cause_program_id
+	# A Transform-caused Sync carries the Function and Effect that caused it, so
+	# the transform bucket is auditable back to the exact activation.
+	if cause == Types.DamageSource.TRANSFORM:
+		info["fn_id"] = origin.get("source_id", "")
+		info["effect_id"] = Effects.TRANSFORM
+	if cause == Types.DamageSource.MATCH and not suppress_base:
+		info["color_raw"] = acc["color_raw"]
+		info["shape_raw"] = acc["shape_raw"]
+
+	deal_damage(state, Types.opponent_of(owner), total + (0 if suppress_base else bonus), info, events)
+
+
+## Reshuffles when no legal move remains. A permutation, so composition and any
+## Packet-converting investment survive.
+static func ensure_no_deadlock(state: GameState, events: Array) -> void:
+	if BoardOps.has_any_valid_move(state.board):
+		return
+	var carrier := {"board": state.board, "rng": state.rng, "next_id": state.next_id}
+	BoardOps.reshuffle(carrier)
+	state.board = carrier["board"]
+	state.next_id = carrier["next_id"]
+	events.append({"t": Types.EVT.AUTO_RESHUFFLE})
+	events.append({"t": Types.EVT.BOARD, "grid": _grid_view(state.board)})
+
+
+static func _grid_view(board: Array) -> Array:
+	var out: Array = []
+	for row in board:
+		var r: Array = []
+		for t in row:
+			r.append(null if t == null else _tile_view(t))
+		out.append(r)
+	return out
+
+
 ## Reports how much of this prevention the removable Packet Shield could NOT
 ## have accounted for, so metrics can tell permanent Shield from Packet Shield.
 static func _report_permanent_shield_share(state: GameState, target: Types.Side, amount: int, prevented: int, events: Array) -> void:
