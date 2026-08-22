@@ -18,8 +18,9 @@ the behavioral specification for this rewrite.
 | --- | --- |
 | Godot 4.7.2 project, portrait, GL Compatibility | ✅ imports clean |
 | Ten authored CSV datasets | ✅ carried over, packed into the APK |
-| Headless test runner | ✅ 128 passing |
+| Headless test runner | ✅ 628 passing |
 | Phase 1 — foundation | ✅ exact-parity RNG, types, constants |
+| Phase 2 — content pipeline | ✅ fingerprint `49c229cd-8ma` matches the alpha |
 | Android debug APK export from CLI | ✅ 54.9 MB, signed, arm64-v8a + armeabi-v7a |
 | Runs on hardware | ✅ two devices — see below |
 

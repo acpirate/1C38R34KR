@@ -766,6 +766,51 @@ func read_bosses() -> void:
 		})
 
 
+## The full pipeline. Every stage runs regardless of earlier failures, so an
+## author sees every problem in one pass rather than one per attempt.
+##
+## Returns `{ok, fingerprint, issues}`. `ok` is false iff any error exists —
+## and a false `ok` means startup stops. There is no partial content.
+func load_all() -> Dictionary:
+	read_all()
+	parse_payloads()
+	resolve_effect_params()
+	build_plans()
+
+	check_duplicate_ids(program_rows, DataIssues.DATASET_HACKER_PROGRAMS, "PRG_ID")
+	check_duplicate_ids(function_rows, DataIssues.DATASET_FUNCTIONS, "FNC_ID")
+	check_duplicate_ids(passive_rows, DataIssues.DATASET_PASSIVES, "PASSIVE_ID")
+	check_duplicate_ids(hacker_rows, DataIssues.DATASET_HACKERS, "HAK_ID")
+	check_duplicate_ids(deck_rows, DataIssues.DATASET_DECKS, "DEK_ID")
+	check_duplicate_ids(system_rows, DataIssues.DATASET_SYSTEMS, "SYS_ID")
+	check_duplicate_ids(host_rows, DataIssues.DATASET_HOSTS, "HOST_ID")
+	check_duplicate_ids(upgrade_rows, DataIssues.DATASET_UPGRADES, "UPGRADE_ID")
+	check_duplicate_ids(boss_rows, DataIssues.DATASET_BOSSES, "BOS_ID")
+
+	check_required_ids(function_rows, Vocab.REQUIRED_FNC_IDS, DataIssues.DATASET_FUNCTIONS, FILES["functions"])
+	check_required_ids(passive_rows, Vocab.REQUIRED_PSV_IDS, DataIssues.DATASET_PASSIVES, FILES["passives"])
+	check_required_ids(hacker_rows, Vocab.REQUIRED_HAK_IDS, DataIssues.DATASET_HACKERS, FILES["hackers"])
+	check_required_ids(deck_rows, Vocab.REQUIRED_DEK_IDS, DataIssues.DATASET_DECKS, FILES["decks"])
+	check_required_ids(system_rows, Vocab.REQUIRED_SYS_IDS, DataIssues.DATASET_SYSTEMS, FILES["systems"])
+	check_required_ids(host_rows, Vocab.REQUIRED_HST_IDS, DataIssues.DATASET_HOSTS, FILES["hosts"])
+	check_required_ids(upgrade_rows, Vocab.REQUIRED_UPG_IDS, DataIssues.DATASET_UPGRADES, FILES["upgrades"])
+	check_required_ids(boss_rows, Vocab.REQUIRED_BOS_IDS, DataIssues.DATASET_BOSSES, FILES["bosses"])
+
+	check_references()
+	check_zero_cost_assignments()
+	check_carrier_executability()
+	check_cross_portfolio()
+	check_minimum_content()
+
+	check_duplicate_display_names()
+	check_unreferenced_functions()
+	check_unreferenced_passives()
+
+	if issues.has_errors():
+		return {"ok": false, "fingerprint": "", "issues": issues}
+	return {"ok": true, "fingerprint": compute_fingerprint(), "issues": issues}
+
+
 ## Reads all ten datasets. Every reader runs regardless of earlier failures, so
 ## an author sees every problem in one pass.
 func read_all() -> void:
@@ -1751,6 +1796,191 @@ func check_unreferenced_passives() -> void:
 				"dataset": DataIssues.DATASET_PASSIVES, "file": s["file"], "row": s["row"], "id": s["id"],
 				"reason": "valid PASSIVE row is not referenced by any Hacker, System, HOST, or UPGRADE",
 			})
+
+
+## Every stable-ID reference must resolve to a loaded record. Unresolved
+## references are errors rather than dropped entries: silently ignoring one
+## would ship content that looks authored and does nothing.
+func check_references() -> void:
+	var fn_ids := _id_set(function_rows)
+	var psv_ids := _id_set(passive_rows)
+	var prg_h := {}
+	var prg_s := {}
+	for p in program_rows:
+		if p["dataset"] == DataIssues.DATASET_HACKER_PROGRAMS:
+			prg_h[p["id"]] = true
+		else:
+			prg_s[p["id"]] = true
+
+	for p in program_rows:
+		_require_ref(p["function_id"], fn_ids, p, p["dataset"], "functions", "a loaded FNC_* Function", "references an unknown Function ID")
+
+	for d in deck_rows:
+		_require_ref(d["function_id"], fn_ids, d, DataIssues.DATASET_DECKS, "FUNCTIONS", "a loaded FNC_* Function", "references an unknown Function ID")
+		for pid in (d["portfolio"] as Array):
+			_require_ref(pid, prg_h, d, DataIssues.DATASET_DECKS, "PRG_SET", "a loaded PRG_H_* Program", "PRG_SET references an unknown Hacker Program ID")
+
+	for h in hacker_rows:
+		for pid in (h["portfolio"] as Array):
+			_require_ref(pid, prg_h, h, DataIssues.DATASET_HACKERS, "PRG_SET", "a loaded PRG_H_* Program", "PRG_SET references an unknown Hacker Program ID")
+		for sid in (h["passive_ids"] as Array):
+			_require_ref(sid, psv_ids, h, DataIssues.DATASET_HACKERS, "PASSIVES", "a loaded PSV_* PASSIVE", "references an unknown PASSIVE ID")
+
+	for s in system_rows:
+		for pid in (s["programs"] as Array):
+			_require_ref(pid, prg_s, s, DataIssues.DATASET_SYSTEMS, "PRG_SET", "a loaded PRG_S_* Program", "PRG_SET references an unknown System Program ID")
+		for sid in (s["passive_ids"] as Array):
+			_require_ref(sid, psv_ids, s, DataIssues.DATASET_SYSTEMS, "PASSIVES", "a loaded PSV_* PASSIVE", "references an unknown PASSIVE ID")
+
+	for b in boss_rows:
+		for pid in (b["programs"] as Array):
+			_require_ref(pid, prg_s, b, DataIssues.DATASET_BOSSES, "PRG_SET", "a loaded PRG_S_* Program", "PRG_SET references an unknown System Program ID")
+
+	for h in host_rows:
+		for sid in (h["passive_ids"] as Array):
+			_require_ref(sid, psv_ids, h, DataIssues.DATASET_HOSTS, "passives", "a loaded PSV_* PASSIVE", "references an unknown PASSIVE ID")
+
+	for u in upgrade_rows:
+		for sid in (u["passive_ids"] as Array):
+			_require_ref(sid, psv_ids, u, DataIssues.DATASET_UPGRADES, "passives", "a loaded PSV_* PASSIVE", "references an unknown PASSIVE ID")
+
+	for s in passive_rows:
+		if str(s["function_id"]) != "":
+			_require_ref(s["function_id"], fn_ids, s, DataIssues.DATASET_PASSIVES, "function_payload", "a loaded FNC_* Function", "references an unknown Function ID")
+
+
+func _id_set(rows: Array) -> Dictionary:
+	var out := {}
+	for r in rows:
+		out[r["id"]] = true
+	return out
+
+
+func _require_ref(ref, known: Dictionary, row: Dictionary, dataset: String, field: String, expected: String, reason: String) -> void:
+	if known.has(ref):
+		return
+	issues.error({
+		"dataset": dataset, "file": row["file"], "row": row["row"], "id": row["id"],
+		"field": field, "value": ref, "expected": expected, "reason": reason,
+	})
+
+
+## A charge pool's capacity IS its Function's cost, so a zero-cost Function
+## fielded by a Program or Deck would hold no pool and fire free every turn.
+##
+## Cost 0 stays legal for a Function reached only through a PASSIVE, boss, or
+## mechanic payload, where no charge is paid — which is exactly what
+## FNC_016/017 and ODANSHAY's FNC_018/019/020 are.
+func check_zero_cost_assignments() -> void:
+	var directly_assigned := {}
+	for p in program_rows:
+		if not directly_assigned.has(p["function_id"]):
+			directly_assigned[p["function_id"]] = p["id"]
+	for d in deck_rows:
+		if not directly_assigned.has(d["function_id"]):
+			directly_assigned[d["function_id"]] = d["id"]
+
+	for f in function_rows:
+		if int(f["cost"]) > 0:
+			continue
+		if not directly_assigned.has(f["id"]):
+			continue
+		issues.error({
+			"dataset": DataIssues.DATASET_FUNCTIONS, "file": f["file"], "row": f["row"],
+			"id": f["id"], "field": "cost", "value": "0",
+			"expected": "a positive cost for a Program- or Deck-assigned Function",
+			"reason": "zero-cost Function is directly assigned to %s — its charge pool would have no capacity" % directly_assigned[f["id"]],
+		})
+
+
+## A START_OF_TURN payload must be executable with NO player target selection:
+## the trigger fires inside turn setup, and there is no asynchronous
+## start-of-turn targeting flow. A carrier needing a manual target is
+## unsupported content, reported rather than silently auto-resolved.
+func check_carrier_executability() -> void:
+	for s in passive_rows:
+		var fn_id := str(s["function_id"])
+		if fn_id == "" or not plans.has(fn_id):
+			continue
+		for op in (plans[fn_id] as Array):
+			if op["target"] != Types.TargetKind.NONE:
+				issues.error({
+					"dataset": DataIssues.DATASET_PASSIVES, "file": s["file"], "row": s["row"],
+					"id": s["id"], "field": "function_payload", "value": fn_id,
+					"reason": "START_OF_TURN payload requires a manual target, which cannot be supplied during turn setup",
+				})
+				break
+
+
+## Every Deck is compatible with every Hacker, so EVERY pairing must be able to
+## produce a valid six-Program inventory. Overlap is a content error rather than
+## a warning: there are no owned Program instances and no duplicate copies of a
+## PRG_ID, so an overlapping pairing simply cannot yield six distinct Programs.
+func check_cross_portfolio() -> void:
+	for h in hacker_rows:
+		for d in deck_rows:
+			var overlap: Array[String] = []
+			for pid in (h["portfolio"] as Array):
+				if (d["portfolio"] as Array).has(pid):
+					overlap.append(pid)
+
+			if not overlap.is_empty():
+				issues.error({
+					"dataset": DataIssues.DATASET_CONTENT, "file": d["file"], "id": d["id"],
+					"field": "PRG_SET", "value": ":".join(overlap),
+					"reason": "Hacker %s and Deck %s portfolios overlap — the pairing cannot produce %d distinct Programs" % [
+						h["id"], d["id"], Content.INVENTORY_SIZE,
+					],
+				})
+				continue
+
+			var combined := {}
+			for pid in (h["portfolio"] as Array):
+				combined[pid] = true
+			for pid in (d["portfolio"] as Array):
+				combined[pid] = true
+			if combined.size() != Content.INVENTORY_SIZE:
+				issues.error({
+					"dataset": DataIssues.DATASET_CONTENT, "file": d["file"], "id": d["id"],
+					"field": "PRG_SET",
+					"reason": "Hacker %s and Deck %s cannot produce %d distinct Programs" % [
+						h["id"], d["id"], Content.INVENTORY_SIZE,
+					],
+				})
+
+
+## Random encounter selection samples the loaded catalog, so an empty catalog is
+## not a playable state — and must never be papered over with a synthesized
+## default System.
+func check_minimum_content() -> void:
+	if system_rows.is_empty():
+		issues.error({"dataset": DataIssues.DATASET_SYSTEMS, "file": FILES["systems"], "reason": "at least one valid System is required"})
+	if host_rows.is_empty():
+		issues.error({"dataset": DataIssues.DATASET_HOSTS, "file": FILES["hosts"], "reason": "at least one valid HOST is required"})
+	if boss_rows.is_empty():
+		issues.error({"dataset": DataIssues.DATASET_BOSSES, "file": FILES["bosses"], "reason": "at least one valid Boss is required"})
+	if upgrade_rows.size() < Content.MIN_UPGRADE_ROWS:
+		issues.error({
+			"dataset": DataIssues.DATASET_UPGRADES, "file": FILES["upgrades"],
+			"value": str(upgrade_rows.size()), "expected": "at least %d" % Content.MIN_UPGRADE_ROWS,
+			"reason": "too few valid UPGRADE rows",
+		})
+
+	# A pool that excludes everything leaves random routing with nothing to
+	# choose, which is a content error rather than a runtime surprise.
+	var pooled_systems := 0
+	for s in system_rows:
+		if s["in_pool"]:
+			pooled_systems += 1
+	if not system_rows.is_empty() and pooled_systems == 0:
+		issues.error({"dataset": DataIssues.DATASET_SYSTEMS, "file": FILES["systems"], "field": "in_pool", "reason": "no System is in the random pool"})
+
+	var pooled_hosts := 0
+	for h in host_rows:
+		if h["in_pool"]:
+			pooled_hosts += 1
+	if not host_rows.is_empty() and pooled_hosts == 0:
+		issues.error({"dataset": DataIssues.DATASET_HOSTS, "file": FILES["hosts"], "field": "in_pool", "reason": "no HOST is in the random pool"})
 
 
 ## Required rows are required by PRESENCE. Their values are validated by the

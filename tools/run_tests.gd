@@ -19,6 +19,7 @@ const SUITES := [
 	"res://tests/test_registries.gd",
 	"res://tests/test_fingerprint.gd",
 	"res://tests/test_load.gd",
+	"res://tests/test_validation.gd",
 	"res://tests/test_layer_purity.gd",
 	"res://tests/test_data_present.gd",
 ]

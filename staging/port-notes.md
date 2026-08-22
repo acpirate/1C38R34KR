@@ -144,6 +144,40 @@ NUL cannot round-trip through a fixture.
 this is a test-coverage limitation rather than a behavioural gap — recorded so
 the omission is not mistaken for an oversight.
 
+### P-012 · JavaScript omits undefined properties when serializing
+
+**Forced by:** the fingerprint includes the whole axis-target object. In
+JavaScript an unset optional property is *absent* from the JSON, not `null`, so
+a whole-Packet target serializes as `{"token":"NEU","kind":"NEU"}` — with no
+`color` or `shape` keys at all.
+
+**Resolution:** `_axis_target` adds those keys only when they are set. The same
+reasoning applies to a PASSIVE's `ALL` scope, which the alpha models as
+`true`-or-absent and never as `false`.
+
+**Impact:** either mistake shifts the fingerprint, and the resulting mismatch
+gives no clue which of ~11,000 characters is wrong. Both are the kind of detail
+that only surfaces because the fingerprint is compared byte-for-byte.
+
+---
+
+## Phase 2 result
+
+The content fingerprint reproduces the alpha's `49c229cd-8ma` exactly.
+
+That one value validates the whole pipeline simultaneously: CSV parsing and
+leading-apostrophe normalization, all ten dataset readers, payload grammar and
+composite expansion, Effect parameter contracts, typed tuple resolution, the
+Transform axis grammar, plan assembly with per-row resolved targeting,
+area-pattern cell *order*, the hand-written canonical serializer, and djb2's
+UTF-16 semantics. Any one of them being subtly wrong produces a different hash.
+
+**What it does not prove:** the validation guard rails. Those fire only on
+invalid content, and the authored content is valid — a rule missing from the
+port would look identical to one that passes. They are covered separately by
+`test_validation.gd`, which constructs the minimal invalid state for each rule
+and asserts it is rejected.
+
 ---
 
 ## Tooling defects found and fixed
