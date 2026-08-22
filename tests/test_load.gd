@@ -11,6 +11,7 @@ func run(t: TestCase) -> void:
 	_test_program_readers(t)
 	_test_function_reader(t)
 	_test_passive_reader(t)
+	_test_identity_datasets(t)
 	_test_prefix_crosscheck(t)
 
 
@@ -131,6 +132,97 @@ func _test_passive_reader(t: TestCase) -> void:
 			"%s display has no unexpanded placeholder" % r["id"],
 			not str(r["display"]).contains("%"),
 		)
+
+
+## All ten datasets read together, as startup does it.
+func _test_identity_datasets(t: TestCase) -> void:
+	t.group("load / all ten datasets")
+	var loader := ContentLoader.new()
+	loader.read_all()
+
+	var errs := loader.issues.errors()
+	t.check("authored content reads without errors", errs.is_empty())
+	for e in errs.slice(0, 8):
+		printerr("        %s" % DataIssues.format(e))
+
+	t.eq("Programs", loader.program_rows.size(), 14)
+	t.eq("Functions", loader.function_rows.size(), 20)
+	t.eq("PASSIVEs", loader.passive_rows.size(), 9)
+	t.eq("HOSTs", loader.host_rows.size(), 5)
+	t.eq("UPGRADEs", loader.upgrade_rows.size(), 4)
+	t.eq("Hackers", loader.hacker_rows.size(), 1)
+	t.eq("Decks", loader.deck_rows.size(), 1)
+	t.eq("Systems", loader.system_rows.size(), 3)
+	t.eq("Bosses", loader.boss_rows.size(), 1)
+
+	# Every required record is present under its stable ID.
+	loader.check_required_ids(loader.hacker_rows, Vocab.REQUIRED_HAK_IDS, DataIssues.DATASET_HACKERS, "hak.csv")
+	loader.check_required_ids(loader.deck_rows, Vocab.REQUIRED_DEK_IDS, DataIssues.DATASET_DECKS, "dek.csv")
+	loader.check_required_ids(loader.system_rows, Vocab.REQUIRED_SYS_IDS, DataIssues.DATASET_SYSTEMS, "sys.csv")
+	loader.check_required_ids(loader.host_rows, Vocab.REQUIRED_HST_IDS, DataIssues.DATASET_HOSTS, "hst.csv")
+	loader.check_required_ids(loader.upgrade_rows, Vocab.REQUIRED_UPG_IDS, DataIssues.DATASET_UPGRADES, "upg.csv")
+	loader.check_required_ids(loader.boss_rows, Vocab.REQUIRED_BOS_IDS, DataIssues.DATASET_BOSSES, "bos.csv")
+	t.check("every required identity record is present", not loader.issues.has_errors())
+
+	# The pinned beta 0.1 identities resolve by stable ID, not by row position.
+	var hacker: Dictionary = loader.hacker_rows[0]
+	t.eq("pinned Hacker is HAK_01", str(hacker["id"]), Content.DEFAULT_HACKER_ID)
+	t.eq("Hacker portfolio size", (hacker["portfolio"] as Array).size(), Content.PORTFOLIO_SIZE)
+	var deck: Dictionary = loader.deck_rows[0]
+	t.eq("pinned Deck is DEK_01", str(deck["id"]), Content.DEFAULT_DECK_ID)
+	t.eq("Deck portfolio size", (deck["portfolio"] as Array).size(), Content.PORTFOLIO_SIZE)
+	t.check("Deck names exactly one Function", str(deck["function_id"]).begins_with("FNC_"))
+
+	# Every System and Boss fields exactly four System Programs, in authored
+	# order — that order is charge-routing priority, not decoration.
+	for s in loader.system_rows:
+		t.eq("%s build size" % s["id"], (s["programs"] as Array).size(), Content.SYSTEM_BUILD_SIZE)
+		for p in (s["programs"] as Array):
+			t.check("%s fields a System Program" % s["id"], str(p).begins_with("PRG_S_"))
+	for b in loader.boss_rows:
+		t.eq("%s build size" % b["id"], (b["programs"] as Array).size(), Content.SYSTEM_BUILD_SIZE)
+
+	# THRESHOLD is the fixed Battle 1 battlefield and contributes nothing —
+	# zero PASSIVEs must be accepted, not treated as a missing value.
+	var threshold_found := false
+	for h in loader.host_rows:
+		if str(h["id"]) == "HST_01":
+			threshold_found = true
+			t.eq("THRESHOLD contributes no PASSIVEs", (h["passive_ids"] as Array).size(), 0)
+	t.check("HST_01 is present", threshold_found)
+
+	# Warnings do not block startup, and are compared against the alpha's actual
+	# diagnostics rather than a count — a count match can be a coincidence,
+	# while dataset/id/reason proves the RULES ported and names which is missing.
+	loader.check_duplicate_display_names()
+	loader.check_unreferenced_functions()
+	loader.check_unreferenced_passives()
+	_compare_diagnostics(t, loader)
+
+
+func _compare_diagnostics(t: TestCase, loader: ContentLoader) -> void:
+	t.group("load / diagnostics match the alpha")
+	var f := FileAccess.open("res://tests/fixtures/content.json", FileAccess.READ)
+	if f == null:
+		t.check("content fixture is readable", false)
+		return
+	var fixture = JSON.parse_string(f.get_as_text())
+	f.close()
+
+	var expected: Array = fixture["issues"]
+	var expected_warnings := []
+	for e in expected:
+		if str(e["severity"]) == "warning":
+			expected_warnings.append("%s/%s/%s" % [e["dataset"], e["id"], e["reason"]])
+
+	var actual_warnings := []
+	for w in loader.issues.warnings():
+		actual_warnings.append("%s/%s/%s" % [w.get("dataset", ""), w.get("id", ""), w.get("reason", "")])
+
+	expected_warnings.sort()
+	actual_warnings.sort()
+	t.eq_seq("warnings match the alpha exactly", actual_warnings, expected_warnings)
+	t.eq("error count matches the alpha", loader.issues.error_count, int(fixture["error_count"]))
 
 
 ## The ID prefix independently cross-checks the manifest's dataset role, so a

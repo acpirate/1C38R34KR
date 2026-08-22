@@ -132,6 +132,16 @@ writeFileSync(
       fingerprint: content?.fingerprint ?? null,
       error_count: errors.length,
       warning_count: warnings.length,
+      // The actual diagnostics, not just counts. A count match can be a
+      // coincidence; comparing dataset/id/field/reason proves the warning RULES
+      // ported, and names which one is missing when they have not.
+      issues: result.issues.map((i) => ({
+        severity: i.severity,
+        dataset: i.dataset,
+        id: i.id ?? null,
+        field: i.field ?? null,
+        reason: i.reason,
+      })),
       non_integer_values: nonIntegers,
     },
     null,

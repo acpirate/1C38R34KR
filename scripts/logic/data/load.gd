@@ -501,6 +501,287 @@ func _expand_display(template: String, shown: Array) -> String:
 
 
 # ---------------------------------------------------------------------------
+# Identity datasets
+# ---------------------------------------------------------------------------
+
+## Shared opening for every identity row: the stable ID and its prefix.
+## Returns an empty context dictionary when the row cannot proceed.
+func _row_ctx(table: DataTable, i: int, dataset: String, id_field: String, prefix: String, label: String) -> Dictionary:
+	var id := table.get_cell(i, id_field).strip_edges()
+	var ctx := {"dataset": dataset, "file": table.file, "row": table.line_of(i), "id": id}
+
+	if id == "":
+		var c := ctx.duplicate()
+		c["field"] = id_field
+		c["reason"] = "%s is required" % id_field
+		issues.error(c)
+		return {}
+	if not id.begins_with(prefix):
+		var c := ctx.duplicate()
+		c["field"] = id_field
+		c["value"] = id
+		c["expected"] = "%s*" % prefix
+		c["reason"] = "wrong %s ID prefix" % label
+		issues.error(c)
+		return {}
+	return ctx
+
+
+func _field_ctx(ctx: Dictionary, field: String) -> Dictionary:
+	var c := ctx.duplicate()
+	c["field"] = field
+	return c
+
+
+## A PASSIVE reference list that may legitimately be EMPTY — a Hacker or System
+## with none, or a zero-PASSIVE HOST such as THRESHOLD. Duplicates are permitted
+## because repeated qualifying PASSIVEs stack additively.
+func _optional_passive_refs(raw: String, ctx: Dictionary) -> Array:
+	if raw.strip_edges() == "":
+		return []
+	return DataTable.parse_ref_list(raw, "PSV_", true, true, ctx, issues)
+
+
+func read_hosts() -> void:
+	var table := DataTable.read(_path("hosts"), DataIssues.DATASET_HOSTS, Vocab.HOST_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var ctx := _row_ctx(table, i, DataIssues.DATASET_HOSTS, "HOST_ID", "HST_", "HOST")
+		if ctx.is_empty():
+			continue
+
+		var name := DataTable.check_name(table.get_cell(i, "name"), ctx, issues)
+		var raw_passives := table.get_cell(i, "passives")
+		var passive_ids := _optional_passive_refs(raw_passives, _field_ctx(ctx, "passives"))
+		var in_pool := DataTable.parse_in_pool(table.get_cell(i, "in_pool"), _field_ctx(ctx, "in_pool"), issues)
+
+		# Zero PASSIVEs is VALID here — THRESHOLD is the fixed Battle 1
+		# battlefield and deliberately contributes nothing.
+		if not name["ok"] or (raw_passives.strip_edges() != "" and passive_ids.is_empty()):
+			continue
+
+		host_rows.append({
+			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
+			"name": name["value"], "passive_ids": passive_ids, "in_pool": in_pool,
+			"display_text": table.get_cell(i, "display_text").strip_edges(),
+			"graphics": table.get_cell(i, "graphics_ref").strip_edges(),
+		})
+
+
+func read_upgrades() -> void:
+	var table := DataTable.read(_path("upgrades"), DataIssues.DATASET_UPGRADES, Vocab.UPGRADE_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var ctx := _row_ctx(table, i, DataIssues.DATASET_UPGRADES, "UPGRADE_ID", "UPG_", "UPGRADE")
+		if ctx.is_empty():
+			continue
+
+		var name := DataTable.check_name(table.get_cell(i, "name"), ctx, issues)
+		var raw_passives := table.get_cell(i, "passives")
+		var passive_ids := _optional_passive_refs(raw_passives, _field_ctx(ctx, "passives"))
+
+		if not name["ok"] or (raw_passives.strip_edges() != "" and passive_ids.is_empty()):
+			continue
+
+		# An UPGRADE that grants nothing is a reward the player cannot perceive.
+		# A warning rather than an error: it is legal, just almost certainly a
+		# mistake, and blocking startup over it would be heavy-handed.
+		if passive_ids.is_empty():
+			var c := _field_ctx(ctx, "passives")
+			c["reason"] = "UPGRADE grants no PASSIVEs — it will present as an empty reward"
+			issues.warn(c)
+
+		upgrade_rows.append({
+			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
+			"name": name["value"], "passive_ids": passive_ids,
+			"display_text": table.get_cell(i, "display_text").strip_edges(),
+			"graphics": table.get_cell(i, "graphics_ref").strip_edges(),
+		})
+
+
+func read_hackers() -> void:
+	var table := DataTable.read(_path("hackers"), DataIssues.DATASET_HACKERS, Vocab.HACKER_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var ctx := _row_ctx(table, i, DataIssues.DATASET_HACKERS, "HAK_ID", "HAK_", "Hacker")
+		if ctx.is_empty():
+			continue
+
+		var name := DataTable.check_name(table.get_cell(i, "name"), ctx, issues)
+		var base_link := DataTable.read_int(table.get_cell(i, "BASE_LINK"), 1, 9999, _field_ctx(ctx, "BASE_LINK"), issues)
+		var colors := DataTable.parse_token_list(table.get_cell(i, "STRONG_COLORS"), Vocab.COLOR_TOKENS, _field_ctx(ctx, "STRONG_COLORS"), issues)
+		var shapes := DataTable.parse_token_list(table.get_cell(i, "STRONG_SHAPES"), Vocab.SHAPE_TOKENS, _field_ctx(ctx, "STRONG_SHAPES"), issues)
+		var portfolio := DataTable.parse_sized_ref_list(
+			table.get_cell(i, "PRG_SET"), "PRG_H_", Content.PORTFOLIO_SIZE, _field_ctx(ctx, "PRG_SET"), issues
+		)
+		var raw_passives := table.get_cell(i, "PASSIVES")
+		var passive_ids := _optional_passive_refs(raw_passives, _field_ctx(ctx, "PASSIVES"))
+
+		if not name["ok"] or not base_link["ok"] or colors.is_empty() or shapes.is_empty() or portfolio.is_empty():
+			continue
+		if raw_passives.strip_edges() != "" and passive_ids.is_empty():
+			continue
+
+		hacker_rows.append({
+			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
+			"name": name["value"], "base_link": base_link["value"],
+			"strong_colors": colors, "strong_shapes": shapes,
+			"portfolio": portfolio, "passive_ids": passive_ids,
+			# Presentation placeholders: retained verbatim, never interpreted.
+			"bio": table.get_cell(i, "BIO").strip_edges(),
+			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
+		})
+
+
+func read_decks() -> void:
+	var table := DataTable.read(_path("decks"), DataIssues.DATASET_DECKS, Vocab.DECK_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var ctx := _row_ctx(table, i, DataIssues.DATASET_DECKS, "DEK_ID", "DEK_", "Deck")
+		if ctx.is_empty():
+			continue
+
+		var name := DataTable.check_name(table.get_cell(i, "name"), ctx, issues)
+		var add_link := DataTable.read_int(table.get_cell(i, "ADD_LINK"), 0, 9999, _field_ctx(ctx, "ADD_LINK"), issues)
+		var portfolio := DataTable.parse_sized_ref_list(
+			table.get_cell(i, "PRG_SET"), "PRG_H_", Content.PORTFOLIO_SIZE, _field_ctx(ctx, "PRG_SET"), issues
+		)
+
+		# Exactly one Deck Function. More than one is an error rather than a
+		# take-the-first, because which one was intended is unknowable.
+		var fn_refs := DataTable.parse_ref_list(
+			table.get_cell(i, "FUNCTIONS"), "FNC_", true, false, _field_ctx(ctx, "FUNCTIONS"), issues
+		)
+		var function_id := ""
+		if not fn_refs.is_empty():
+			if fn_refs.size() != 1:
+				var c := _field_ctx(ctx, "FUNCTIONS")
+				c["value"] = table.get_cell(i, "FUNCTIONS").strip_edges()
+				c["expected"] = "exactly one FNC_* reference"
+				c["reason"] = "exactly one Deck Function is permitted"
+				issues.error(c)
+			else:
+				function_id = fn_refs[0]
+
+		if not name["ok"] or not add_link["ok"] or portfolio.is_empty() or function_id == "":
+			continue
+
+		deck_rows.append({
+			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
+			"name": name["value"], "add_link": add_link["value"],
+			"portfolio": portfolio, "function_id": function_id,
+			"descript": table.get_cell(i, "DESCRIPT").strip_edges(),
+			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
+		})
+
+
+func read_systems() -> void:
+	var table := DataTable.read(_path("systems"), DataIssues.DATASET_SYSTEMS, Vocab.SYSTEM_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var ctx := _row_ctx(table, i, DataIssues.DATASET_SYSTEMS, "SYS_ID", "SYS_", "System")
+		if ctx.is_empty():
+			continue
+
+		var name := DataTable.check_name(table.get_cell(i, "name"), ctx, issues)
+		# Base maximum ICE. Run escalation is applied on top as an additive
+		# modifier, never baked in here.
+		var base_ice := DataTable.read_int(table.get_cell(i, "BASE_ICE"), 1, 9999, _field_ctx(ctx, "BASE_ICE"), issues)
+		var colors := DataTable.parse_token_list(table.get_cell(i, "STRONG_COLORS"), Vocab.COLOR_TOKENS, _field_ctx(ctx, "STRONG_COLORS"), issues)
+		var shapes := DataTable.parse_token_list(table.get_cell(i, "STRONG_SHAPES"), Vocab.SHAPE_TOKENS, _field_ctx(ctx, "STRONG_SHAPES"), issues)
+		var programs := DataTable.parse_sized_ref_list(
+			table.get_cell(i, "PRG_SET"), "PRG_S_", Content.SYSTEM_BUILD_SIZE, _field_ctx(ctx, "PRG_SET"), issues
+		)
+		var raw_passives := table.get_cell(i, "PASSIVES")
+		var passive_ids := _optional_passive_refs(raw_passives, _field_ctx(ctx, "PASSIVES"))
+		var in_pool := DataTable.parse_in_pool(table.get_cell(i, "in_pool"), _field_ctx(ctx, "in_pool"), issues)
+
+		if not name["ok"] or not base_ice["ok"] or colors.is_empty() or shapes.is_empty() or programs.is_empty():
+			continue
+		if raw_passives.strip_edges() != "" and passive_ids.is_empty():
+			continue
+
+		system_rows.append({
+			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
+			"name": name["value"], "base_ice": base_ice["value"],
+			"strong_colors": colors, "strong_shapes": shapes,
+			"programs": programs, "passive_ids": passive_ids, "in_pool": in_pool,
+			"bio": table.get_cell(i, "BIO").strip_edges(),
+			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
+		})
+
+
+## Structurally close to a System, and deliberately its own reader: a Boss has
+## no PASSIVES column, its ICE is not subject to Run escalation, and its
+## `in_pool` is inert because Boss Selection is explicit. Collapsing the two
+## would make every one of those differences an implicit special case.
+func read_bosses() -> void:
+	var table := DataTable.read(_path("bosses"), DataIssues.DATASET_BOSSES, Vocab.BOSS_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var ctx := _row_ctx(table, i, DataIssues.DATASET_BOSSES, "BOS_ID", "BOS_", "Boss")
+		if ctx.is_empty():
+			continue
+
+		var name := DataTable.check_name(table.get_cell(i, "name"), ctx, issues)
+		# Unlike a System's, this is the FINAL Boss-battle ICE — the Run's
+		# additive escalation modifier is never applied on top.
+		var base_ice := DataTable.read_int(table.get_cell(i, "BASE_ICE"), 1, 9999, _field_ctx(ctx, "BASE_ICE"), issues)
+		var colors := DataTable.parse_token_list(table.get_cell(i, "STRONG_COLORS"), Vocab.COLOR_TOKENS, _field_ctx(ctx, "STRONG_COLORS"), issues)
+		var shapes := DataTable.parse_token_list(table.get_cell(i, "STRONG_SHAPES"), Vocab.SHAPE_TOKENS, _field_ctx(ctx, "STRONG_SHAPES"), issues)
+		# A Boss fields the existing four-Program enemy model, so PRG_SET
+		# resolves through exactly the System build parser rather than acquiring
+		# speculative variable-size support.
+		var programs := DataTable.parse_sized_ref_list(
+			table.get_cell(i, "PRG_SET"), "PRG_S_", Content.SYSTEM_BUILD_SIZE, _field_ctx(ctx, "PRG_SET"), issues
+		)
+		# Parsed for schema completeness and fingerprinting only — deliberately
+		# NOT a selection filter, since Boss Selection lists every valid row.
+		var in_pool := DataTable.parse_in_pool(table.get_cell(i, "in_pool"), _field_ctx(ctx, "in_pool"), issues)
+
+		if not name["ok"] or not base_ice["ok"] or colors.is_empty() or shapes.is_empty() or programs.is_empty():
+			continue
+
+		boss_rows.append({
+			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
+			"name": name["value"], "base_ice": base_ice["value"],
+			"strong_colors": colors, "strong_shapes": shapes,
+			"programs": programs, "in_pool": in_pool,
+			# Presentation only: never mechanic authority and never fingerprinted.
+			"passive_description": table.get_cell(i, "BOSS_PASSIVE_DESCRIPTION").strip_edges(),
+			"bio": table.get_cell(i, "BIO").strip_edges(),
+			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
+		})
+
+
+## Reads all ten datasets. Every reader runs regardless of earlier failures, so
+## an author sees every problem in one pass.
+func read_all() -> void:
+	read_programs("hacker_programs", DataIssues.DATASET_HACKER_PROGRAMS, "PRG_H_")
+	read_programs("system_programs", DataIssues.DATASET_SYSTEM_PROGRAMS, "PRG_S_")
+	read_functions()
+	read_passives()
+	read_hosts()
+	read_upgrades()
+	read_hackers()
+	read_decks()
+	read_systems()
+	read_bosses()
+
+
+# ---------------------------------------------------------------------------
 # Duplicate and required-ID checks
 # ---------------------------------------------------------------------------
 
@@ -518,6 +799,91 @@ func check_duplicate_ids(rows: Array[Dictionary], dataset: String, field: String
 			})
 			continue
 		seen[id] = r["row"]
+
+
+# ---------------------------------------------------------------------------
+# Cross-dataset checks
+# ---------------------------------------------------------------------------
+
+## Duplicate display names are VALID — they warn rather than block. Two records
+## may legitimately share a name, but it is nearly always an authoring slip, and
+## it makes every log and character sheet ambiguous.
+##
+## Scanned in a fixed order across every named dataset, so which row is reported
+## as the duplicate and which as the original is deterministic.
+func check_duplicate_display_names() -> void:
+	var seen := {}
+	var groups := [
+		[program_rows, ""],  # Programs carry their own dataset name per row
+		[function_rows, DataIssues.DATASET_FUNCTIONS],
+		[hacker_rows, DataIssues.DATASET_HACKERS],
+		[deck_rows, DataIssues.DATASET_DECKS],
+		[system_rows, DataIssues.DATASET_SYSTEMS],
+		[host_rows, DataIssues.DATASET_HOSTS],
+		[upgrade_rows, DataIssues.DATASET_UPGRADES],
+		[boss_rows, DataIssues.DATASET_BOSSES],
+	]
+
+	for g in groups:
+		var rows: Array = g[0]
+		var dataset: String = g[1]
+		for r in rows:
+			var name: String = r["name"]
+			if seen.has(name):
+				issues.warn({
+					"dataset": r.get("dataset", dataset), "file": r["file"], "row": r["row"],
+					"id": r["id"], "field": "name", "value": name,
+					"reason": "duplicate display name (also used by %s)" % seen[name],
+				})
+			else:
+				seen[name] = r["id"]
+
+
+## A Function row nothing can reach is dead content — it looks authored but can
+## never fire. A warning rather than an error, because a row staged ahead of the
+## build that uses it is legitimate.
+##
+## References come from four places, and missing any of them would produce a
+## false warning on genuinely live content.
+func check_unreferenced_functions() -> void:
+	var referenced := {}
+	for p in program_rows:
+		referenced[p["function_id"]] = true
+	for d in deck_rows:
+		referenced[d["function_id"]] = true
+	# A PASSIVE carrier payload is a real reference — it is exactly how GREENING
+	# and SNEAK reach the board.
+	for s in passive_rows:
+		if str(s["function_id"]) != "":
+			referenced[s["function_id"]] = true
+	# ODANSHAY's mechanic payloads are referenced by CODE rather than by data,
+	# because the Boss schema deliberately has no MECHANIC_ID column. They are
+	# real references all the same and must not warn as dead rows.
+	for id in Content.BOSS_MECHANIC_FUNCTION_IDS:
+		referenced[id] = true
+
+	for f in function_rows:
+		if not referenced.has(f["id"]):
+			issues.warn({
+				"dataset": DataIssues.DATASET_FUNCTIONS, "file": f["file"], "row": f["row"], "id": f["id"],
+				"reason": "valid Function row is not referenced by any Program, Deck, composite payload, or PASSIVE",
+			})
+
+
+## A PASSIVE row is referenced when ANY source kind cites it.
+func check_unreferenced_passives() -> void:
+	var referenced := {}
+	for group in [hacker_rows, system_rows, host_rows, upgrade_rows]:
+		for r in group:
+			for pid in (r["passive_ids"] as Array):
+				referenced[pid] = true
+
+	for s in passive_rows:
+		if not referenced.has(s["id"]):
+			issues.warn({
+				"dataset": DataIssues.DATASET_PASSIVES, "file": s["file"], "row": s["row"], "id": s["id"],
+				"reason": "valid PASSIVE row is not referenced by any Hacker, System, HOST, or UPGRADE",
+			})
 
 
 ## Required rows are required by PRESENCE. Their values are validated by the

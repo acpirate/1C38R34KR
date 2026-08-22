@@ -3,5 +3,42 @@
   "fingerprint": "49c229cd-8ma",
   "error_count": 0,
   "warning_count": 5,
+  "issues": [
+    {
+      "severity": "warning",
+      "dataset": "system-programs",
+      "id": "PRG_S_003",
+      "field": "name",
+      "reason": "duplicate display name (also used by PRG_H_003)"
+    },
+    {
+      "severity": "warning",
+      "dataset": "system-programs",
+      "id": "PRG_S_004",
+      "field": "name",
+      "reason": "duplicate display name (also used by PRG_H_004)"
+    },
+    {
+      "severity": "warning",
+      "dataset": "functions",
+      "id": "FNC_007",
+      "field": null,
+      "reason": "valid Function row is not referenced by any Program, Deck, composite payload, or PASSIVE"
+    },
+    {
+      "severity": "warning",
+      "dataset": "functions",
+      "id": "FNC_008",
+      "field": null,
+      "reason": "valid Function row is not referenced by any Program, Deck, composite payload, or PASSIVE"
+    },
+    {
+      "severity": "warning",
+      "dataset": "functions",
+      "id": "FNC_009",
+      "field": null,
+      "reason": "valid Function row is not referenced by any Program, Deck, composite payload, or PASSIVE"
+    }
+  ],
   "non_integer_values": []
 }
