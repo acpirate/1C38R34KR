@@ -1,0 +1,228 @@
+{
+  "_comment": "Generated from the alpha registries. Do not hand-edit.",
+  "effect_param_names": [
+    "quantity",
+    "countdown",
+    "areaPattern",
+    "magnitude",
+    "damage"
+  ],
+  "effect_axis_names": [
+    "axisTarget",
+    "axisResult"
+  ],
+  "effects": {
+    "EFFECT_BOMB": {
+      "required": [
+        "quantity",
+        "areaPattern"
+      ],
+      "optional": [
+        "countdown"
+      ],
+      "targeted": false,
+      "targetKind": "packet",
+      "tuple": [
+        {
+          "name": "targeting",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "dealDamage",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "gainCharge",
+          "min": 0,
+          "max": 1
+        }
+      ],
+      "axes": []
+    },
+    "EFFECT_BUFF": {
+      "required": [
+        "quantity",
+        "magnitude"
+      ],
+      "optional": [
+        "countdown"
+      ],
+      "targeted": false,
+      "targetKind": null,
+      "tuple": [],
+      "axes": []
+    },
+    "EFFECT_ATTACK": {
+      "required": [
+        "damage"
+      ],
+      "optional": [],
+      "targeted": false,
+      "targetKind": null,
+      "tuple": [],
+      "axes": []
+    },
+    "EFFECT_DRAIN": {
+      "required": [],
+      "optional": [],
+      "targeted": true,
+      "targetKind": "unit",
+      "tuple": [],
+      "axes": []
+    },
+    "EFFECT_SHIELD": {
+      "required": [
+        "quantity",
+        "magnitude"
+      ],
+      "optional": [],
+      "targeted": false,
+      "targetKind": null,
+      "tuple": [],
+      "axes": []
+    },
+    "EFFECT_SHAKE": {
+      "required": [],
+      "optional": [],
+      "targeted": false,
+      "targetKind": null,
+      "tuple": [
+        {
+          "name": "boardComposition",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "specialGems",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "name": "matches",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "cascades",
+          "min": 0,
+          "max": 2
+        }
+      ],
+      "axes": []
+    },
+    "EFFECT_LINESLICE": {
+      "required": [
+        "quantity"
+      ],
+      "optional": [],
+      "targeted": false,
+      "targetKind": "packet",
+      "tuple": [
+        {
+          "name": "dimension",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "targeting",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "specialRetention",
+          "min": 0,
+          "max": 2
+        },
+        {
+          "name": "dealDamage",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "gainCharge",
+          "min": 0,
+          "max": 1
+        }
+      ],
+      "axes": []
+    },
+    "EFFECT_TRANSFORM": {
+      "required": [
+        "quantity"
+      ],
+      "optional": [],
+      "targeted": false,
+      "targetKind": "packet",
+      "tuple": [
+        {
+          "name": "targeting",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "specialPacketTreatment",
+          "min": 0,
+          "max": 2
+        }
+      ],
+      "axes": [
+        "axisTarget",
+        "axisResult"
+      ]
+    }
+  },
+  "passives": {
+    "PSV_EXTRA_MATCH_DAMAGE": {
+      "params": [
+        "color",
+        "positiveInt"
+      ],
+      "activation": "CONTINUAL",
+      "payload": "forbidden"
+    },
+    "PSV_EXTRA_MATCH_CHARGE": {
+      "params": [
+        "color",
+        "positiveInt"
+      ],
+      "activation": "CONTINUAL",
+      "payload": "forbidden"
+    },
+    "PSV_CHARGE_DAMPEN": {
+      "params": [
+        "scope",
+        "positiveInt"
+      ],
+      "activation": "CONTINUAL",
+      "payload": "forbidden"
+    },
+    "PSV_FUNCTION_DAMAGE_INCREASE": {
+      "params": [
+        "scope",
+        "positiveInt"
+      ],
+      "activation": "CONTINUAL",
+      "payload": "forbidden"
+    },
+    "PSV_PERM_SHIELD": {
+      "params": [
+        "scope",
+        "positiveInt"
+      ],
+      "activation": "CONTINUAL",
+      "payload": "forbidden"
+    },
+    "PSV_BIGGER_BOMB": {
+      "params": [],
+      "activation": "CONTINUAL",
+      "payload": "forbidden"
+    },
+    "PSV_CARRIER": {
+      "params": [],
+      "activation": "START_OF_TURN",
+      "payload": "required"
+    }
+  }
+}

@@ -16,6 +16,7 @@ const SUITES := [
 	# Phase 2 — content pipeline, in dependency order.
 	"res://tests/test_areas.gd",
 	"res://tests/test_csv.gd",
+	"res://tests/test_registries.gd",
 	"res://tests/test_layer_purity.gd",
 	"res://tests/test_data_present.gd",
 ]
