@@ -183,31 +183,202 @@ static func parse_token_list(
 	return out if ok else []
 
 
-## Colon-separated reference list (Program IDs, PASSIVE IDs). Unlike token
-## lists, resolution against the target dataset happens later, once every
-## dataset has been read.
-static func parse_ref_list(raw: String, required: bool, ctx: Dictionary, issues: DataIssues) -> Array:
-	var trimmed := raw.strip_edges()
-	if trimmed == "":
+## Colon-separated stable-ID reference list. Resolution against the target
+## dataset happens later, once every dataset has been read; this validates
+## shape and prefix only.
+##
+## The prefix check is what rejects a Hacker Program smuggled into a System
+## build — a mistake that would otherwise resolve successfully and misbehave in
+## combat rather than at load.
+##
+## `allow_duplicates` is true where repeats carry defined meaning: duplicate
+## PASSIVE references stack, so rejecting them would forbid authored content.
+##
+## Returns an empty array on failure, having recorded every reason. Callers
+## distinguish failure from a legitimately empty list via `required`.
+static func parse_ref_list(
+	raw: String,
+	prefix: String,
+	required: bool,
+	allow_duplicates: bool,
+	ctx: Dictionary,
+	issues: DataIssues
+) -> Array:
+	if raw.strip_edges() == "":
 		if required:
 			var c := ctx.duplicate()
 			c["value"] = raw
 			c["reason"] = "at least one entry is required"
 			issues.error(c)
-			return []
 		return []
 
 	var out: Array = []
-	for token_raw in trimmed.split(":"):
+	var seen := {}
+	var ok := true
+
+	for token_raw in raw.split(":"):
 		var token := token_raw.strip_edges()
 		if token == "":
 			var c := ctx.duplicate()
 			c["value"] = raw
-			c["reason"] = "blank entry in reference list"
+			c["reason"] = "blank token in list"
 			issues.error(c)
-			return []
+			ok = false
+			continue
+		if not allow_duplicates and seen.has(token):
+			var c := ctx.duplicate()
+			c["value"] = token
+			c["reason"] = "duplicate token in list"
+			issues.error(c)
+			ok = false
+			continue
+		seen[token] = true
+		if not token.begins_with(prefix):
+			var c := ctx.duplicate()
+			c["value"] = token
+			c["expected"] = "%s*" % prefix
+			c["reason"] = "wrong ID prefix for this reference"
+			issues.error(c)
+			ok = false
+			continue
 		out.append(token)
-	return out
+
+	return out if ok else []
+
+
+## A reference list of an exact length — a Hacker/Deck portfolio or a System
+## build. Authored order is gameplay-significant (charge-routing priority), so
+## this never sorts and never silently deduplicates.
+static func parse_sized_ref_list(
+	raw: String,
+	prefix: String,
+	size: int,
+	ctx: Dictionary,
+	issues: DataIssues
+) -> Array:
+	var ids := parse_ref_list(raw, prefix, true, false, ctx, issues)
+	if ids.is_empty():
+		return []
+	if ids.size() != size:
+		var c := ctx.duplicate()
+		c["value"] = raw.strip_edges()
+		c["expected"] = "exactly %d %s* references" % [size, prefix]
+		c["reason"] = "PRG_SET must contain exactly %d distinct Programs" % size
+		issues.error(c)
+		return []
+	return ids
+
+
+## A bounded integer field with an explicit accepted range.
+## Returns `{ok: bool, value: int}`.
+static func read_int(raw: String, min_v: int, max_v: int, ctx: Dictionary, issues: DataIssues) -> Dictionary:
+	var p := Vocab.parse_int_field(raw)
+	if not p["present"] or not p["valid"]:
+		var c := ctx.duplicate()
+		var trimmed := raw.strip_edges()
+		if trimmed != "":
+			c["value"] = trimmed
+		c["expected"] = "integer %d-%d" % [min_v, max_v]
+		c["reason"] = "%s must be an integer" % ctx.get("field", "value")
+		issues.error(c)
+		return {"ok": false, "value": 0}
+
+	var v: int = p["value"]
+	if v < min_v or v > max_v:
+		var c := ctx.duplicate()
+		c["value"] = raw.strip_edges()
+		c["expected"] = "%d-%d" % [min_v, max_v]
+		c["reason"] = "%s is out of range" % ctx.get("field", "value")
+		issues.error(c)
+		return {"ok": false, "value": 0}
+
+	return {"ok": true, "value": v}
+
+
+## `Y` / `N` / blank, where blank means N. Case-SENSITIVE, unlike `in_pool` —
+## the alpha accepts only uppercase here, and loosening it would accept content
+## the alpha rejects.
+## Returns `{ok: bool, value: bool}`.
+static func read_start_charged(raw: String, ctx: Dictionary, issues: DataIssues) -> Dictionary:
+	var t := raw.strip_edges()
+	if t == "" or t == "N":
+		return {"ok": true, "value": false}
+	if t == "Y":
+		return {"ok": true, "value": true}
+	var c := ctx.duplicate()
+	c["field"] = "startCharged"
+	c["value"] = t
+	c["expected"] = "Y|N|blank"
+	c["reason"] = "invalid startCharged token"
+	issues.error(c)
+	return {"ok": false, "value": false}
+
+
+## A compound colon-delimited integer-enum tuple. `0` is a supplied value, not
+## absence. Exact length, token type, and allowed range are all validated here
+## so runtime never parses the raw string.
+## Returns `{ok: bool, values: Array[int]}`.
+static func read_tuple(raw: String, fields: Array, ctx: Dictionary, issues: DataIssues) -> Dictionary:
+	var tokens := raw.split(":")
+	if tokens.size() != fields.size():
+		var names := PackedStringArray()
+		for f in fields:
+			names.append(f["name"])
+		var c := ctx.duplicate()
+		c["value"] = raw.strip_edges()
+		c["expected"] = ":".join(names)
+		c["reason"] = "tuple must have exactly %d colon-delimited values" % fields.size()
+		issues.error(c)
+		return {"ok": false, "values": []}
+
+	var out: Array[int] = []
+	var ok := true
+	for i in fields.size():
+		var f: Dictionary = fields[i]
+		var tok := tokens[i].strip_edges()
+		var p := Vocab.parse_int_field(tok)
+		var range_text := "%s %d-%d" % [f["name"], f["min"], f["max"]]
+		if not p["present"] or not p["valid"]:
+			var c := ctx.duplicate()
+			c["value"] = tok
+			c["expected"] = range_text
+			c["reason"] = "malformed tuple value for %s" % f["name"]
+			issues.error(c)
+			ok = false
+			continue
+		var v: int = p["value"]
+		if v < int(f["min"]) or v > int(f["max"]):
+			var c := ctx.duplicate()
+			c["value"] = tok
+			c["expected"] = range_text
+			c["reason"] = "tuple value out of range for %s" % f["name"]
+			issues.error(c)
+			ok = false
+			continue
+		out.append(v)
+
+	return {"ok": ok, "values": out if ok else []}
+
+
+## Display names are required to be nonempty and uppercase.
+## Returns `{ok: bool, value: String}`.
+static func check_name(raw: String, ctx: Dictionary, issues: DataIssues) -> Dictionary:
+	var name := raw.strip_edges()
+	if name == "":
+		var c := ctx.duplicate()
+		c["field"] = "name"
+		c["value"] = raw
+		c["reason"] = "name must be nonempty"
+		issues.error(c)
+		return {"ok": false, "value": ""}
+	if name != name.to_upper():
+		var c := ctx.duplicate()
+		c["field"] = "name"
+		c["value"] = name
+		c["reason"] = "name must be uppercase"
+		issues.error(c)
+		return {"ok": false, "value": ""}
+	return {"ok": true, "value": name}
 
 
 ## `in_pool`: blank or `y` includes the row in random generation, `n` excludes
@@ -220,8 +391,8 @@ static func parse_in_pool(raw: String, ctx: Dictionary, issues: DataIssues) -> b
 	if t == "n":
 		return false
 	var c := ctx.duplicate()
-	c["value"] = raw
-	c["expected"] = "y|n|(blank)"
-	c["reason"] = "invalid pool flag"
+	c["value"] = raw.strip_edges()
+	c["expected"] = "y|n|blank"
+	c["reason"] = "invalid in_pool token"
 	issues.error(c)
 	return true
