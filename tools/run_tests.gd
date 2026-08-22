@@ -23,6 +23,7 @@ const SUITES := [
 	# Phase 3 — battle core.
 	"res://tests/test_board.gd",
 	"res://tests/test_passives.gd",
+	"res://tests/test_charge_routing.gd",
 	"res://tests/test_layer_purity.gd",
 	"res://tests/test_data_present.gd",
 ]
