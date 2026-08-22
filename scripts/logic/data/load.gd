@@ -970,9 +970,147 @@ func resolve_effect_params() -> void:
 		var ok := _resolve_discrete_params(f, contract, str(p["effect_id"]), ctx, out)
 		if not _resolve_tuple(f, contract, str(p["effect_id"]), ctx, out):
 			ok = false
+		if not _resolve_axes(f, contract, str(p["effect_id"]), ctx, out):
+			ok = false
 
 		if ok:
 			fn_params[id] = out
+
+
+## The Transform axis columns.
+##
+## The colon is INTERSECTION: `GRE:TRI` means "green triangles", never "green
+## or triangular". There is deliberately no OR targeting, no multi-value axis,
+## and no negation — which is why two tokens of the same kind are rejected
+## rather than unioned.
+func _resolve_axes(f: Dictionary, contract: Dictionary, effect_id: String, ctx: Dictionary, out: Dictionary) -> bool:
+	var declared: Array = contract["axes"]
+	var axes: Dictionary = f["axes"]
+	var ok := true
+
+	for col in Effects.AXIS_NAMES:
+		var raw := str(axes[col]).strip_edges()
+
+		if not declared.has(col):
+			if raw != "":
+				var c := _field_ctx(ctx, col)
+				c["value"] = raw
+				c["reason"] = "populated parameter is unused by %s" % effect_id
+				issues.warn(c)
+			continue
+
+		if raw == "":
+			var c := _field_ctx(ctx, col)
+			c["reason"] = "missing required parameter for %s" % effect_id
+			issues.error(c)
+			ok = false
+			continue
+
+		var tokens: Array[String] = []
+		var has_blank := false
+		for tk in raw.split(":"):
+			var t := tk.strip_edges()
+			if t == "":
+				has_blank = true
+			tokens.append(t)
+
+		if has_blank:
+			var c := _field_ctx(ctx, col)
+			c["value"] = raw
+			c["reason"] = "blank token in axis list"
+			issues.error(c)
+			ok = false
+			continue
+
+		if tokens.size() > 2:
+			var c := _field_ctx(ctx, col)
+			c["value"] = raw
+			c["expected"] = "<AXIS> or <COLOR>:<SHAPE>"
+			c["reason"] = "an axis list holds at most one color and one shape"
+			issues.error(c)
+			ok = false
+			continue
+
+		# NEU and ALL are whole-Packet tokens and never combine with an axis.
+		var whole := ""
+		for t in tokens:
+			if t == Content.AXIS_NEUTRAL or t == Content.AXIS_ALL:
+				whole = t
+
+		if whole != "":
+			if tokens.size() != 1:
+				var c := _field_ctx(ctx, col)
+				c["value"] = raw
+				c["expected"] = whole
+				c["reason"] = "%s selects whole Packets and cannot be combined with an axis" % whole
+				issues.error(c)
+				ok = false
+				continue
+
+			if col == "axisTarget":
+				var kind := Content.AxisTargetKind.NEU if whole == Content.AXIS_NEUTRAL else Content.AxisTargetKind.ALL
+				out["axisTarget"] = {"token": raw, "kind": kind, "color": null, "shape": null}
+			else:
+				# ALL is a target, not a result: "turn these into everything"
+				# has no meaning.
+				if whole == Content.AXIS_ALL:
+					var c := _field_ctx(ctx, col)
+					c["value"] = raw
+					c["expected"] = "%s|<COLOR>|<SHAPE>|<COLOR>:<SHAPE>" % Content.AXIS_NEUTRAL
+					c["reason"] = "ALL is not a transform RESULT"
+					issues.error(c)
+					ok = false
+					continue
+				out["axisResult"] = {"token": raw, "neutral": true, "color": null, "shape": null}
+			continue
+
+		# Axis-specific form: at most one colour and at most one shape.
+		var color = null
+		var shape = null
+		var axes_ok := true
+		for t in tokens:
+			if Vocab.COLOR_TOKENS.has(t):
+				if color != null:
+					var c := _field_ctx(ctx, col)
+					c["value"] = raw
+					c["reason"] = "an axis list holds at most one color"
+					issues.error(c)
+					axes_ok = false
+					break
+				color = Vocab.COLOR_TOKENS[t]
+			elif Vocab.SHAPE_TOKENS.has(t):
+				if shape != null:
+					var c := _field_ctx(ctx, col)
+					c["value"] = raw
+					c["reason"] = "an axis list holds at most one shape"
+					issues.error(c)
+					axes_ok = false
+					break
+				shape = Vocab.SHAPE_TOKENS[t]
+			else:
+				var allowed := PackedStringArray([Content.AXIS_NEUTRAL])
+				if col == "axisTarget":
+					allowed.append(Content.AXIS_ALL)
+				allowed.append_array(PackedStringArray(Vocab.COLOR_TOKENS.keys()))
+				allowed.append_array(PackedStringArray(Vocab.SHAPE_TOKENS.keys()))
+				var c := _field_ctx(ctx, col)
+				c["value"] = t
+				c["expected"] = "|".join(allowed)
+				c["reason"] = "unknown axis token"
+				issues.error(c)
+				axes_ok = false
+				break
+
+		if not axes_ok:
+			ok = false
+			continue
+
+		if col == "axisTarget":
+			out["axisTarget"] = {"token": raw, "kind": Content.AxisTargetKind.AXIS, "color": color, "shape": shape}
+		else:
+			out["axisResult"] = {"token": raw, "neutral": false, "color": color, "shape": shape}
+
+	return ok
 
 
 ## A composite pays the parent cost once and delegates everything else to its
@@ -1161,6 +1299,373 @@ func _resolve_tuple(f: Dictionary, contract: Dictionary, effect_id: String, ctx:
 				issues.warn(c)
 
 	return true
+
+
+# ---------------------------------------------------------------------------
+# Plan assembly
+# ---------------------------------------------------------------------------
+
+## Expanded execution plans, keyed by Function ID. A leaf has one op; a
+## composite has one op per child reference, in payload order.
+var plans := {}
+
+
+## Whether an op asks the player to pick something, and for what.
+##
+## Resolved once here rather than recomputed at runtime, because targeting is
+## no longer a property of the Effect alone: Bomb, LineSlice, and Transform each
+## select it per row through their typed tuple. The same Effect is targeted on
+## one row and random on the next.
+static func resolve_target(effect_id: String, params: Dictionary) -> Types.TargetKind:
+	var contract := Effects.contract(effect_id)
+	if contract["targeted"]:
+		var kind: int = contract["target_kind"]
+		return kind if kind != Types.TargetKind.NONE else Types.TargetKind.UNIT
+
+	var targeting = null
+	for key in ["bomb", "line", "transform"]:
+		if params.has(key):
+			targeting = params[key]["targeting"]
+			break
+
+	if targeting == Content.TARGETING_TARGETED:
+		var kind: int = contract["target_kind"]
+		return kind if kind != Types.TargetKind.NONE else Types.TargetKind.PACKET
+	return Types.TargetKind.NONE
+
+
+func _build_plan(fn_id: String) -> Array:
+	if not payloads.has(fn_id):
+		return []
+	var payload: Dictionary = payloads[fn_id]
+
+	if payload["kind"] == "leaf":
+		if not fn_params.has(fn_id):
+			return []
+		var effect_id: String = payload["effect_id"]
+		var params: Dictionary = fn_params[fn_id]
+		return [{
+			"fn_id": fn_id,
+			"effect_id": effect_id,
+			"params": params,
+			"target": resolve_target(effect_id, params),
+		}]
+
+	# Children are validated leaves, so this recursion is exactly one level
+	# deep and cannot loop.
+	var plan: Array = []
+	for child in (payload["children"] as Array):
+		var child_plan := _build_plan(child)
+		if child_plan.is_empty():
+			return []
+		plan.append_array(child_plan)
+	return plan
+
+
+## Builds every Function's plan and enforces the targeting-order rules against
+## the RESOLVED per-op target — so a Bomb row configured for random placement
+## is correctly not targeted, while the same Effect configured for player
+## selection is.
+func build_plans() -> void:
+	for f in function_rows:
+		var id: String = f["id"]
+		var plan := _build_plan(id)
+		if plan.is_empty():
+			continue  # upstream errors already reported
+
+		var ctx := {
+			"dataset": DataIssues.DATASET_FUNCTIONS, "file": f["file"],
+			"row": f["row"], "id": id, "field": "payload",
+		}
+		var ok := true
+
+		var targeted_indices: Array[int] = []
+		var drain_count := 0
+		for i in plan.size():
+			var op: Dictionary = plan[i]
+			if op["target"] != Types.TargetKind.NONE:
+				targeted_indices.append(i)
+			if op["effect_id"] == Effects.DRAIN:
+				drain_count += 1
+
+		if drain_count > 1:
+			var c := ctx.duplicate()
+			c["reason"] = "two Drain operations in one expanded payload are invalid"
+			issues.error(c)
+			ok = false
+
+		# At most one targeted operation, and it must run first. Anything else
+		# would mean asking the player to pick a Packet partway through a
+		# resolution that has already changed the board under them.
+		if targeted_indices.size() > 1:
+			var c := ctx.duplicate()
+			c["reason"] = "more than one non-random targeted operation in one expanded payload"
+			issues.error(c)
+			ok = false
+		elif targeted_indices.size() == 1 and targeted_indices[0] != 0:
+			var c := ctx.duplicate()
+			c["reason"] = "a non-random targeted operation must be the first expanded operation"
+			issues.error(c)
+			ok = false
+
+		if ok:
+			plans[id] = plan
+
+
+# ---------------------------------------------------------------------------
+# Fingerprint
+# ---------------------------------------------------------------------------
+
+## Builds the canonical structure and hashes it. Must reproduce the alpha's
+## value byte-for-byte for identical content.
+##
+## What is INCLUDED is everything gameplay-affecting; what is EXCLUDED is
+## presentation — display names, BIO, GRAPHICS, notes, PASSIVE display text,
+## and BOSS_PASSIVE_DESCRIPTION. That split is the point: fixing a typo in
+## flavour copy must never invalidate a player's save.
+##
+## Derived values are excluded too. Weak sets are the enum-order complement of
+## the authored strong sets, so fingerprinting both would be duplicate
+## authority.
+func compute_fingerprint() -> String:
+	var used_areas := {}
+	var fn_norm := _fingerprint_functions(used_areas)
+
+	# Every registered pattern is included, not just those the FNC rows name:
+	# PSV_BIGGER_BOMB can advance an authored Bomb into any larger pattern, so
+	# the whole ordered registry is gameplay-affecting.
+	for id in Areas.PATTERN_ORDER:
+		used_areas[id] = true
+	var area_ids := used_areas.keys()
+	area_ids.sort()
+	var areas: Array = []
+	for id in area_ids:
+		var entry := {}
+		entry["id"] = id
+		entry["cells"] = Areas.cells(id)
+		areas.append(entry)
+
+	var canonical := {}
+	canonical["schema"] = Content.DATA_SCHEMA_VERSION
+	canonical["hacker"] = _fingerprint_programs(DataIssues.DATASET_HACKER_PROGRAMS, "player")
+	canonical["system"] = _fingerprint_programs(DataIssues.DATASET_SYSTEM_PROGRAMS, "enemy")
+	canonical["functions"] = fn_norm
+	canonical["areas"] = areas
+	canonical["areaOrder"] = Areas.PATTERN_ORDER
+	canonical["hackers"] = _fingerprint_hackers()
+	canonical["passives"] = _fingerprint_passives()
+	canonical["decks"] = _fingerprint_decks()
+	canonical["systems"] = _fingerprint_systems()
+	canonical["hosts"] = _fingerprint_hosts()
+	canonical["upgrades"] = _fingerprint_upgrades()
+	canonical["bosses"] = _fingerprint_bosses()
+
+	return Fingerprint.of(canonical)
+
+
+## Rows sorted by stable ID, so authored row order never changes the
+## fingerprint — only authored content does.
+func _sorted_by_id(rows: Array) -> Array:
+	var out := rows.duplicate()
+	out.sort_custom(func(a, b): return str(a["id"]) < str(b["id"]))
+	return out
+
+
+## Programs keep FILE order rather than being sorted: they are emitted as the
+## resolved per-side lists, which is how the runtime holds them.
+func _fingerprint_programs(dataset: String, side: String) -> Array:
+	var out: Array = []
+	for p in program_rows:
+		if p["dataset"] != dataset:
+			continue
+		var e := {}
+		e["id"] = p["id"]
+		e["side"] = side
+		e["colors"] = p["colors"]
+		e["shapes"] = p["shapes"]
+		e["fn"] = p["function_id"]
+		out.append(e)
+	return out
+
+
+func _fingerprint_functions(used_areas: Dictionary) -> Array:
+	var out: Array = []
+	for f in _sorted_by_id(function_rows):
+		var id: String = f["id"]
+		var e := {}
+		e["id"] = id
+		e["cost"] = f["cost"]
+		e["sc"] = f["start_charged"]
+
+		var plan_out: Array = []
+		for op in (plans.get(id, []) as Array):
+			var params: Dictionary = op["params"]
+			if params.has("areaPattern"):
+				used_areas[params["areaPattern"]] = true
+
+			var o := {}
+			o["fn"] = op["fn_id"]
+			o["effect"] = op["effect_id"]
+			o["q"] = params.get("quantity", null)
+			o["cd"] = params.get("countdown", null)
+			o["ap"] = params.get("areaPattern", null)
+			o["mag"] = params.get("magnitude", null)
+			o["dmg"] = params.get("damage", null)
+			o["shake"] = _tuple_array(params, "shake", ["boardComposition", "specialGems", "matches", "cascades"])
+			o["bomb"] = _tuple_array(params, "bomb", ["targeting", "dealDamage", "gainCharge"])
+			o["line"] = _tuple_array(params, "line", ["dimension", "targeting", "specialRetention", "dealDamage", "gainCharge"])
+			o["xf"] = _tuple_array(params, "transform", ["targeting", "specialPacketTreatment"])
+			o["at"] = _axis_target(params)
+			o["ar"] = _axis_result(params)
+			o["tgt"] = _target_name(op["target"])
+			plan_out.append(o)
+
+		e["plan"] = plan_out
+		out.append(e)
+	return out
+
+
+func _tuple_array(params: Dictionary, key: String, fields: Array):
+	if not params.has(key):
+		return null
+	var t: Dictionary = params[key]
+	var out: Array = []
+	for f in fields:
+		out.append(t[f])
+	return out
+
+
+## The whole axis-target object reaches the fingerprint, and JavaScript omits
+## undefined properties — so a whole-Packet target serializes as `{token, kind}`
+## with no colour or shape keys at all, not as explicit nulls.
+func _axis_target(params: Dictionary):
+	if not params.has("axisTarget"):
+		return null
+	var at: Dictionary = params["axisTarget"]
+	var e := {}
+	e["token"] = at["token"]
+	e["kind"] = ["NEU", "ALL", "AXIS"][at["kind"]]
+	if at["color"] != null:
+		e["color"] = at["color"]
+	if at["shape"] != null:
+		e["shape"] = at["shape"]
+	return e
+
+
+## The result contributes only its resolved axes, as a two-element array. An
+## unauthored axis is null — which is meaningful: a single-axis result PRESERVES
+## the other axis rather than clearing it.
+func _axis_result(params: Dictionary):
+	if not params.has("axisResult"):
+		return null
+	var ar: Dictionary = params["axisResult"]
+	return [ar["color"], ar["shape"]]
+
+
+func _target_name(target: int):
+	match target:
+		Types.TargetKind.UNIT:
+			return "unit"
+		Types.TargetKind.PACKET:
+			return "packet"
+		_:
+			return null
+
+
+func _fingerprint_hackers() -> Array:
+	var out: Array = []
+	for h in _sorted_by_id(hacker_rows):
+		var e := {}
+		e["id"] = h["id"]
+		e["link"] = h["base_link"]
+		e["sc"] = h["strong_colors"]
+		e["ss"] = h["strong_shapes"]
+		e["psv"] = h["passive_ids"]
+		# Portfolio ORDER is mandatory input: it determines the default build
+		# and the inventory's source display.
+		e["prg"] = h["portfolio"]
+		out.append(e)
+	return out
+
+
+func _fingerprint_passives() -> Array:
+	var out: Array = []
+	for s in _sorted_by_id(passive_rows):
+		var e := {}
+		e["id"] = s["id"]
+		e["effect"] = s["effect_type"]
+		e["act"] = s["activation"]
+		e["scope"] = s["agent_scope"]
+		e["color"] = s["color"]
+		# The alpha models this as `true` or absent, never `false`.
+		e["all"] = true if s["all_scope"] else null
+		e["mag"] = s["magnitude"]
+		e["fn"] = null if str(s["function_id"]) == "" else s["function_id"]
+		out.append(e)
+	return out
+
+
+func _fingerprint_decks() -> Array:
+	var out: Array = []
+	for d in _sorted_by_id(deck_rows):
+		var e := {}
+		e["id"] = d["id"]
+		e["add"] = d["add_link"]
+		e["fn"] = d["function_id"]
+		e["prg"] = d["portfolio"]
+		out.append(e)
+	return out
+
+
+func _fingerprint_systems() -> Array:
+	var out: Array = []
+	for s in _sorted_by_id(system_rows):
+		var e := {}
+		e["id"] = s["id"]
+		e["ice"] = s["base_ice"]
+		e["sc"] = s["strong_colors"]
+		e["ss"] = s["strong_shapes"]
+		# PRG_SET order matters: it is charge-routing priority.
+		e["prg"] = s["programs"]
+		e["psv"] = s["passive_ids"]
+		e["pool"] = s["in_pool"]
+		out.append(e)
+	return out
+
+
+func _fingerprint_hosts() -> Array:
+	var out: Array = []
+	for h in _sorted_by_id(host_rows):
+		var e := {}
+		e["id"] = h["id"]
+		e["psv"] = h["passive_ids"]
+		e["pool"] = h["in_pool"]
+		out.append(e)
+	return out
+
+
+func _fingerprint_upgrades() -> Array:
+	var out: Array = []
+	for u in _sorted_by_id(upgrade_rows):
+		var e := {}
+		e["id"] = u["id"]
+		e["psv"] = u["passive_ids"]
+		out.append(e)
+	return out
+
+
+func _fingerprint_bosses() -> Array:
+	var out: Array = []
+	for b in _sorted_by_id(boss_rows):
+		var e := {}
+		e["id"] = b["id"]
+		e["ice"] = b["base_ice"]
+		e["sc"] = b["strong_colors"]
+		e["ss"] = b["strong_shapes"]
+		e["prg"] = b["programs"]
+		e["pool"] = b["in_pool"]
+		out.append(e)
+	return out
 
 
 # ---------------------------------------------------------------------------

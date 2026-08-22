@@ -268,6 +268,65 @@ func _test_payload_grammar(t: TestCase) -> void:
 	# every authored row uses exactly the columns its Effect claims.
 	t.eq("no new warnings from contract validation", loader.issues.warning_count, 0)
 
+	# Transform axes resolve to typed values. Current content is COERCE
+	# (NEU -> YEL:STR), GREENING (ALL -> GRE), and SNEAK (ALL -> MAG).
+	t.group("load / Transform axis grammar")
+	var transforms := []
+	for id in loader.fn_params:
+		if loader.payloads[id]["effect_id"] == Effects.TRANSFORM:
+			transforms.append(id)
+	t.eq("three Transform Functions are authored", transforms.size(), 3)
+
+	for id in transforms:
+		var params: Dictionary = loader.fn_params[id]
+		t.check("%s resolved an axisTarget" % id, params.has("axisTarget"))
+		t.check("%s resolved an axisResult" % id, params.has("axisResult"))
+		var at: Dictionary = params["axisTarget"]
+		var ar: Dictionary = params["axisResult"]
+		# A whole-Packet target carries no axis; an AXIS target carries at
+		# least one.
+		if at["kind"] == Content.AxisTargetKind.AXIS:
+			t.check("%s AXIS target names an axis" % id, at["color"] != null or at["shape"] != null)
+		else:
+			t.check("%s whole-Packet target has no axis" % id, at["color"] == null and at["shape"] == null)
+		# ALL is never a result — "turn these into everything" has no meaning.
+		t.check("%s result is not ALL" % id, str(ar["token"]) != Content.AXIS_ALL)
+
+	_test_fingerprint_match(t, loader)
+
+
+## The end-to-end gate: does the whole parse, normalize, and resolve path
+## produce the alpha's fingerprint byte-for-byte?
+func _test_fingerprint_match(t: TestCase, loader: ContentLoader) -> void:
+	t.group("load / fingerprint")
+	loader.build_plans()
+
+	var errs := loader.issues.errors()
+	t.check("plans build without errors", errs.is_empty())
+	for e in errs.slice(0, 5):
+		printerr("        %s" % DataIssues.format(e))
+
+	t.eq("every Function has a plan", loader.plans.size(), loader.function_rows.size())
+
+	var f := FileAccess.open("res://tests/fixtures/content.json", FileAccess.READ)
+	if f == null:
+		t.check("content fixture is readable", false)
+		return
+	var fixture = JSON.parse_string(f.get_as_text())
+	f.close()
+
+	var actual := loader.compute_fingerprint()
+	var expected := str(fixture["fingerprint"])
+	t.eq("fingerprint matches the alpha", actual, expected)
+
+	if actual != expected:
+		# The suffix is the canonical string's length in base36, so comparing it
+		# separately says whether the content differs in SIZE or only in bytes —
+		# a materially different search either way.
+		printerr("        canonical length (base36): got %s, want %s" % [
+			actual.split("-")[1], expected.split("-")[1],
+		])
+
 
 func _compare_diagnostics(t: TestCase, loader: ContentLoader) -> void:
 	t.group("load / diagnostics match the alpha")
