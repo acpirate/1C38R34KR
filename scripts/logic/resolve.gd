@@ -893,6 +893,7 @@ static func ensure_no_deadlock(state: GameState, events: Array) -> void:
 	state.board = carrier["board"]
 	state.next_id = carrier["next_id"]
 	events.append({"t": Types.EVT.AUTO_RESHUFFLE})
+	events.append({"t": Types.EVT.MSG, "text": "No moves left — Datastream reshuffled"})
 	events.append({"t": Types.EVT.BOARD, "grid": _grid_view(state.board)})
 
 
@@ -904,6 +905,402 @@ static func _grid_view(board: Array) -> Array:
 			r.append(null if t == null else _tile_view(t))
 		out.append(r)
 	return out
+
+
+# ---------------------------------------------------------------------------
+# Bomb detonation
+# ---------------------------------------------------------------------------
+
+## Pre-parameterization Bombs granted no charge at all, so an overlay saved
+## without an explicit selection keeps that behaviour.
+const GAIN_CHARGE_NO_DEFAULT := 1
+
+## Default footprint for an overlay armed before area patterns were authored.
+const DEFAULT_BLAST_PATTERN := Areas.SQUARE_3X3
+
+
+## Detonates the Bomb overlay at `p`, if there is one.
+##
+## The placing Function's typed selections travel WITH the overlay, so a Bomb
+## armed three turns ago still resolves under its own contract — a Function
+## edited in between cannot reach back and change what is already in flight.
+static func resolve_detonation(state: GameState, p: Vector2i, events: Array) -> void:
+	var bomb := state.tile_at(p)
+	if bomb == null or not bomb.has_special() or bomb.special.type != Tile.Special.Type.BOMB:
+		return
+	var sp: Tile.Special = bomb.special
+	detonate_at(state, p, {
+		"owner": sp.owner,
+		"area_pattern": sp.area_pattern if sp.area_pattern != "" else DEFAULT_BLAST_PATTERN,
+		"program_id": sp.program_id,
+		"fn_id": sp.fn_id,
+		"deal_damage": sp.deal_damage if sp.deal_damage != -1 else Content.DEAL_DAMAGE_YES,
+		"gain_charge": sp.gain_charge if sp.gain_charge != -1 else GAIN_CHARGE_NO_DEFAULT,
+	}, events)
+
+
+## The ONE Bomb blast implementation, shared by countdown detonations and by
+## immediate (countdown-blank) resolutions.
+##
+## No chain detonations and no re-triggers: everything in the footprint is
+## sliced as an ordinary Packet, including another Bomb.
+##
+## `settle` false leaves gravity, refill, and cascades to the caller, so an
+## immediately resolving Bomb can log its target BEFORE the board moves.
+static func detonate_at(state: GameState, p: Vector2i, spec: Dictionary, events: Array, settle := true) -> void:
+	var owner: Types.Side = spec["owner"]
+	var offsets := Areas.cells(spec["area_pattern"])
+
+	# Clipped to the board. The full in-bounds footprint is reported so the
+	# renderer can flash cells that were empty, while only occupied cells are
+	# actually sliced.
+	var in_bounds: Array[Vector2i] = []
+	var cells: Array[Vector2i] = []
+	for d in offsets:
+		var n := p + d
+		if state.in_bounds(n):
+			in_bounds.append(n)
+			if state.tile_at(n) != null:
+				cells.append(n)
+	events.append({"t": Types.EVT.DETONATE, "p": p, "cells": in_bounds})
+
+	var bonus := buff_bonus(state, owner)
+	var raw := 0
+	var shields_removed := 0
+	var sliced: Array[Tile] = []
+	for c in cells:
+		var t := state.tile_at(c)
+		if t.has_special() and t.special.type == Tile.Special.Type.SHIELD:
+			shields_removed += 1
+		sliced.append(t)
+		raw += base_damage(t, state, owner)
+
+	events.append({"t": Types.EVT.DESTROY, "cells": cells})
+	for c in cells:
+		state.set_tile(c, null)
+	if shields_removed > 0:
+		events.append({"t": Types.EVT.SHIELD_REMOVED, "count": shields_removed})
+
+	# Directly sliced blast Packets charge only when the tuple says so. Current
+	# content grants none, preserving the established rule that Bomb destruction
+	# does not charge.
+	if spec["gain_charge"] == Content.GAIN_CHARGE_YES:
+		charge_from_effect_slice(state, owner, sliced, events)
+
+	# A blast can mutate the board WITHOUT dealing damage. Resulting refill
+	# Syncs still resolve normally either way.
+	if spec["deal_damage"] == Content.DEAL_DAMAGE_YES:
+		deal_damage(state, Types.opponent_of(owner), raw + bonus, {
+			"source": Types.DamageSource.BOMB,
+			"label": "Hacker bomb" if owner == Types.Side.PLAYER else "System bomb",
+			"program_id": spec.get("program_id", ""),
+			"fn_id": spec.get("fn_id", ""),
+			"effect_id": Effects.BOMB,
+			"buff_bonus": bonus,
+		}, events)
+
+	if state.has_winner() or not settle:
+		return
+	settle_after_effect(state, owner, Types.DamageSource.BOMB, str(spec.get("program_id", "")), events)
+
+
+## An Effect-caused destruction has no "initial Sync", so its entire cascade
+## budget is the cap itself — and at cap 0 even its own refill is constrained.
+##
+## Everything descended from it carries that Effect's causal bucket and belongs
+## to the initiator, however many Syncs follow.
+static func settle_after_effect(state: GameState, owner: Types.Side, cause: Types.DamageSource, cause_program_id: String, events: Array) -> void:
+	var cap = state.config["max_cascade_steps"]
+	var fresh_ids := {}
+	apply_gravity_and_refill(state, events, cap != null and int(cap) <= 0, fresh_ids)
+	resolve_cascades(state, owner, events, cap, cause, fresh_ids, cause_program_id)
+
+
+# ---------------------------------------------------------------------------
+# Line slice
+# ---------------------------------------------------------------------------
+
+## Slices a whole row or column through the resolved target.
+##
+## Returns `{dimension, sliced, retained, damage, charge}` — the caller logs the
+## target and outcome, so the return is richer than the events alone.
+static func resolve_line_slice(state: GameState, target: Vector2i, spec: Dictionary, events: Array) -> Dictionary:
+	var owner: Types.Side = spec["owner"]
+	var params: Dictionary = spec["params"]
+	var vertical: bool = params["dimension"] == Content.LINE_DIMENSION_COLUMN
+
+	var line_cells: Array[Vector2i] = []
+	if vertical:
+		for y in Constants.BOARD_HEIGHT:
+			line_cells.append(Vector2i(target.x, y))
+	else:
+		for x in Constants.BOARD_WIDTH:
+			line_cells.append(Vector2i(x, target.y))
+
+	# Retention is decided BEFORE anything is sliced. A retained overlay stays a
+	# complete Packet, is excluded from the direct slice, and then settles
+	# normally — it is not pinned above empty space.
+	var retention: int = params["specialRetention"]
+	var retained: Array[Vector2i] = []
+	var sliced_pts: Array[Vector2i] = []
+	var sliced_tiles: Array[Tile] = []
+
+	for c in line_cells:
+		var t := state.tile_at(c)
+		# A concluded board may legitimately hold gaps.
+		if t == null:
+			continue
+		var keep := false
+		if t.has_special():
+			keep = retention == Content.SPECIALS_RETAIN_ALL or (retention == Content.SPECIALS_RETAIN_OWN and t.special.owner == owner)
+		if keep:
+			retained.append(c)
+			continue
+		sliced_pts.append(c)
+		sliced_tiles.append(t)
+
+	# ONE combined NONCRITICAL damage instance per deployment, valued through
+	# the shared collateral valuation. Buff and Shield apply once, via the
+	# ordinary damage pipeline. Retained overlays and out-of-board cells
+	# contribute nothing.
+	var raw := 0
+	var shields_removed := 0
+	for t in sliced_tiles:
+		if t.has_special() and t.special.type == Tile.Special.Type.SHIELD:
+			shields_removed += 1
+		raw += base_damage(t, state, owner)
+
+	events.append({"t": Types.EVT.DESTROY, "cells": sliced_pts})
+	for c in sliced_pts:
+		state.set_tile(c, null)
+	if shields_removed > 0:
+		events.append({"t": Types.EVT.SHIELD_REMOVED, "count": shields_removed})
+
+	var charge := 0
+	if params["gainCharge"] == Content.GAIN_CHARGE_YES:
+		charge = charge_from_effect_slice(state, owner, sliced_tiles, events)
+
+	var damage := 0
+	if params["dealDamage"] == Content.DEAL_DAMAGE_YES:
+		var bonus := buff_bonus(state, owner)
+		damage = raw + bonus
+		# Function damage, so Reinforced Connection — which suppresses BASE SYNC
+		# damage only — does not touch it.
+		deal_damage(state, Types.opponent_of(owner), damage, {
+			"source": Types.DamageSource.LINESLICE,
+			"label": "Hacker line slice" if owner == Types.Side.PLAYER else "System line slice",
+			"program_id": spec.get("program_id", ""),
+			"fn_id": spec.get("fn_id", ""),
+			"effect_id": Effects.LINESLICE,
+			"buff_bonus": bonus,
+		}, events)
+
+	return {
+		"dimension": "column" if vertical else "row",
+		"sliced": sliced_pts, "retained": retained,
+		"damage": damage, "charge": charge,
+	}
+
+
+# ---------------------------------------------------------------------------
+# Transform
+# ---------------------------------------------------------------------------
+
+## Does this Packet match the authored target axis?
+##
+## A single authored axis targets that value on one axis and ANY value on the
+## other, and excludes neutrals — a neutral has no axis to match against.
+static func _matches_axis_target(t: Tile, target: Dictionary) -> bool:
+	var kind: int = target["kind"]
+	if kind == Content.AxisTargetKind.NEU:
+		return t.is_neutral()
+	if kind == Content.AxisTargetKind.ALL:
+		return true
+	if t.is_neutral():
+		return false
+	if target["color"] != null and t.color != int(target["color"]):
+		return false
+	if target["shape"] != null and t.shape != int(target["shape"]):
+		return false
+	return true
+
+
+## How many axes of the RESULT this Packet already has.
+##
+## A Packet sharing EVERY result axis is a pure no-op and is never a valid
+## target; one sharing exactly one axis of a two-axis result is the FALLBACK
+## tier, used only to top up after the clean tier is exhausted.
+static func _shared_result_axes(t: Tile, result: Dictionary) -> int:
+	if result["neutral"]:
+		return 1 if t.is_neutral() else 0
+	if t.is_neutral():
+		return 0  ## a neutral shares no colour or shape
+	var n := 0
+	if result["color"] != null and t.color == int(result["color"]):
+		n += 1
+	if result["shape"] != null and t.shape == int(result["shape"]):
+		n += 1
+	return n
+
+
+static func _result_axis_count(result: Dictionary) -> int:
+	if result["neutral"]:
+		return 1
+	var n := 0
+	if result["color"] != null:
+		n += 1
+	if result["shape"] != null:
+		n += 1
+	return n
+
+
+## The eligible pool, split into two tiers.
+##
+## Tier 1 is Packets sharing NO result axis; tier 2 is Packets sharing exactly
+## one axis of a TWO-axis result. Anything matching every result axis is
+## excluded outright, so `quantity` always means "up to this many REAL
+## transformations" rather than counting no-ops.
+static func transform_candidates(state: GameState, spec: Dictionary) -> Dictionary:
+	var tier1: Array[Vector2i] = []
+	var tier2: Array[Vector2i] = []
+	var axes := _result_axis_count(spec["axis_result"])
+
+	for y in Constants.BOARD_HEIGHT:
+		for x in Constants.BOARD_WIDTH:
+			var t: Tile = state.board[y][x]
+			if t == null or not _matches_axis_target(t, spec["axis_target"]):
+				continue
+			var shared := _shared_result_axes(t, spec["axis_result"])
+			if shared == 0:
+				tier1.append(Vector2i(x, y))
+			elif axes == 2 and shared == 1:
+				tier2.append(Vector2i(x, y))
+			# shared == axes: already identical on every result axis, never valid.
+
+	return {"tier1": tier1, "tier2": tier2}
+
+
+## Total eligible count, for the valid-target gating that decides whether a
+## Function is withheld rather than fired into nothing.
+static func transform_candidate_count(state: GameState, spec: Dictionary) -> int:
+	var c := transform_candidates(state, spec)
+	return (c["tier1"] as Array).size() + (c["tier2"] as Array).size()
+
+
+## Draws up to `want` distinct targets without replacement.
+##
+## When every eligible Packet in a tier will be transformed anyway, the
+## selection is a complete set and its order is irrelevant — so NO gameplay RNG
+## is consumed merely to permute it. RNG is consumed only when the choice
+## actually excludes something.
+##
+## That distinction is load-bearing for seed parity: drawing "for tidiness" when
+## the outcome cannot differ would shift every subsequent draw in the battle.
+static func _draw(state: GameState, pool: Array, want: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if want <= 0 or pool.is_empty():
+		return out
+	if pool.size() <= want:
+		for p in pool:
+			out.append(p)
+		return out
+	var rest := pool.duplicate()
+	for i in want:
+		var idx := state.rng.int_below(rest.size())
+		out.append(rest[idx])
+		rest.remove_at(idx)
+	return out
+
+
+## ATOMIC transformation: every selected Packet changes BEFORE any Sync
+## detection runs.
+##
+## Transform-one-then-resolve-then-transform-the-next would make arbitrary
+## target-iteration order mechanically significant, and would not match the
+## player's mental model of a single simultaneous conversion.
+##
+## This performs ONLY the board mutation and reports what it did; the caller
+## runs the resulting Sync wave. Splitting it that way makes the
+## "all transforms, then detection" ordering impossible to get wrong.
+static func apply_transform(state: GameState, spec: Dictionary, events: Array) -> Dictionary:
+	var candidates := transform_candidates(state, spec)
+	var tier1: Array = candidates["tier1"]
+	var tier2: Array = candidates["tier2"]
+
+	var outcome := {
+		"candidates": tier1.size() + tier2.size(),
+		"cells": [] as Array[Vector2i],
+		"tier2_used": 0,
+		"specials_retained": 0,
+		"specials_destroyed": 0,
+	}
+	if outcome["candidates"] == 0:
+		return outcome
+
+	# Tier 1 is drawn first and tier 2 TOPS UP whatever quantity remains, so a
+	# Function never converts fewer Packets than it could merely because the
+	# clean pool ran short.
+	var quantity: int = spec["quantity"]
+	var from_tier1 := _draw(state, tier1, quantity)
+	var from_tier2 := _draw(state, tier2, quantity - from_tier1.size())
+	outcome["tier2_used"] = from_tier2.size()
+
+	var chosen: Array[Vector2i] = []
+	chosen.append_array(from_tier1)
+	chosen.append_array(from_tier2)
+
+	var result: Dictionary = spec["axis_result"]
+	for p in chosen:
+		var t := state.tile_at(p)
+		_apply_overlay_treatment(t, spec, result, outcome)
+		_apply_result_axes(state, t, result)
+		(outcome["cells"] as Array).append(p)
+		events.append({"t": Types.EVT.SET_TILE, "p": p, "view": _tile_view(t)})
+
+	return outcome
+
+
+## Retaining preserves the overlay's ownership and Effect-specific state —
+## countdown, magnitude, attribution — while the UNDERLYING Packet changes
+## identity.
+static func _apply_overlay_treatment(t: Tile, spec: Dictionary, result: Dictionary, outcome: Dictionary) -> void:
+	if not t.has_special():
+		return
+	# A neutral RESULT is the exception: a neutral structurally cannot carry an
+	# overlay, so retention is impossible whatever the tuple says. The loader
+	# warns about that authoring; here it simply always destroys.
+	var treatment: int = spec["params"]["specialPacketTreatment"]
+	var keep: bool = not result["neutral"] and (
+		treatment == Content.SPECIALS_RETAIN_ALL
+		or (treatment == Content.SPECIALS_RETAIN_OWN and t.special.owner == spec["owner"])
+	)
+	if keep:
+		outcome["specials_retained"] += 1
+	else:
+		t.special = null
+		outcome["specials_destroyed"] += 1
+
+
+## A single-axis result PRESERVES the other axis. A neutral target has no axis
+## to preserve, so the unauthored one is randomized per Packet from the
+## battle's gameplay RNG.
+static func _apply_result_axes(state: GameState, t: Tile, result: Dictionary) -> void:
+	if result["neutral"]:
+		t.kind = Tile.Kind.NEUTRAL
+		t.color = -1
+		t.shape = -1
+		return
+
+	var was_neutral := t.is_neutral()
+	t.kind = Tile.Kind.STANDARD
+	if result["color"] != null:
+		t.color = int(result["color"])
+	elif was_neutral:
+		t.color = state.rng.int_below(Constants.COLOR_COUNT)
+	if result["shape"] != null:
+		t.shape = int(result["shape"])
+	elif was_neutral:
+		t.shape = state.rng.int_below(Constants.SHAPE_COUNT)
 
 
 ## Reports how much of this prevention the removable Packet Shield could NOT
