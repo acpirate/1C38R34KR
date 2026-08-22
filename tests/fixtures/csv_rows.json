@@ -1,0 +1,1029 @@
+{
+  "_comment": "Alpha parseCsv output. Pins line numbers and empty-row handling.",
+  "datasets": {
+    "bos": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "BOS_ID",
+            "name",
+            "in_pool",
+            "BASE_ICE",
+            "STRONG_COLORS",
+            "STRONG_SHAPES",
+            "PRG_SET",
+            "BOSS_PASSIVE_DESCRIPTION",
+            "BIO",
+            "GRAPHICS"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "BOS_01",
+            "ODANSHAY",
+            "",
+            "250",
+            "GRE:BLU:MAG",
+            "SQU:CIR:DIA",
+            "PRG_S_004:PRG_S_002:PRG_S_007:PRG_S_003",
+            "boss passive description goes here",
+            "system biography goes here",
+            "system graphics reference goes here"
+          ]
+        }
+      ],
+      "error": null
+    },
+    "dek": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "DEK_ID",
+            "name",
+            "ADD_LINK",
+            "PRG_SET",
+            "FUNCTIONS",
+            "DESCRIPT",
+            "GRAPHICS"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "DEK_01",
+            "AGIMA",
+            "50",
+            "PRG_H_003:PRG_H_004:PRG_H_006",
+            "FNC_010",
+            "deck description goes here",
+            "graphics reference goes here"
+          ]
+        }
+      ],
+      "error": null
+    },
+    "fnc": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "FNC_ID",
+            "name",
+            "cost",
+            "payload",
+            "notes",
+            "quantity",
+            "countdown",
+            "areaPattern",
+            "magnitude",
+            "damage",
+            "startCharged",
+            "axisTarget",
+            "axisResult",
+            "params"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "FNC_001",
+            "BOMB",
+            "7",
+            "EFFECT_BOMB",
+            "generic bomb effect",
+            "2",
+            "2",
+            "AREA_SQUARE_3X3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "0:0:1"
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "FNC_002",
+            "BUFF",
+            "8",
+            "EFFECT_BUFF",
+            "player buffer",
+            "1",
+            "",
+            "",
+            "5",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "FNC_003",
+            "ATTACK",
+            "10",
+            "EFFECT_ATTACK",
+            "direct damage to opponent",
+            "",
+            "",
+            "",
+            "",
+            "30",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 5,
+          "fields": [
+            "FNC_004",
+            "DRAIN",
+            "9",
+            "EFFECT_DRAIN",
+            "unit target, remove all charge",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 6,
+          "fields": [
+            "FNC_005",
+            "EBOMB",
+            "7",
+            "EFFECT_BOMB",
+            "",
+            "1",
+            "3",
+            "AREA_SQUARE_3X3_CARDINAL_2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "0:0:1"
+          ]
+        },
+        {
+          "line": 7,
+          "fields": [
+            "FNC_006",
+            "SHIELD",
+            "8",
+            "EFFECT_SHIELD",
+            "",
+            "2",
+            "",
+            "",
+            "2",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 8,
+          "fields": [
+            "FNC_007",
+            "SHOWCASE",
+            "9",
+            "FNC_008:FNC_009",
+            "chained function example, costs of called functions are ignored",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 9,
+          "fields": [
+            "FNC_008",
+            "ONEBOMB",
+            "5",
+            "EFFECT_BOMB",
+            "chained function payload",
+            "1",
+            "2",
+            "AREA_SQUARE_3X3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "0:0:1"
+          ]
+        },
+        {
+          "line": 10,
+          "fields": [
+            "FNC_009",
+            "ONESHIELD",
+            "5",
+            "EFFECT_SHIELD",
+            "chained function payload",
+            "1",
+            "",
+            "",
+            "2",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 11,
+          "fields": [
+            "FNC_010",
+            "SCRAMBLE",
+            "3",
+            "EFFECT_SHAKE",
+            "re-arrange the packets on the whole screen - see param notes",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Y",
+            "",
+            "",
+            "0:0:0:0"
+          ]
+        },
+        {
+          "line": 12,
+          "fields": [
+            "FNC_011",
+            "DATACUT",
+            "7",
+            "EFFECT_LINESLICE",
+            "slice targeted row, deal damage, no charge",
+            "1",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "0:1:0:0:1"
+          ]
+        },
+        {
+          "line": 13,
+          "fields": [
+            "FNC_012",
+            "PLINK",
+            "5",
+            "EFFECT_BOMB",
+            "slice cross centered on target",
+            "1",
+            "",
+            "AREA_CARDINAL_1",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "1:0:1"
+          ]
+        },
+        {
+          "line": 14,
+          "fields": [
+            "FNC_013",
+            "COERCE",
+            "7",
+            "EFFECT_TRANSFORM",
+            "turn neutral packets into attacker axes",
+            "99",
+            "",
+            "",
+            "",
+            "",
+            "Y",
+            "NEU",
+            "YEL:STR",
+            "0:0"
+          ]
+        },
+        {
+          "line": 15,
+          "fields": [
+            "FNC_014",
+            "EBUFF",
+            "9",
+            "EFFECT_BUFF",
+            "when countdown goes off those same packets become the buff",
+            "3",
+            "2",
+            "",
+            "5",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 16,
+          "fields": [
+            "FNC_015",
+            "SPAM",
+            "7",
+            "EFFECT_BOMB",
+            "many small bombs, charges",
+            "3",
+            "1",
+            "AREA_CARDINAL_1",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "0:0:0"
+          ]
+        },
+        {
+          "line": 17,
+          "fields": [
+            "FNC_016",
+            "GREENING",
+            "0",
+            "EFFECT_TRANSFORM",
+            "turn other packets into green",
+            "3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "ALL",
+            "GRE",
+            "0:1"
+          ]
+        },
+        {
+          "line": 18,
+          "fields": [
+            "FNC_017",
+            "SNEAK",
+            "0",
+            "EFFECT_TRANSFORM",
+            "turn other packets into magenta",
+            "2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "ALL",
+            "MAG",
+            "0:1"
+          ]
+        },
+        {
+          "line": 19,
+          "fields": [
+            "FNC_018",
+            "DATABEND",
+            "0",
+            "EFFECT_SHAKE",
+            "supports ODANSHAY's passive",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "1:2:1:2"
+          ]
+        },
+        {
+          "line": 20,
+          "fields": [
+            "FNC_019",
+            "REBOOT",
+            "0",
+            "EFFECT_SHAKE",
+            "supports ODANSHAY's passive",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "1:1:0:0"
+          ]
+        },
+        {
+          "line": 21,
+          "fields": [
+            "FNC_020",
+            "CODESHATTER",
+            "0",
+            "EFFECT_ATTACK",
+            "supports ODANSHAY's passive",
+            "",
+            "",
+            "",
+            "",
+            "70",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "error": null
+    },
+    "hak": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "HAK_ID",
+            "name",
+            "BASE_LINK",
+            "STRONG_COLORS",
+            "STRONG_SHAPES",
+            "PRG_SET",
+            "PASSIVES",
+            "BIO",
+            "GRAPHICS"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "HAK_01",
+            "CR45H",
+            "100",
+            "RED:GRE:YEL",
+            "TRI:SQU:STR",
+            "PRG_H_001:PRG_H_002:PRG_H_005",
+            "PSV_001:PSV_002",
+            "hacker biography goes here",
+            "hacker graphics reference goes here"
+          ]
+        }
+      ],
+      "error": null
+    },
+    "hst": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "HOST_ID",
+            "name",
+            "passives",
+            "in_pool",
+            "display_text",
+            "graphics_ref",
+            "notes"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "HST_01",
+            "THRESHOLD",
+            "",
+            "n",
+            "",
+            "",
+            "host for first battle with no passives"
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "HST_02",
+            "BITMIRE",
+            "PSV_003",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "HST_03",
+            "ARENA",
+            "PSV_004",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 5,
+          "fields": [
+            "HST_04",
+            "VERDUN",
+            "PSV_007",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 6,
+          "fields": [
+            "HST_05",
+            "WEEDS",
+            "PSV_008",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "error": null
+    },
+    "prg_h": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "PRG_ID",
+            "name",
+            "colors",
+            "shapes",
+            "functions",
+            "notes"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "PRG_H_001",
+            "BOMBER",
+            "RED",
+            "TRI",
+            "FNC_001",
+            ""
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "PRG_H_002",
+            "BUFFER",
+            "GRE",
+            "SQU",
+            "FNC_002",
+            ""
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "PRG_H_003",
+            "ATTACKER",
+            "YEL",
+            "STR",
+            "FNC_003",
+            ""
+          ]
+        },
+        {
+          "line": 5,
+          "fields": [
+            "PRG_H_004",
+            "DISABLER",
+            "BLU",
+            "CIR",
+            "FNC_004",
+            ""
+          ]
+        },
+        {
+          "line": 6,
+          "fields": [
+            "PRG_H_005",
+            "NINJA",
+            "MAG",
+            "CRO",
+            "FNC_011",
+            ""
+          ]
+        },
+        {
+          "line": 7,
+          "fields": [
+            "PRG_H_006",
+            "WEASEL",
+            "RED",
+            "CIR",
+            "FNC_012",
+            ""
+          ]
+        }
+      ],
+      "error": null
+    },
+    "prg_s": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "PRG_ID",
+            "name",
+            "colors",
+            "shapes",
+            "functions",
+            "notes"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "PRG_S_001",
+            "E-BOMBER",
+            "RED",
+            "TRI",
+            "FNC_005",
+            ""
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "PRG_S_002",
+            "SHIELDER",
+            "GRE",
+            "SQU",
+            "FNC_006",
+            ""
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "PRG_S_003",
+            "ATTACKER",
+            "YEL",
+            "STR",
+            "FNC_003",
+            ""
+          ]
+        },
+        {
+          "line": 5,
+          "fields": [
+            "PRG_S_004",
+            "DISABLER",
+            "BLU",
+            "CIR",
+            "FNC_004",
+            ""
+          ]
+        },
+        {
+          "line": 6,
+          "fields": [
+            "PRG_S_005",
+            "MUSCLE",
+            "BLU",
+            "CRO",
+            "FNC_013",
+            ""
+          ]
+        },
+        {
+          "line": 7,
+          "fields": [
+            "PRG_S_006",
+            "ENHANCE",
+            "MAG",
+            "TRI",
+            "FNC_014",
+            ""
+          ]
+        },
+        {
+          "line": 8,
+          "fields": [
+            "PRG_S_007",
+            "SPAMBOT",
+            "YEL",
+            "CIR",
+            "FNC_015",
+            ""
+          ]
+        },
+        {
+          "line": 9,
+          "fields": [
+            "PRG_S_008",
+            "THROWER",
+            "BLU",
+            "STR",
+            "FNC_001",
+            ""
+          ]
+        }
+      ],
+      "error": null
+    },
+    "psv": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "PASSIVE_ID",
+            "passive_effect",
+            "params",
+            "activation",
+            "function_payload",
+            "agent_scope",
+            "display",
+            "notes"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "PSV_001",
+            "PSV_EXTRA_MATCH_DAMAGE",
+            "RED:1",
+            "CONTINUAL",
+            "",
+            "OWNER",
+            "Deal %1 extra damage on a %0 sync",
+            ""
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "PSV_002",
+            "PSV_EXTRA_MATCH_CHARGE",
+            "RED:1",
+            "CONTINUAL",
+            "",
+            "OWNER",
+            "Gain %1 extra charge on a %0 sync",
+            ""
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "PSV_003",
+            "PSV_CHARGE_DAMPEN",
+            "ALL:1",
+            "CONTINUAL",
+            "",
+            "ENEMY",
+            "%0 syncs generate %1 fewer charge",
+            ""
+          ]
+        },
+        {
+          "line": 5,
+          "fields": [
+            "PSV_004",
+            "PSV_FUNCTION_DAMAGE_INCREASE",
+            "ALL:2",
+            "CONTINUAL",
+            "",
+            "OWNER",
+            "Increase damage dealt by %0 FUNCTIONS by %1",
+            ""
+          ]
+        },
+        {
+          "line": 6,
+          "fields": [
+            "PSV_005",
+            "PSV_PERM_SHIELD",
+            "ALL:1",
+            "CONTINUAL",
+            "",
+            "OWNER",
+            "Decrease damage dealt from %0 sources by %1",
+            ""
+          ]
+        },
+        {
+          "line": 7,
+          "fields": [
+            "PSV_006",
+            "PSV_EXTRA_MATCH_CHARGE",
+            "YEL:1",
+            "CONTINUAL",
+            "",
+            "OWNER",
+            "Gain %1 extra charge on a %0 sync",
+            ""
+          ]
+        },
+        {
+          "line": 8,
+          "fields": [
+            "PSV_007",
+            "PSV_BIGGER_BOMB",
+            "",
+            "CONTINUAL",
+            "",
+            "OWNER",
+            "Increased explosion radius for all bombs",
+            ""
+          ]
+        },
+        {
+          "line": 9,
+          "fields": [
+            "PSV_008",
+            "PSV_CARRIER",
+            "",
+            "START_OF_TURN",
+            "FNC_016",
+            "OWNER",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 10,
+          "fields": [
+            "PSV_009",
+            "PSV_CARRIER",
+            "",
+            "START_OF_TURN",
+            "FNC_017",
+            "OWNER",
+            "",
+            ""
+          ]
+        }
+      ],
+      "error": null
+    },
+    "sys": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "SYS_ID",
+            "name",
+            "in_pool",
+            "BASE_ICE",
+            "STRONG_COLORS",
+            "STRONG_SHAPES",
+            "PRG_SET",
+            "PASSIVES",
+            "BIO",
+            "GRAPHICS"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "SYS_01",
+            "BOUNCER",
+            "",
+            "100",
+            "RED:GRE:YEL",
+            "TRI:SQU:STR",
+            "PRG_S_003:PRG_S_005:PRG_S_006:PRG_S_001",
+            "",
+            "system biography goes here",
+            "system graphics reference goes here"
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "SYS_02",
+            "MIDNIGHT",
+            "",
+            "100",
+            "RED:MAG:BLU",
+            "TRI:SQU:STR",
+            "PRG_S_007:PRG_S_008:PRG_S_001:PRG_S_002",
+            "",
+            "system bio goes here",
+            "system graphics go here"
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "SYS_03",
+            "DOORMAN",
+            "n",
+            "100",
+            "GRE:YEL:BLU",
+            "CIR:CRO:STR",
+            "PRG_S_001:PRG_S_002:PRG_S_003:PRG_S_004",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "error": null
+    },
+    "upg": {
+      "rows": [
+        {
+          "line": 1,
+          "fields": [
+            "UPGRADE_ID",
+            "name",
+            "passives",
+            "display_text",
+            "graphics_ref",
+            "notes"
+          ]
+        },
+        {
+          "line": 2,
+          "fields": [
+            "UPG_01",
+            "BRACER",
+            "PSV_005",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "UPG_02",
+            "GRACE",
+            "PSV_006",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "UPG_03",
+            "L33TSK1LL",
+            "PSV_003",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 5,
+          "fields": [
+            "UPG_04",
+            "SNEAKERS",
+            "PSV_009",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "error": null
+    }
+  }
+}

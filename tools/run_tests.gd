@@ -13,6 +13,9 @@ const SUITES := [
 	# RNG first: D-009 makes it the gate on everything downstream.
 	"res://tests/test_rng.gd",
 	"res://tests/test_constants.gd",
+	# Phase 2 — content pipeline, in dependency order.
+	"res://tests/test_areas.gd",
+	"res://tests/test_csv.gd",
 	"res://tests/test_layer_purity.gd",
 	"res://tests/test_data_present.gd",
 ]
