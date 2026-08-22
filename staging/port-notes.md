@@ -159,6 +159,19 @@ reasoning applies to a PASSIVE's `ALL` scope, which the alpha models as
 gives no clue which of ~11,000 characters is wrong. Both are the kind of detail
 that only surfaces because the fingerprint is compared byte-for-byte.
 
+### P-013 · P-002 recurred, exactly as predicted
+
+`match_finder.gd` declared its enums and then annotated with the bare names,
+and every external caller failed to compile:
+
+```
+Parse Error: Cannot pass a value of type "MatchFinder.Orientation" as "Orientation".
+```
+
+The convention from P-002 — always qualify — is correct and easy to forget when
+writing a new module. Recorded because it is now the second occurrence, which
+makes it a pattern rather than an anecdote.
+
 ---
 
 ## Phase 2 result
