@@ -198,6 +198,75 @@ func _test_identity_datasets(t: TestCase) -> void:
 	loader.check_unreferenced_functions()
 	loader.check_unreferenced_passives()
 	_compare_diagnostics(t, loader)
+	_test_payload_grammar(t)
+
+
+func _test_payload_grammar(t: TestCase) -> void:
+	t.group("load / payload grammar")
+	var loader := ContentLoader.new()
+	loader.read_all()
+	loader.parse_payloads()
+
+	var errs := loader.issues.errors()
+	t.check("every authored payload parses", errs.is_empty())
+	for e in errs.slice(0, 5):
+		printerr("        %s" % DataIssues.format(e))
+
+	t.eq("every Function has a resolved payload", loader.payloads.size(), loader.function_rows.size())
+
+	var leaves := 0
+	var composites := 0
+	for id in loader.payloads:
+		var p: Dictionary = loader.payloads[id]
+		if p["kind"] == "leaf":
+			leaves += 1
+			t.check("%s names a registered Effect" % id, Effects.is_effect_id(str(p["effect_id"])))
+		else:
+			composites += 1
+			t.check("%s has children" % id, (p["children"] as Array).size() > 0)
+			# One-level nesting: every child must be a leaf. This is what makes
+			# cycles structurally impossible rather than something to detect.
+			for child in (p["children"] as Array):
+				t.check(
+					"%s child %s is a leaf" % [id, child],
+					loader.payloads.has(child) and loader.payloads[child]["kind"] == "leaf",
+				)
+	t.check("the content includes leaf Functions", leaves > 0)
+	print("        %d leaf, %d composite" % [leaves, composites])
+
+	t.group("load / Effect parameter contracts")
+	loader.resolve_effect_params()
+	var perrs := loader.issues.errors()
+	t.check("every authored Function satisfies its Effect contract", perrs.is_empty())
+	for e in perrs.slice(0, 5):
+		printerr("        %s" % DataIssues.format(e))
+
+	t.eq("every leaf Function resolved parameters", loader.fn_params.size(), leaves)
+
+	# Typed tuples are resolved into named fields, so runtime never re-parses
+	# the raw string and a positional mistake cannot survive to combat.
+	for id in loader.fn_params:
+		var params: Dictionary = loader.fn_params[id]
+		var effect_id: String = loader.payloads[id]["effect_id"]
+		var contract := Effects.contract(effect_id)
+
+		for req in (contract["required"] as Array):
+			t.check("%s supplies required %s" % [id, req], params.has(req))
+
+		if not (contract["tuple"] as Array).is_empty():
+			var tuple_keys := {
+				Effects.BOMB: "bomb", Effects.LINESLICE: "line",
+				Effects.TRANSFORM: "transform", Effects.SHAKE: "shake",
+			}
+			var key: String = tuple_keys.get(effect_id, "")
+			t.check("%s resolved its %s tuple" % [id, effect_id], key != "" and params.has(key))
+
+		if params.has("areaPattern"):
+			t.check("%s names a registered area pattern" % id, Areas.is_pattern_id(str(params["areaPattern"])))
+
+	# The alpha's warning set is unchanged by this phase on current content:
+	# every authored row uses exactly the columns its Effect claims.
+	t.eq("no new warnings from contract validation", loader.issues.warning_count, 0)
 
 
 func _compare_diagnostics(t: TestCase, loader: ContentLoader) -> void:

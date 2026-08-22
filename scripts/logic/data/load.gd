@@ -802,6 +802,368 @@ func check_duplicate_ids(rows: Array[Dictionary], dataset: String, field: String
 
 
 # ---------------------------------------------------------------------------
+# Payload grammar
+# ---------------------------------------------------------------------------
+
+## A Function is either a LEAF that invokes one coded Effect, or a one-level
+## COMPOSITE that invokes leaf Functions in order.
+##
+## One-level nesting is what makes cycles structurally impossible rather than
+## something to detect: a composite may only reference leaves, so no chain can
+## ever return to its start.
+##
+## Populates `payloads`: id to `{kind, effect_id, children}`. A Function absent
+## from the map failed validation and has already reported why.
+var payloads := {}
+
+
+func parse_payloads() -> void:
+	var fn_ids := {}
+	for f in function_rows:
+		fn_ids[f["id"]] = true
+
+	for f in function_rows:
+		var ctx := {
+			"dataset": DataIssues.DATASET_FUNCTIONS, "file": f["file"],
+			"row": f["row"], "id": f["id"], "field": "payload",
+		}
+		var raw: String = f["payload_raw"]
+		var tokens: Array[String] = []
+		var has_blank := false
+		for tk in raw.split(":"):
+			var t := tk.strip_edges()
+			if t == "":
+				has_blank = true
+			tokens.append(t)
+
+		if has_blank:
+			var c := ctx.duplicate()
+			c["value"] = raw
+			c["reason"] = "blank token in payload"
+			issues.error(c)
+			continue
+
+		var effect_tokens: Array[String] = []
+		var fn_tokens: Array[String] = []
+		var bad_token := ""
+		for t in tokens:
+			if t.begins_with("EFFECT_"):
+				effect_tokens.append(t)
+			elif t.begins_with("FNC_"):
+				fn_tokens.append(t)
+			elif bad_token == "":
+				bad_token = t
+
+		if effect_tokens.size() + fn_tokens.size() != tokens.size():
+			var c := ctx.duplicate()
+			c["value"] = bad_token
+			c["expected"] = "EFFECT_* or FNC_*"
+			c["reason"] = "payload entry is neither an Effect ID nor a Function ID"
+			issues.error(c)
+			continue
+
+		if not effect_tokens.is_empty() and not fn_tokens.is_empty():
+			var c := ctx.duplicate()
+			c["value"] = raw
+			c["reason"] = "payload may not mix EFFECT_* and FNC_* entries"
+			issues.error(c)
+			continue
+
+		if effect_tokens.size() > 1:
+			var c := ctx.duplicate()
+			c["value"] = raw
+			c["reason"] = "a leaf payload must be exactly one EFFECT_* ID"
+			issues.error(c)
+			continue
+
+		if effect_tokens.size() == 1:
+			if not Effects.is_effect_id(effect_tokens[0]):
+				var c := ctx.duplicate()
+				c["value"] = effect_tokens[0]
+				c["reason"] = "unknown Effect ID"
+				issues.error(c)
+				continue
+			payloads[f["id"]] = {"kind": "leaf", "effect_id": effect_tokens[0], "children": []}
+		else:
+			if fn_tokens.has(f["id"]):
+				var c := ctx.duplicate()
+				c["value"] = f["id"]
+				c["reason"] = "self-reference in payload is invalid"
+				issues.error(c)
+				continue
+			# Repeats are allowed and intentional: a composite may invoke the
+			# same child twice.
+			payloads[f["id"]] = {"kind": "composite", "effect_id": "", "children": fn_tokens}
+
+	_check_composite_children(fn_ids)
+
+
+## Composite children must exist and be LEAF Functions. Rejecting
+## composite-of-composite is what enforces one-level nesting, and with it the
+## impossibility of a cycle.
+func _check_composite_children(fn_ids: Dictionary) -> void:
+	for f in function_rows:
+		var id: String = f["id"]
+		if not payloads.has(id) or payloads[id]["kind"] != "composite":
+			continue
+
+		var ctx := {
+			"dataset": DataIssues.DATASET_FUNCTIONS, "file": f["file"],
+			"row": f["row"], "id": id, "field": "payload",
+		}
+		var ok := true
+		for child in (payloads[id]["children"] as Array):
+			if not fn_ids.has(child):
+				var c := ctx.duplicate()
+				c["value"] = child
+				c["reason"] = "payload references an unknown Function ID"
+				issues.error(c)
+				ok = false
+			elif not payloads.has(child):
+				# The child failed its own payload validation and has already
+				# reported why; adding a second message here would be noise.
+				ok = false
+			elif payloads[child]["kind"] == "composite":
+				var c := ctx.duplicate()
+				c["value"] = child
+				c["reason"] = "a composite Function may not reference another composite Function (one-level nesting only)"
+				issues.error(c)
+				ok = false
+
+		if not ok:
+			payloads.erase(id)
+
+
+# ---------------------------------------------------------------------------
+# Effect parameter contracts
+# ---------------------------------------------------------------------------
+
+## Resolved leaf parameters, keyed by Function ID.
+var fn_params := {}
+
+
+## Validates each leaf Function's discrete columns and compound tuple against
+## its Effect's contract, and resolves them into typed values so runtime never
+## re-parses raw text.
+##
+## Anything the contract does not claim is *unused* and warns when populated.
+## Silence there would let a stray value sit in a column doing nothing for
+## months, looking authored.
+func resolve_effect_params() -> void:
+	for f in function_rows:
+		var id: String = f["id"]
+		if not payloads.has(id):
+			continue
+
+		var p: Dictionary = payloads[id]
+		var ctx := {
+			"dataset": DataIssues.DATASET_FUNCTIONS, "file": f["file"],
+			"row": f["row"], "id": id,
+		}
+
+		if p["kind"] == "composite":
+			_warn_unused_on_composite(f, ctx)
+			continue
+
+		var contract := Effects.contract(str(p["effect_id"]))
+		var out := {}
+		var ok := _resolve_discrete_params(f, contract, str(p["effect_id"]), ctx, out)
+		if not _resolve_tuple(f, contract, str(p["effect_id"]), ctx, out):
+			ok = false
+
+		if ok:
+			fn_params[id] = out
+
+
+## A composite pays the parent cost once and delegates everything else to its
+## children, so every discrete parameter column on its own row is unused.
+func _warn_unused_on_composite(f: Dictionary, ctx: Dictionary) -> void:
+	var params: Dictionary = f["params"]
+	for col in Effects.PARAM_NAMES:
+		if str(params[col]).strip_edges() != "":
+			var c := ctx.duplicate()
+			c["field"] = col
+			c["value"] = params[col]
+			c["reason"] = "populated parameter is unused by a composite Function"
+			issues.warn(c)
+	if str(f["tuple_raw"]) != "":
+		var c := ctx.duplicate()
+		c["field"] = "params"
+		c["value"] = f["tuple_raw"]
+		c["reason"] = "populated parameter is unused by a composite Function"
+		issues.warn(c)
+
+
+func _resolve_discrete_params(f: Dictionary, contract: Dictionary, effect_id: String, ctx: Dictionary, out: Dictionary) -> bool:
+	var params: Dictionary = f["params"]
+	var required: Array = contract["required"]
+	var optional: Array = contract["optional"]
+	var ok := true
+
+	for col in Effects.PARAM_NAMES:
+		var raw: String = params[col]
+		var is_required := required.has(col)
+
+		# An OPTIONAL column is validated when supplied and simply absent
+		# otherwise. Blank is MEANINGFUL here — it selects immediate Bomb
+		# resolution — so it is neither an error nor an unused-parameter warning.
+		if not is_required and optional.has(col) and col != "areaPattern":
+			var parsed := Vocab.parse_int_field(raw)
+			if not parsed["present"]:
+				continue
+			if not parsed["valid"]:
+				var c := _field_ctx(ctx, col)
+				c["value"] = raw.strip_edges()
+				c["expected"] = "non-negative integer"
+				c["reason"] = "invalid %s for %s" % [col, effect_id]
+				issues.error(c)
+				ok = false
+				continue
+			# countdown 0 explicitly means "resolve immediately"; a negative
+			# value cannot reach here because the integer syntax rejects signs.
+			if int(parsed["value"]) > 9999:
+				var c := _field_ctx(ctx, col)
+				c["value"] = raw.strip_edges()
+				c["expected"] = "0-9999"
+				c["reason"] = "parameter out of range"
+				issues.error(c)
+				ok = false
+				continue
+			out[col] = int(parsed["value"])
+			continue
+
+		if col == "areaPattern":
+			if not _resolve_area_pattern(raw, is_required, effect_id, ctx, out):
+				ok = false
+			continue
+
+		var parsed := Vocab.parse_int_field(raw)
+		if is_required:
+			if not parsed["present"] or not parsed["valid"]:
+				var c := _field_ctx(ctx, col)
+				if raw.strip_edges() != "":
+					c["value"] = raw.strip_edges()
+				c["expected"] = "positive integer"
+				c["reason"] = "missing or invalid required parameter for %s" % effect_id
+				issues.error(c)
+				ok = false
+				continue
+
+			# `quantity` means "up to this many valid targets", so an authored
+			# maximum may legitimately exceed the board's cell count — COERCE
+			# uses 99 to mean "every eligible Packet". 99 is an ORDINARY number
+			# here, never a sentinel, and fewer targets simply means fewer
+			# deployments.
+			var lo := 1
+			var hi := 999999
+			if col == "quantity":
+				hi = 999
+			elif col == "countdown":
+				hi = 9999
+
+			var v := int(parsed["value"])
+			if v < lo or v > hi:
+				var c := _field_ctx(ctx, col)
+				c["value"] = raw.strip_edges()
+				c["expected"] = "%d-%d" % [lo, hi]
+				c["reason"] = "parameter out of range"
+				issues.error(c)
+				ok = false
+				continue
+			out[col] = v
+		elif parsed["present"]:
+			# Populated-but-unused warns, including a numeric 0.
+			var c := _field_ctx(ctx, col)
+			c["value"] = raw.strip_edges()
+			c["reason"] = "populated parameter is unused by %s" % effect_id
+			issues.warn(c)
+
+	return ok
+
+
+func _resolve_area_pattern(raw: String, is_required: bool, effect_id: String, ctx: Dictionary, out: Dictionary) -> bool:
+	var t := raw.strip_edges()
+	var expected := "|".join(Areas.patterns().keys())
+
+	if is_required:
+		if t == "":
+			var c := _field_ctx(ctx, "areaPattern")
+			c["expected"] = expected
+			c["reason"] = "missing required parameter for %s" % effect_id
+			issues.error(c)
+			return false
+		if not Areas.is_pattern_id(t):
+			var c := _field_ctx(ctx, "areaPattern")
+			c["value"] = t
+			c["expected"] = expected
+			c["reason"] = "unknown area pattern"
+			issues.error(c)
+			return false
+		out["areaPattern"] = t
+		return true
+
+	if t != "":
+		var c := _field_ctx(ctx, "areaPattern")
+		c["value"] = t
+		c["reason"] = "populated parameter is unused by %s" % effect_id
+		issues.warn(c)
+	return true
+
+
+func _resolve_tuple(f: Dictionary, contract: Dictionary, effect_id: String, ctx: Dictionary, out: Dictionary) -> bool:
+	var tuple_fields: Array = contract["tuple"]
+	var raw: String = f["tuple_raw"]
+
+	if tuple_fields.is_empty():
+		if raw != "":
+			var c := _field_ctx(ctx, "params")
+			c["value"] = raw
+			c["reason"] = "populated parameter is unused by %s" % effect_id
+			issues.warn(c)
+		return true
+
+	if raw == "":
+		var names := PackedStringArray()
+		for tf in tuple_fields:
+			names.append(tf["name"])
+		var c := _field_ctx(ctx, "params")
+		c["expected"] = ":".join(names)
+		c["reason"] = "missing required params tuple for %s" % effect_id
+		issues.error(c)
+		return false
+
+	var parsed := DataTable.read_tuple(raw, tuple_fields, _field_ctx(ctx, "params"), issues)
+	if not parsed["ok"]:
+		return false
+
+	var vals: Array = parsed["values"]
+	match effect_id:
+		Effects.BOMB:
+			out["bomb"] = {"targeting": vals[0], "dealDamage": vals[1], "gainCharge": vals[2]}
+		Effects.LINESLICE:
+			out["line"] = {
+				"dimension": vals[0], "targeting": vals[1], "specialRetention": vals[2],
+				"dealDamage": vals[3], "gainCharge": vals[4],
+			}
+		Effects.TRANSFORM:
+			out["transform"] = {"targeting": vals[0], "specialPacketTreatment": vals[1]}
+		Effects.SHAKE:
+			out["shake"] = {
+				"boardComposition": vals[0], "specialGems": vals[1],
+				"matches": vals[2], "cascades": vals[3],
+			}
+			# Valid data whose combination is inert: with matches disabled, the
+			# cascade mode has nothing to act on.
+			if vals[2] == Content.SHAKE_PREVENT_MATCHES and vals[3] != Content.SHAKE_CASCADE_NONE:
+				var c := _field_ctx(ctx, "params")
+				c["value"] = raw
+				c["reason"] = "EFFECT_SHAKE matches are disabled while a nonzero cascade mode is supplied — the cascade mode is currently ignored"
+				issues.warn(c)
+
+	return true
+
+
+# ---------------------------------------------------------------------------
 # Cross-dataset checks
 # ---------------------------------------------------------------------------
 
