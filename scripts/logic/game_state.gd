@@ -41,6 +41,19 @@ var config := {}
 ## differential traces, since it is identity rather than behaviour.
 var battle_id := ""
 
+## Battle metrics and the battle log, both fed from `Game._collect`.
+##
+## They live on the state rather than on `Game` because they must survive save
+## and resume: a battle continued from disk has to report the same figures as
+## one played straight through, and a `Game` is reconstructed around a restored
+## state rather than restored itself.
+##
+## Both are nullable, and every consumer checks. The differential harness runs
+## thousands of battles where neither is wanted, and making them mandatory would
+## mean paying for accounting nobody reads.
+var metrics: Metrics.Battle = null
+var log: BattleLog = null
+
 
 ## A charge pool bound to a resolved Program by stable ID.
 ##

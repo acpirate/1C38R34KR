@@ -18,6 +18,10 @@ var _panel: PanelContainer
 var _root: VBoxContainer
 var _content: Control
 
+## The state of the battle currently on screen, kept so the result screen can
+## report on it after the battle scene has been freed.
+var _finished_state: GameState = null
+
 var _system_id := ""
 var _host_id := ""
 var _build: Array = []
@@ -29,6 +33,11 @@ func _ready() -> void:
 	# Set once on the root: every screen and the battle scene inherit it, so
 	# there is exactly one place a control's appearance is decided.
 	theme = UiTheme.build()
+
+	# Debug builds log at VERBOSE and release at BASIC. COMPLETE is never
+	# reached by defaulting — it retains the readable mirror and every ordinary
+	# charge route, so it is an explicit diagnostic opt-in.
+	BattleLog.set_level(BattleLog.default_level(OS.is_debug_build()))
 
 	var bg := ColorRect.new()
 	bg.color = PacketStyle.BOARD_BACKGROUND
@@ -462,9 +471,13 @@ func _token_list(values: Array, vocab: Dictionary) -> String:
 # ---------------------------------------------------------------------------
 
 func _start_battle() -> void:
-	_enter_battle(Session.create_quick_match(_system_id, _host_id, _seed, _build))
+	_enter_battle(Session.create_quick_match(_system_id, _host_id, _seed, _build, {}, true))
 
 
+## A save written before accounting existed, or by a harness run that carried
+## none, resumes without it rather than starting a fresh accumulator mid-battle
+## — half a battle's figures presented as a whole battle's would be worse than
+## none at all.
 func _resume(state: GameState) -> void:
 	_enter_battle(state)
 
@@ -475,6 +488,8 @@ func _enter_battle(state: GameState) -> void:
 		_shell = null
 		_panel = null
 		_root = null
+
+	_finished_state = state
 
 	var screen := BattleScreen.new()
 	screen.setup(state)
@@ -494,6 +509,8 @@ func _on_battle_finished(winner: int) -> void:
 	# A concluded battle is not resumable, so its save is cleared rather than
 	# left to offer a Continue that would restore a finished battle.
 	SaveState.clear()
+	if _finished_state != null:
+		LogStore.flush_battle(_finished_state, _finished_state.metrics, _finished_state.log)
 	_show_result(winner)
 
 
@@ -503,7 +520,9 @@ func _show_result(winner: int) -> void:
 		_content = null
 
 	var won := winner == Types.Side.PLAYER
-	_fresh_screen(true)
+	# Not compact: the report needs room to scroll. The exits stay above it, so
+	# they remain reachable without scrolling past the whole thing.
+	_fresh_screen(_finished_state == null or _finished_state.metrics == null)
 	_heading("VICTORY" if won else "DEFEAT")
 	_subheading("System ICE breached." if won else "Hacker LINK severed.")
 
@@ -527,3 +546,106 @@ func _show_result(winner: int) -> void:
 	stamp.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
 	stamp.text = "seed %d · content %s" % [_seed, Content.fingerprint()]
 	_root.add_child(stamp)
+
+	if _finished_state != null and _finished_state.metrics != null:
+		_show_metrics(_finished_state)
+
+
+## The battle report, in its own scroll region below the exits.
+##
+## Left-aligned and plain-text on purpose: this is a diagnostic readout, and a
+## tester comparing it against a harness run needs to read values, not admire a
+## chart. Per-Program lines carry the stable content ID for exactly that reason
+## — it is what makes a screenshot of this screen actionable.
+func _show_metrics(state: GameState) -> void:
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size.y = 200
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_root.add_child(scroll)
+
+	var body := Label.new()
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
+	body.text = "\n".join(_metrics_lines(state))
+	scroll.add_child(body)
+
+
+func _metrics_lines(state: GameState) -> PackedStringArray:
+	var m := state.metrics
+	var out := PackedStringArray()
+
+	out.append("BATTLE")
+	out.append("Turns to resolution: %d" % m.turns)
+	out.append("Sync-locks (auto-reshuffles): %d" % m.auto_reshuffles)
+	out.append("Detonations: %d" % m.detonations)
+	out.append("System withholds: %d" % m.system_withholds)
+	out.append("System shields — created %d, sliced %d" % [m.enemy_shield_created, m.enemy_shield_removed])
+	out.append("Shielded hits: %d, damage prevented: %d" % [m.enemy_shield_instances, m.enemy_shield_prevented])
+
+	_append_side(out, m, Types.Side.PLAYER, "HACKER")
+	_append_side(out, m, Types.Side.ENEMY, "SYSTEM")
+	return out
+
+
+func _append_side(out: PackedStringArray, m: Metrics.Battle, side: Types.Side, title: String) -> void:
+	var s := m.side(side)
+	out.append("")
+	out.append(title)
+	out.append("Total damage dealt: %d" % s.total_damage)
+	# Rounded for display only. The stored values are pre-floor floats — a
+	# Shield rescales them proportionally — and rounding here rather than in the
+	# accumulator is what keeps the buckets summing to the total exactly.
+	out.append("Sync-caused (incl. its cascades): %d" % roundi(s.match_damage))
+	out.append("bomb-caused (incl. its cascades): %d" % roundi(s.bomb_damage))
+	out.append("line-slice-caused (incl. its cascades): %d" % roundi(s.lineslice_damage))
+	out.append("transform-caused (incl. its cascades): %d" % roundi(s.transform_damage))
+	out.append("Function-caused (incl. its cascades): %d" % roundi(s.attacker_damage))
+	out.append("PASSIVE-caused: %d" % roundi(s.passive_damage))
+	out.append("Buff added: %d" % roundi(s.buff_damage_added))
+	out.append("Deepest cascade: %d RNG rounds" % s.deepest_cascade)
+	out.append("Line clears: %d" % s.line_clears)
+
+	var contested := s.contention_tiles
+	var destroyed := s.tiles_destroyed
+	var pct := (100.0 * float(contested) / float(destroyed)) if destroyed > 0 else 0.0
+	out.append("Opponent-bound Packets sliced: %d of %d (%.1f%%)" % [contested, destroyed, pct])
+	out.append("Charge wasted (no Program could take it): %d" % s.charge_wasted_total)
+
+	# Ordered by the battle's own roster rather than by the metrics Dictionary,
+	# so the report reads in charge-routing priority order — the same order the
+	# Build screen presented.
+	for u in (state_units(m, side)):
+		var um: Metrics.Unit = s.units.get(u, null)
+		if um == null:
+			continue
+		var prog := Content.program(u)
+		out.append("%s [%s]: fired %d, effect %d" % [
+			prog["name"], u, um.fires, roundi(um.effect),
+		])
+
+	if side == Types.Side.PLAYER and _finished_state != null:
+		var deck := Content.deck(_finished_state.identity["deck_id"])
+		out.append("%s [%s deck]: fired %d, neutral charge %d (wasted %d)" % [
+			deck["name"], deck["id"], s.deck.fires,
+			s.deck.charge_from_neutral, s.deck.charge_wasted,
+		])
+
+	for key in s.passives:
+		var p: Metrics.Passive = s.passives[key]
+		out.append("%s via %s: %d trigger(s), %d damage" % [
+			p.passive_id, p.source_id, p.triggers, roundi(p.damage),
+		])
+
+
+## The side's Program IDs in roster order, read from the battle rather than from
+## the metrics map — a Dictionary's iteration order is insertion order, which is
+## not the order the player built.
+func state_units(_m: Metrics.Battle, side: Types.Side) -> Array:
+	var out: Array = []
+	if _finished_state == null:
+		return out
+	for u in (_finished_state.units[side] as Array):
+		out.append(u.program_id)
+	return out

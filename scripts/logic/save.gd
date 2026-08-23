@@ -22,7 +22,13 @@ extends RefCounted
 ## RNG state, a dropped countdown, or a lost stamped area pattern. Continuing to
 ## the end and comparing the event stream does not.
 
-const SCHEMA := 1
+## Bumped to 2: the envelope gained the metrics accumulator and the open turn
+## log record. A schema-1 save has no accounting to restore and is rejected
+## rather than resumed with the counters silently starting from zero — the
+## authorization requires the metrics state needed for consistent continuation
+## to be part of the save, and a battle that resumes reporting half its damage
+## is exactly the failure that requirement exists to prevent.
+const SCHEMA := 2
 const SAVE_PATH := "user://save.json"
 
 
@@ -47,6 +53,11 @@ static func to_dict(state: GameState) -> Dictionary:
 		"identity": state.identity.duplicate(true),
 		"config": _config_to_dict(state.config),
 		"board": _board_to_array(state.board),
+		# Accounting state. Null when the battle was created without it — the
+		# differential harness's battles carry none, and inventing empty
+		# counters on restore would be a quiet lie about what was recorded.
+		"metrics": null if state.metrics == null else state.metrics.to_dict(),
+		"log": null if state.log == null else state.log.to_dict(),
 	}
 
 
@@ -138,6 +149,12 @@ static func from_dict(data: Dictionary) -> Dictionary:
 	s.units = units["units"]
 
 	s.board = _board_from_array(data["board"])
+
+	if data.get("metrics", null) != null:
+		s.metrics = Metrics.Battle.from_dict(data["metrics"])
+	if data.get("log", null) != null:
+		s.log = BattleLog.from_dict(data["log"])
+
 	return {"ok": true, "state": s, "reason": ""}
 
 

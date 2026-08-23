@@ -44,7 +44,11 @@ static func create_quick_match(
 	host_id: String,
 	seed_value: int,
 	build: Array,
-	settings: Dictionary = {}
+	settings: Dictionary = {},
+	# Accounting is opt-in. The differential harness runs thousands of battles
+	# that want neither, and paying for records nobody reads would show up
+	# directly in the parity run's wall clock.
+	with_accounting := false,
 ) -> GameState:
 	var hacker := Content.hacker(Content.DEFAULT_HACKER_ID)
 	var deck := Content.deck(Content.DEFAULT_DECK_ID)
@@ -102,7 +106,26 @@ static func create_quick_match(
 	s.board = BoardOps.generate_initial(gen)
 	s.next_id = gen.next_id
 
+	if with_accounting:
+		attach_accounting(s)
+
 	return s
+
+
+## Attaches a metrics accumulator and a battle log to a state that has none.
+##
+## Seeded from the battle's ACTIVE roster on both sides, so an inventory Program
+## that is not in the build has no metrics slot to be confused by.
+static func attach_accounting(s: GameState) -> void:
+	var player_ids: Array = []
+	for u in (s.units[Types.Side.PLAYER] as Array):
+		player_ids.append(u.program_id)
+	var enemy_ids: Array = []
+	for u in (s.units[Types.Side.ENEMY] as Array):
+		enemy_ids.append(u.program_id)
+	s.metrics = Metrics.create(player_ids, enemy_ids)
+	s.metrics.turns = s.turn
+	s.log = BattleLog.new(s.battle_id)
 
 
 static func _units_for(program_ids: Array) -> Array:

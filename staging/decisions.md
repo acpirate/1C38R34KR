@@ -562,3 +562,61 @@ What was NOT replicated, deliberately:
   the report drops in below without moving them.
 
 Verified end-to-end on the tablet: all six screens, 942 tests, parity 150/150.
+
+## D-025 — Metrics and logging attach to the event funnel, and to nothing else
+
+**2026-08-23.** Phase 6's last logic module. Both are collectors over the SAME
+event stream the resolver already emits, attached at `Game._collect` — the one
+funnel every returned batch passes through. There is no second pipeline and no
+path by which logging can observe something metrics did not.
+
+That placement is what makes them cheap to trust. The differential gate proves
+the beta's event stream matches the alpha's byte for byte, so a collector
+consuming only events inherits that proof: the numbers are right because the
+stream is right.
+
+Consequences of the design, each deliberate:
+
+- **They live on `GameState`, not on `Game`.** The authorization requires the
+  metrics state needed for consistent continuation to be in the save, and a
+  `Game` is reconstructed around a restored state rather than restored itself.
+  Save schema bumped to 2; a schema-1 save is rejected rather than resumed with
+  the counters silently starting from zero.
+- **Both are nullable and opt-in.** The parity run plays thousands of battles
+  that want neither, and mandatory accounting would show up directly in its wall
+  clock. `Session.create_quick_match(..., with_accounting)` defaults to false;
+  the game passes true, the harness does not.
+- **Damage buckets are floats.** The analytical splits are pre-floor values that
+  a Shield rescales proportionally, and they are `null` when they do not apply.
+  Truncating each to an int would push the disjointness identity off by a few
+  units per battle; `int(null)` is worse still — it raises at runtime and aborts
+  the rest of the batch, so every later event goes uncounted and the totals
+  under-report silently. `_num()` handles both. Display rounds; the accumulator
+  does not.
+- **`force_outcome` moved into `Game`.** The debug win/lose buttons reached past
+  `Game` into `Resolve`, which meant they bypassed the funnel and produced a
+  result screen reporting zero damage for a battle that plainly had some. A
+  diagnostic outside the funnel eventually produces a bug report about the
+  metrics rather than about the diagnostic.
+
+The load-bearing test is the bucket identity — `match + attacker + bomb +
+lineslice + transform + passive + buff == total`, asserted over real battles
+rather than against hand-computed numbers, which would only re-derive the
+implementation. `cascade` is excluded because it is cross-cutting. Continuation
+is tested the same way `save` is: an interrupted battle must finish with the
+same figures as an uninterrupted one.
+
+Logging keeps the alpha's three levels with VERBOSE in debug builds and BASIC in
+release; COMPLETE is never reached by defaulting. `LogStore` writes three JSONL
+streams under `user://logs` with per-stream byte caps and oldest-first trimming.
+Godot's filesystem removes the alpha's localStorage quota problem but is not
+itself a budget — an unbounded log on a phone is a slow disk leak, so the cap
+stays and only the mechanism changes.
+
+**Not ported:** the alpha's selection, wizard, and Boss-selection log streams.
+Beta 0.1 is Constructed Quick Match only, so no code path can produce them, and
+a record type that cannot be written is a schema claim the build cannot back up.
+They land with the features in 0.2.
+
+Verified: 1047 tests green, parity 150/150, logs written and read back off the
+tablet.

@@ -17,11 +17,19 @@ func _init(s: GameState) -> void:
 	state = s
 
 
-## Metrics and logging consume this list downstream in Phase 6. Verified
-## (port note P-014) that both are strictly read-only over the event stream, so
-## adding them later cannot perturb behaviour or make the differential gate
-## sensitive to log level.
+## The one funnel every returned event batch passes through, and therefore the
+## one place metrics and logging attach.
+##
+## Both are strictly READ-ONLY over the stream (port note P-014). Neither may
+## write game state, consume RNG, or alter the list — if either could, the
+## differential gate would become sensitive to log level, which would make it
+## worthless as a gate.
 func _collect(events: Array) -> Array:
+	if state.metrics != null:
+		Metrics.consume(state.metrics, events)
+		state.metrics.turns = state.turn
+	if state.log != null:
+		state.log.consume(state, events)
 	return events
 
 
@@ -763,6 +771,24 @@ func _place_specials(opts: Dictionary, events: Array) -> int:
 	return placed
 
 
+## Ends the battle by dealing lethal damage through the ORDINARY damage path.
+##
+## Lives here rather than in the battle screen so it goes through `_collect`
+## like everything else: a diagnostic that bypasses the funnel produces a result
+## screen reporting zero damage for a battle that clearly had some, and the next
+## bug report is about the metrics rather than about the shortcut. A diagnostic
+## that reaches behind the rules eventually produces a bug report about the
+## rules.
+func force_outcome(loser: Types.Side) -> Array:
+	var events: Array = []
+	if state.has_winner():
+		return events
+	Resolve.deal_damage(state, loser, state.hp[loser] + 9999, {
+		"source": Types.DamageSource.ATTACKER, "label": "debug",
+	}, events)
+	return _collect(events)
+
+
 # ---------------------------------------------------------------------------
 # The turn-ending Sync
 # ---------------------------------------------------------------------------
@@ -771,9 +797,9 @@ func _place_specials(opts: Dictionary, events: Array) -> int:
 func attempt_swap(a: Vector2i, b: Vector2i, think_ms := -1, hint_shown := false) -> Dictionary:
 	var events: Array = []
 	if state.phase != Types.Phase.PLAYER_PRE:
-		return {"matched": false, "events": events}
+		return {"matched": false, "events": _collect(events)}
 	if absi(a.x - b.x) + absi(a.y - b.y) != 1:
-		return {"matched": false, "events": events}
+		return {"matched": false, "events": _collect(events)}
 
 	BoardOps.swap(state.board, a, b)
 	events.append({"t": Types.EVT.SWAP, "a": a, "b": b})
@@ -782,7 +808,7 @@ func attempt_swap(a: Vector2i, b: Vector2i, think_ms := -1, hint_shown := false)
 		BoardOps.swap(state.board, a, b)
 		events.append({"t": Types.EVT.REVERT, "a": a, "b": b})
 		events.append({"t": Types.EVT.NO_MATCH})
-		return {"matched": false, "events": events}
+		return {"matched": false, "events": _collect(events)}
 
 	if think_ms >= 0:
 		events.append({"t": Types.EVT.THINK_TIME, "ms": think_ms})

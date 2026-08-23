@@ -352,17 +352,14 @@ func _grant_charge() -> void:
 	_refresh_programs()
 
 
-## Ends the battle by dealing lethal damage through the ordinary damage path,
-## rather than setting the winner directly. A diagnostic that reaches behind the
-## rules eventually produces a bug report about the rules.
+## Ends the battle through `Game.force_outcome`, which deals lethal damage down
+## the ordinary path and through the ordinary event funnel. The renderer does
+## not reach into `Resolve` itself — doing so is what let this shortcut skip
+## metrics and report a battle with zero damage in it.
 func _force_outcome(loser: Types.Side) -> void:
 	if _playing or state.has_winner():
 		return
-	var events: Array = []
-	Resolve.deal_damage(state, loser, state.hp[loser] + 9999, {
-		"source": Types.DamageSource.ATTACKER, "label": "debug",
-	}, events)
-	_play(events)
+	_play(game.force_outcome(loser))
 
 
 # ---------------------------------------------------------------------------
