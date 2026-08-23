@@ -191,9 +191,14 @@ func _cycle_speed() -> void:
 	_update_speed_button()
 
 
+## GDScript's format operator has no `%g`, and using one raises
+## "unsupported format character" at runtime rather than failing to compile —
+## so the button silently never got a label.
 func _update_speed_button() -> void:
-	if _speed_button != null:
-		_speed_button.text = "%.2gx" % PLAYBACK_SPEEDS[_speed_index]
+	if _speed_button == null:
+		return
+	var speed: float = PLAYBACK_SPEEDS[_speed_index]
+	_speed_button.text = ("%dx" % int(speed)) if speed >= 1.0 else ("%.2fx" % speed)
 
 
 ## Fills every Program pool. Function activation, targeting, cancel-without-

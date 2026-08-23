@@ -38,8 +38,18 @@ Highest-value files there:
 
 | Role | Device | Availability |
 | --- | --- | --- |
-| **Primary / daily** | Galaxy Tab A 10.1 (`SM-T580`) — Android 8.1, Mali-T830, **armeabi-v7a**, 1.9 GB RAM | permanently connected |
+| **Primary / daily** | Galaxy Tab A 10.1 (`SM-T580`) — Android 8.1, Mali-T830, **armeabi-v7a**, 1.9 GB RAM | wireless: `adb connect 192.168.1.14:5555` |
 | **Target / periodic** | Galaxy S25 Ultra (`SM-S938U`) — Android 16, Adreno 830, **arm64-v8a** | on request only |
+
+The tablet's USB port is flaky, so it runs over **wireless ADB**. Reconnect with
+`adb connect 192.168.1.14:5555`; only re-run `adb tcpip 5555` over a cable if it
+has rebooted.
+
+It is also set to **stay awake while charging**. Without that the screen sleeps,
+the Godot activity pauses and stops the instant it launches, and a screenshot
+comes back pure black with an empty Godot log — which reads exactly like a
+rendering failure and is not one. If a device build ever appears to render
+nothing, check `dumpsys power` before debugging the renderer.
 
 Both ABI slices ship because **neither device can run the other's**. Do not
 propose dropping either to save APK size.
