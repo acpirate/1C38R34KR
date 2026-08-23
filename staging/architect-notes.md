@@ -58,3 +58,42 @@ need a trace-comparison exemption or an alpha-side change to match.
 - The Drain telemetry the log already emits (`target_program_id`,
   `target_readiness`, `charge_before`, `charge_after`) becomes considerably more
   interesting once a human is choosing the target.
+
+---
+
+## AN-002 — Scroll feel needs a dedicated pass
+
+**Raised by the director, 2026-08-23, after playtesting the two-finger fix.**
+"Scrolling is still not exact."
+
+**What beta 0.1 does:** `TouchScroll` scrolls when two fingers are down inside
+its rect, moving the content by the delta of the fingers' average position. The
+scrollbar is widened with a grabber as the visible affordance and the fallback.
+
+**What is unresolved.** The gesture works — it was verified with real multitouch
+— but "works" and "feels right" are different standards, and this only meets the
+first. Known gaps, in the order I would attack them:
+
+- **No inertia.** The content stops dead when the fingers lift. Every scrolling
+  surface a player has ever used carries momentum, so its absence reads as the
+  list being stuck rather than as a deliberate choice.
+- **No rubber-band at the ends.** Hitting the top or bottom is an abrupt stop
+  with no feedback distinguishing "you are at the end" from "the gesture was
+  dropped".
+- **Two fingers is a learned gesture, not a discovered one.** Nothing on screen
+  says the region needs two. The widened scrollbar hints that it scrolls; it
+  does not hint how.
+- **One-finger drag is still consumed by the controls.** The real fix may be a
+  drag-threshold on the controls themselves — a press that moves more than N
+  pixels before release becomes a scroll and the control cancels — which is what
+  native scroll views do and would make one finger work everywhere.
+
+**Recommendation.** The threshold approach is the one worth designing around,
+because it removes the need for the two-finger gesture rather than papering over
+it. `TouchScroll` should survive as the escape hatch either way. This is a feel
+problem and needs a human iterating on a device; it is not something to specify
+precisely in advance.
+
+**Not blocking the port.** The screens are all reachable and operable. This is a
+polish pass, and it belongs with whoever owns the eventual visual design rather
+than with the porting work.
