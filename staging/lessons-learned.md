@@ -211,3 +211,22 @@ for twice.
   Function armed and instantly cancelled) was invisible to 1,047 tests and
   150/150 parity, because it is not a rules bug. Get a human on the build early,
   and take "it feels wrong" as a bug report.
+
+## 11. Verify with real device events, not with reasoning
+
+The two-finger scroll gesture was the kind of change it is tempting to ship on
+inspection: the code is short, the mechanism is understood, and `adb shell
+input` cannot produce multitouch. The honest options were "hand it back
+unverified" or "drive the touchscreen directly".
+
+`adb shell sendevent` on the raw `/dev/input/eventN` node does produce genuine
+multitouch — protocol B, `ABS_MT_SLOT` / `ABS_MT_TRACKING_ID` / `ABS_MT_POSITION_*`
+with a `SYN_REPORT` per frame. Setting it up cost about ten minutes and turned
+"this should work" into "this scrolls both directions and passes over six
+Buttons without activating any of them".
+
+Two of the three playtest bugs in this session were input-layer behaviour that no
+amount of reading the code would have surfaced, and the fix for one of them
+(swallowing the release during a gesture) had a non-obvious failure mode: the
+Button underneath stays latched and fires later. **Where a fix is about what the
+hardware does, test with what the hardware sends.**

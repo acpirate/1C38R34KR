@@ -265,9 +265,10 @@ func _show_chooser(title: String, prompt: String, options: Array, on_choose: Cal
 	var confirm := Button.new()
 	var cards: Array[Button] = []
 
-	var scroll := ScrollContainer.new()
+	# TouchScroll, not ScrollContainer: these regions are wall-to-wall Buttons,
+	# and a Button eats the one-finger drag that would otherwise scroll.
+	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(scroll)
 
 	var list := VBoxContainer.new()
@@ -325,9 +326,10 @@ func _show_build() -> void:
 	inventory.append_array(Content.hacker(Content.DEFAULT_HACKER_ID)["portfolio"])
 	inventory.append_array(Content.deck(Content.DEFAULT_DECK_ID)["portfolio"])
 
-	var scroll := ScrollContainer.new()
+	# TouchScroll, not ScrollContainer: these regions are wall-to-wall Buttons,
+	# and a Button eats the one-finger drag that would otherwise scroll.
+	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(scroll)
 
 	var list := VBoxContainer.new()
@@ -575,10 +577,9 @@ func _show_result(winner: int) -> void:
 ## chart. Per-Program lines carry the stable content ID for exactly that reason
 ## — it is what makes a screenshot of this screen actionable.
 func _show_metrics(state: GameState) -> void:
-	var scroll := ScrollContainer.new()
+	var scroll := TouchScroll.new()
 	scroll.custom_minimum_size.y = UiTheme.px(150)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(scroll)
 
 	var body := Label.new()

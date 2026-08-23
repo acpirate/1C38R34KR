@@ -660,3 +660,39 @@ whichever event type arrives second is a no-op.
 parity had nothing to say about any of these. They are not rules bugs. A human
 on the build finds a class of defect no harness reaches, and "it feels wrong" is
 a bug report.
+
+## D-027 — Two-finger scroll bypasses the controls underneath it
+
+**2026-08-23.** The Build screen was effectively unscrollable on device. Godot's
+touch drag-scroll only works where the gesture reaches the ScrollContainer, and
+that screen is wall-to-wall Buttons — a one-finger drag presses controls, so the
+only way to scroll was to find a sliver of background. That is a puzzle, not an
+interface.
+
+The director offered three options — widen the scrollbar, add a dedicated
+handle, or make a two-finger gesture bypass the other elements — and preferred
+the third. Both the preferred fix and the fallback are implemented, because they
+answer different questions: the gesture is how you scroll, the visible bar is
+what tells you the region scrolls at all.
+
+`TouchScroll` overrides `_input`, which runs BEFORE the viewport hands events to
+`_gui_input`, so it sees a touch before the Button under it does. Once two
+fingers are down inside its rect it marks every subsequent touch event handled
+and the controls never see them.
+
+The non-obvious part: the first finger's press has ALREADY reached a Button by
+the time the second arrives, so that Button is latched. Since the gesture then
+swallows the release, the control would stay drawn as pressed for the whole
+scroll and fire on the next real tap. `_release_controls` walks the subtree and
+clears it; `UnitBox.release()` exists for the same reason.
+
+Verified with genuine multitouch driven through `sendevent` on the raw input
+node, not with `adb shell input` (which cannot produce it): the gesture scrolls
+both directions and passes over six Buttons without activating any of them.
+
+Also added: `staging/architect-notes.md`, for design items raised during the port
+that must NOT be built as part of it. First entry AN-001 — DISABLER/Drain should
+be manually targeted at a System Program rather than auto-targeting the fullest
+slot, which silently removes the decision the Function exists to create. Deferred
+because changing behaviour mid-port would put the differential gate in the
+position of failing for a reason that is correct.

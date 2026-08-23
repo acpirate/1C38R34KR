@@ -73,6 +73,21 @@ static func build() -> Theme:
 	theme.set_color("font_color", "Label", PacketStyle.TEXT)
 	theme.set_font_size("font_size", "Label", font_body())
 
+	# A scrollbar wide enough to be a real target. Godot's default is a few
+	# pixels — fine with a mouse, hopeless with a thumb. `TouchScroll`'s
+	# two-finger gesture is the primary way to scroll; this is the visible
+	# affordance that says the region scrolls at all, and the fallback for
+	# anyone who reaches for the bar.
+	var track := StyleBoxFlat.new()
+	track.bg_color = PacketStyle.CHARGE_TRACK
+	track.content_margin_left = px(7)
+	track.content_margin_right = px(7)
+	theme.set_stylebox("scroll", "VScrollBar", track)
+
+	theme.set_stylebox("grabber", "VScrollBar", _grabber(PacketStyle.CONTROL_EDGE))
+	theme.set_stylebox("grabber_highlight", "VScrollBar", _grabber(PacketStyle.ACCENT))
+	theme.set_stylebox("grabber_pressed", "VScrollBar", _grabber(PacketStyle.ACCENT))
+
 	var field := StyleBoxFlat.new()
 	field.bg_color = PacketStyle.CHARGE_TRACK
 	field.border_color = PacketStyle.CONTROL_EDGE
@@ -83,6 +98,15 @@ static func build() -> Theme:
 	theme.set_font_size("font_size", "LineEdit", font_button())
 
 	return theme
+
+
+static func _grabber(colour: Color) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = colour
+	box.content_margin_left = px(7)
+	box.content_margin_right = px(7)
+	box.set_corner_radius_all(px(3))
+	return box
 
 
 static func _button_box(bg: Color, edge: Color) -> StyleBoxFlat:

@@ -69,6 +69,15 @@ var dimmed := false:
 var _latched := false
 
 
+## Drops a latched press without emitting.
+##
+## Used when something upstream claims the gesture — a two-finger scroll that
+## started on top of this control. Without it the latch survives, and the next
+## release anywhere fires a Function the player never chose.
+func release() -> void:
+	_latched = false
+
+
 func _init() -> void:
 	custom_minimum_size.y = height()
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
