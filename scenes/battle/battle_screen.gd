@@ -13,6 +13,7 @@ extends Control
 ## path is painful, and without one a human cannot test at speed.
 
 signal battle_finished(winner: int)
+signal quit_requested
 
 const PLAYBACK_SPEEDS := [1.0, 2.0, 4.0, 0.25]
 
@@ -29,6 +30,7 @@ var _message: Label
 var _program_rows: VBoxContainer
 var _deck_button: Button
 var _speed_button: Button
+var _save_button: Button
 var _log_overlay: RichTextLabel
 
 var _playing := false
@@ -119,6 +121,13 @@ func _build_ui() -> void:
 	_link_label = Label.new()
 	root.add_child(_link_bar)
 	root.add_child(_link_label)
+
+	# Save and Quit is only offered at a stable boundary — never mid-playback,
+	# when the board on screen is behind the state that would be written.
+	_save_button = Button.new()
+	_save_button.text = "Save and Quit"
+	_save_button.pressed.connect(_on_save_and_quit)
+	root.add_child(_save_button)
 
 	root.add_child(_build_debug_bar())
 
@@ -378,10 +387,27 @@ func _refresh_programs() -> void:
 	_deck_button.text = "%s  %d/%d" % [deck["name"], state.deck_charge, deck_cost]
 	_deck_button.disabled = state.deck_charge < deck_cost or _playing or state.has_winner()
 
+	if _save_button != null:
+		_save_button.disabled = _playing or state.has_winner()
+
 
 # ---------------------------------------------------------------------------
 # Input
 # ---------------------------------------------------------------------------
+
+## Writes the save and leaves. Refused mid-playback: `GameState` is already
+## final while events are still animating, so saving then would persist a
+## position ahead of what the player can see — and cancel any targeting, whose
+## charge has not been spent.
+func _on_save_and_quit() -> void:
+	if _playing or state.has_winner():
+		return
+	_cancel_targeting()
+	if SaveState.write(state):
+		quit_requested.emit()
+	else:
+		_message.text = "Save failed"
+
 
 func _on_program_pressed(idx: int) -> void:
 	if _playing or state.has_winner():

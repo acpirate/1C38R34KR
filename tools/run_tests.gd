@@ -26,6 +26,8 @@ const SUITES := [
 	"res://tests/test_charge_routing.gd",
 	# Phase 5 — presentation.
 	"res://tests/test_presentation.gd",
+	# Phase 6 — persistence.
+	"res://tests/test_save.gd",
 	"res://tests/test_layer_purity.gd",
 	"res://tests/test_data_present.gd",
 ]

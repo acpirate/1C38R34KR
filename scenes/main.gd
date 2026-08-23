@@ -106,6 +106,13 @@ func _show_title(fingerprint: String) -> void:
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_root.add_child(spacer)
 
+	# Continue appears only for a save this build can actually restore. A save
+	# from different content is rejected rather than offered and then failed.
+	var saved := SaveState.read()
+	if saved["ok"]:
+		var s: GameState = saved["state"]
+		_button("Continue — turn %d" % s.turn, func(): _resume(s))
+
 	_button("Constructed Quick Match", _show_system_select)
 
 	var stamp := Label.new()
@@ -235,17 +242,37 @@ func _token_list(values: Array, vocab: Dictionary) -> String:
 # ---------------------------------------------------------------------------
 
 func _start_battle() -> void:
+	_enter_battle(Session.create_quick_match(_system_id, _host_id, _seed, _build))
+
+
+func _resume(state: GameState) -> void:
+	_enter_battle(state)
+
+
+func _enter_battle(state: GameState) -> void:
 	if _root != null:
 		_root.queue_free()
 		_root = null
 
-	var state := Session.create_quick_match(_system_id, _host_id, _seed, _build)
 	var screen := BattleScreen.new()
 	screen.setup(state)
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
-	screen.battle_finished.connect(_show_result)
+	screen.battle_finished.connect(_on_battle_finished)
+	screen.quit_requested.connect(func():
+		# The save is written by the battle screen; this only returns to the
+		# title, which then offers Continue.
+		_content.queue_free()
+		_content = null
+		_show_title(Content.fingerprint()))
 	_content = screen
 	add_child(screen)
+
+
+func _on_battle_finished(winner: int) -> void:
+	# A concluded battle is not resumable, so its save is cleared rather than
+	# left to offer a Continue that would restore a finished battle.
+	SaveState.clear()
+	_show_result(winner)
 
 
 func _show_result(winner: int) -> void:
