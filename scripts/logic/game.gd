@@ -82,10 +82,17 @@ func _run_start_of_turn_passives(active: Types.Side, events: Array) -> void:
 		# trigger, so damage profile, charge routing, and owner-scoped PASSIVEs
 		# all follow the agent whose turn is beginning. `cause` carries the
 		# causal fact — which HOST, which PASSIVE — alongside it.
+		# The ACTOR is the PASSIVE itself, not the source that supplied it: the
+		# source travels separately in `cause`, and collapsing the two would
+		# lose the distinction between "which PASSIVE acted" and "which HOST,
+		# Hacker, System, or UPGRADE contributed it".
+		#
+		# The actor's name is the payload FUNCTION's name — the PASSIVE's
+		# display text is presentation and never gameplay authority.
 		_cast_actor(active, {
 			"kind": Types.OwnerKind.PASSIVE,
-			"id": inst.source_id,
-			"name": str(inst.passive["display"]) if str(inst.passive["display"]) != "" else str(fn["name"]),
+			"id": inst.passive["id"],
+			"name": fn["name"],
 			"fn": fn,
 			"cause": inst.cause(),
 		}, events)
@@ -571,7 +578,15 @@ func _cast_shake(owner: Types.Side, actor: Dictionary, op: Dictionary, params: D
 	var sp: Dictionary = params["shake"]
 	# The activating side decides whose overlays the remove-enemy mode clears;
 	# the other modes ignore it.
-	var ok := BoardOps.shake({"board": state.board, "rng": state.rng, "next_id": state.next_id}, sp, owner)
+	#
+	# The carrier is written back because `shake` REPLACES the board rather than
+	# mutating it in place — it drafts a candidate arrangement and commits only
+	# on success, which is what makes the fizzle leave the Datastream untouched.
+	# Dropping the write-back silently discards a successful Shake.
+	var carrier := {"board": state.board, "rng": state.rng, "next_id": state.next_id}
+	var ok := BoardOps.shake(carrier, sp, owner)
+	state.board = carrier["board"]
+	state.next_id = carrier["next_id"]
 	events.append({"t": Types.EVT.SHAKE, "side": owner, "resolved": ok})
 	events.append(_op_event(owner, actor, op, ok))
 
@@ -729,7 +744,10 @@ func _place_specials(opts: Dictionary, events: Array) -> int:
 	if opts["type"] != Tile.Special.Type.BUFF:
 		events.append({
 			"t": Types.EVT.PLACED, "side": opts["owner"], "owner_kind": actor["kind"],
-			"kind": opts["type"], "count": placed, "program_id": actor["id"],
+			# A string for the same reason the Packet view uses one: `kind`
+			# names an overlay here and a Packet kind there.
+			"kind": Resolve.SPECIAL_TYPE_NAMES[opts["type"]],
+			"count": placed, "program_id": actor["id"],
 		})
 
 	var who := "Hacker" if opts["owner"] == Types.Side.PLAYER else "System"

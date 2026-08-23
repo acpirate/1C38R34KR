@@ -13,6 +13,28 @@ extends RefCounted
 ## change how an in-flight battle behaves.
 
 
+## The default active build: the Hacker's portfolio in authored order, then the
+## Deck's, truncated to the build size.
+##
+## Portfolio order is authored content and is gameplay-significant, so this
+## derives the build rather than naming Programs — a content edit changes the
+## default build, as it should.
+static func default_build() -> Array:
+	var hacker := Content.hacker(Content.DEFAULT_HACKER_ID)
+	var deck := Content.deck(Content.DEFAULT_DECK_ID)
+	var inventory: Array = []
+	inventory.append_array(hacker["portfolio"])
+	inventory.append_array(deck["portfolio"])
+
+	# Hacker portfolio Programs 1 and 2, then Deck portfolio Programs 1 and 2.
+	var build: Array = []
+	build.append(inventory[0])
+	build.append(inventory[1])
+	build.append(inventory[Content.PORTFOLIO_SIZE])
+	build.append(inventory[Content.PORTFOLIO_SIZE + 1])
+	return build
+
+
 ## Builds a playable Quick Match.
 ##
 ## `build` is the ordered active build — exactly four distinct inventory

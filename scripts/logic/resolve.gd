@@ -542,13 +542,31 @@ static func _refill_constrained(state: GameState, cells: Array, gen: BoardOps.Ti
 		state.board[p.y][p.x] = BoardOps.random_tile(gen)
 
 
+const SPECIAL_TYPE_NAMES := ["bomb", "buff", "shield", "override"]
+
+
+## A Packet as the renderer and the trace see it.
+##
+## `kind` and the overlay type are emitted as STRINGS rather than enum values:
+## the key `kind` means a Packet kind here and an overlay kind in the placement
+## event, and a generic normalizer cannot tell those apart by name. Resolving it
+## at the point of emission, where the meaning is known, is safer than
+## reconstructing the context later.
 static func _tile_view(t: Tile) -> Dictionary:
-	var v := {"kind": t.kind}
+	var v := {"kind": "neutral" if t.is_neutral() else "standard"}
 	if not t.is_neutral():
 		v["color"] = t.color
 		v["shape"] = t.shape
 	if t.has_special():
-		v["special"] = {"type": t.special.type, "owner": t.special.owner, "countdown": t.special.countdown}
+		var sp := {
+			"type": SPECIAL_TYPE_NAMES[t.special.type],
+			"owner": Types.SIDE_NAMES[t.special.owner],
+		}
+		# An absent countdown means the overlay is already live. The alpha omits
+		# the property entirely rather than emitting a sentinel.
+		if t.special.countdown >= 0:
+			sp["countdown"] = t.special.countdown
+		v["special"] = sp
 	return v
 
 

@@ -213,6 +213,49 @@ and asserts it is rejected.
 
 ---
 
+## Phase 4 — bugs the differential harness found
+
+Both were real port defects. Neither was caught by any other test, and neither
+would have crashed — which is exactly the failure mode the harness exists for.
+
+### D-001 · The Shake result was silently discarded
+
+**Symptom:** total divergence from record 6 of the very first battle compared —
+different boards, turn counts, and winners.
+
+**Cause:** `BoardOps.shake` REPLACES the board rather than mutating it in place.
+It drafts a candidate arrangement and commits only on success, which is what
+makes a fizzle leave the Datastream untouched. `_cast_shake` passed a state
+carrier in but never wrote `board` and `next_id` back, so a successful Shake
+consumed its RNG, reported success, and changed nothing.
+
+**Why nothing else caught it:** the Shake still "worked" from every other
+angle — the event said resolved, the RNG advanced, no error was raised. Only a
+comparison against a reference implementation could see that the board was wrong.
+
+The same write-back is done correctly in `ensure_no_deadlock`. Getting it right
+in one place and wrong in the other is the ordinary shape of this kind of bug.
+
+### D-002 · A PASSIVE carrier's actor identity
+
+**Symptom:** 30 of 150 battles diverged, all on HST_05 (WEEDS), every one with
+identical event counts, turn counts, and winners but different content. That
+pattern — same shape, different content — pointed at attribution rather than
+mechanics before the trace was even opened.
+
+**Cause:** when a carrier PASSIVE fires its payload Function, the ACTOR is the
+PASSIVE itself; the source that supplied it travels separately in `cause`. The
+port used the source ID (`HST_05`) where the alpha uses the PASSIVE ID
+(`PSV_008`), collapsing "which PASSIVE acted" into "which HOST contributed it".
+The actor's name was also taken from the PASSIVE's display text rather than the
+payload Function's name — presentation standing in for identity.
+
+**Why it mattered:** those two facts are deliberately kept separate throughout
+the engine so a log can say the battlefield caused an effect that the active
+agent owns. Collapsing them loses exactly that distinction.
+
+---
+
 ## Tooling defects found and fixed
 
 ### P-005 · A parse error in a test suite hung the runner
