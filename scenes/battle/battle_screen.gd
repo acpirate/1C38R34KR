@@ -21,16 +21,16 @@ var state: GameState
 var game: Game
 
 var _stream: Datastream
-var _ice_bar: ProgressBar
-var _link_bar: ProgressBar
-var _ice_label: Label
-var _link_label: Label
+var _hacker_box: AvatarBox
+var _system_box: AvatarBox
 var _turn_label: Label
 var _message: Label
-var _program_rows: VBoxContainer
-var _deck_button: Button
+var _player_boxes: Array[UnitBox] = []
+var _system_boxes: Array[UnitBox] = []
+var _deck_box: UnitBox
 var _speed_button: Button
-var _save_button: Button
+var _pause_scrim: ColorRect
+var _pause_panel: PanelContainer
 var _log_overlay: RichTextLabel
 
 var _playing := false
@@ -82,17 +82,65 @@ func _build_ui() -> void:
 	add_child(root)
 	_apply_safe_area(root)
 
-	# --- enemy ---
-	_ice_label = Label.new()
-	_ice_bar = ProgressBar.new()
-	_ice_bar.custom_minimum_size.y = 18
-	_ice_bar.show_percentage = false
-	root.add_child(_ice_label)
-	root.add_child(_ice_bar)
+	# --- header: both sides' standing, and the pause control between them ---
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	root.add_child(header)
 
-	_turn_label = Label.new()
-	_turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	root.add_child(_turn_label)
+	_hacker_box = AvatarBox.new()
+	_hacker_box.title = "HACKER"
+	_hacker_box.stat = "LINK"
+	_hacker_box.bar_color = PacketStyle.LINK_BAR
+	header.add_child(_hacker_box)
+
+	var menu := Button.new()
+	menu.text = "≡"
+	menu.custom_minimum_size = Vector2(44, AvatarBox.HEIGHT)
+	menu.pressed.connect(_toggle_pause)
+	header.add_child(menu)
+
+	_system_box = AvatarBox.new()
+	_system_box.title = "SYSTEM"
+	_system_box.stat = "ICE"
+	_system_box.bar_color = PacketStyle.ICE_BAR
+	header.add_child(_system_box)
+
+	# --- Program grid: the Hacker's build on the left, the System's on the
+	# right, both visible at all times. Seeing the System's charge fill is what
+	# turns a turn into a decision instead of a reaction; it is the single
+	# biggest thing the alpha's battle screen gets right.
+	var grid := HBoxContainer.new()
+	grid.add_theme_constant_override("separation", 6)
+	root.add_child(grid)
+
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 4)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(left)
+
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 4)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(right)
+
+	for i in maxi(Content.ACTIVE_BUILD_SIZE, Content.SYSTEM_BUILD_SIZE):
+		var mine := UnitBox.new()
+		var idx := i
+		mine.pressed.connect(func(): _on_program_pressed(idx))
+		left.add_child(mine)
+		_player_boxes.append(mine)
+
+		var theirs := UnitBox.new()
+		theirs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		right.add_child(theirs)
+		_system_boxes.append(theirs)
+
+	# The Deck Function sits under the Hacker's Programs and matches them: it is
+	# a fifth control with its own pool, not a Program, and beta 0.1 does not yet
+	# distinguish it further.
+	_deck_box = UnitBox.new()
+	_deck_box.pressed.connect(_on_deck_pressed)
+	left.add_child(_deck_box)
 
 	# --- board, square on any phone ---
 	var frame := AspectRatioContainer.new()
@@ -105,6 +153,11 @@ func _build_ui() -> void:
 	_stream.packet_dragged.connect(_on_packet_dragged)
 	frame.add_child(_stream)
 
+	_turn_label = Label.new()
+	_turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_turn_label.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
+	root.add_child(_turn_label)
+
 	# A short scrollback rather than one overwritten line. A turn produces
 	# several narrative messages in quick succession, and with a single label
 	# every one but the last is gone before it can be read — which makes the
@@ -112,32 +165,10 @@ func _build_ui() -> void:
 	_message = Label.new()
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_message.custom_minimum_size.y = 88
+	_message.custom_minimum_size.y = 76
 	_message.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_message.add_theme_color_override("font_color", PacketStyle.TEXT_STATUS)
 	root.add_child(_message)
-
-	# --- player ---
-	_program_rows = VBoxContainer.new()
-	_program_rows.add_theme_constant_override("separation", 4)
-	root.add_child(_program_rows)
-
-	_deck_button = Button.new()
-	_deck_button.pressed.connect(_on_deck_pressed)
-	root.add_child(_deck_button)
-
-	_link_bar = ProgressBar.new()
-	_link_bar.custom_minimum_size.y = 18
-	_link_bar.show_percentage = false
-	_link_label = Label.new()
-	root.add_child(_link_bar)
-	root.add_child(_link_label)
-
-	# Save and Quit is only offered at a stable boundary — never mid-playback,
-	# when the board on screen is behind the state that would be written.
-	_save_button = Button.new()
-	_save_button.text = "Save and Quit"
-	_save_button.pressed.connect(_on_save_and_quit)
-	root.add_child(_save_button)
 
 	root.add_child(_build_debug_bar())
 
@@ -146,6 +177,97 @@ func _build_ui() -> void:
 	_log_overlay.visible = false
 	_log_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_log_overlay)
+
+	_build_pause_panel()
+
+
+## The pause menu, reached from the header's `≡`.
+##
+## Save and Quit lives in here rather than on the battle screen because it is
+## only legal at a stable boundary — never mid-playback, when `GameState` is
+## already ahead of the board the player can see — and a control that is
+## disabled most of the time is better out of the main layout entirely.
+func _build_pause_panel() -> void:
+	# A scrim plus a centred panel, not a full-screen takeover: the board stays
+	# visible behind it, so pausing reads as suspending the battle rather than
+	# leaving it. The scrim also swallows taps meant for the panel and misses.
+	_pause_scrim = ColorRect.new()
+	_pause_scrim.color = PacketStyle.SCRIM
+	_pause_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pause_scrim.visible = false
+	add_child(_pause_scrim)
+
+	var centre := CenterContainer.new()
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pause_scrim.add_child(centre)
+
+	_pause_panel = PanelContainer.new()
+	_pause_panel.custom_minimum_size.x = 300
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = PacketStyle.PANEL
+	style.border_color = PacketStyle.PANEL_EDGE
+	style.set_border_width_all(1)
+	style.set_content_margin_all(20)
+	_pause_panel.add_theme_stylebox_override("panel", style)
+	centre.add_child(_pause_panel)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	_pause_panel.add_child(box)
+
+	var head := Label.new()
+	head.text = "PAUSED"
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.add_theme_font_size_override("font_size", 22)
+	head.add_theme_color_override("font_color", PacketStyle.TEXT_HEADING)
+	box.add_child(head)
+
+	var mode := Label.new()
+	mode.text = "Quick Match"
+	mode.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mode.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
+	box.add_child(mode)
+
+	var resume := Button.new()
+	resume.text = "Resume"
+	resume.custom_minimum_size.y = 48
+	resume.pressed.connect(_toggle_pause)
+	box.add_child(resume)
+
+	var save := Button.new()
+	save.text = "Save and Quit"
+	save.custom_minimum_size.y = 48
+	save.pressed.connect(_on_save_and_quit)
+	box.add_child(save)
+
+	_divider(box)
+
+	# The same reason the title screen carries the content fingerprint: a tester
+	# looking at a screenshot should be able to say what rules produced it.
+	var note := Label.new()
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
+	note.text = "seed %d · content %s" % [_battle_seed(), Content.fingerprint()]
+	box.add_child(note)
+
+
+func _divider(box: Control) -> void:
+	var line := ColorRect.new()
+	line.color = PacketStyle.PANEL_EDGE
+	line.custom_minimum_size.y = 1
+	box.add_child(line)
+
+
+## Pausing is refused mid-playback for the same reason saving is: the board on
+## screen is behind the state, so anything offered here would act on a position
+## the player cannot see.
+func _toggle_pause() -> void:
+	if _playing:
+		return
+	_pause_scrim.visible = not _pause_scrim.visible
 
 
 ## The safe area keeps status text and controls clear of a display cutout and
@@ -291,9 +413,26 @@ func _play_one(ev: Dictionary) -> void:
 				var p := _stream.at(c)
 				if p != null:
 					p.modulate = PacketStyle.TINT_NONE
-		Types.EVT.FALL, Types.EVT.SPAWN, Types.EVT.SET_TILE, Types.EVT.BOARD:
+		Types.EVT.FALL, Types.EVT.SPAWN, Types.EVT.BOARD:
 			_refresh_board()
 			await _pause(0.10 / speed)
+
+		# One event per Packet, so each conversion gets its OWN beat and a
+		# flash. A Transform changes several Packets at once and the logic layer
+		# emits them individually; playing them as a single board refresh threw
+		# that away and made a three-Packet GREENING look like one instant edit.
+		Types.EVT.SET_TILE:
+			var cell: Vector2i = ev["p"]
+			var view := _stream.at(cell)
+			if view != null:
+				view.modulate = PacketStyle.TINT_BLAST
+				await _pause(0.10 / speed)
+				_stream.set_cell(cell, ev["view"])
+				await _pause(0.16 / speed)
+				view.modulate = PacketStyle.TINT_NONE
+			else:
+				_refresh_board()
+				await _pause(0.16 / speed)
 		Types.EVT.DETONATE:
 			for c in (ev["cells"] as Array):
 				var p := _stream.at(c)
@@ -345,6 +484,7 @@ func _play_one(ev: Dictionary) -> void:
 
 		Types.EVT.DAMAGE:
 			_refresh_bars()
+			_float_damage(int(ev.get("target", 0)), int(ev.get("amount", 0)))
 			_log("  %d damage to %s" % [int(ev.get("amount", 0)), _who(ev.get("target", 0))])
 			await _pause(0.24 / speed)
 		Types.EVT.SHIELD:
@@ -366,6 +506,31 @@ func _play_one(ev: Dictionary) -> void:
 
 func _who(side) -> String:
 	return "Hacker" if int(side) == Types.Side.PLAYER else "System"
+
+
+## A `-N` that rises off the struck side's box and fades.
+##
+## Worth the twelve lines: a cascade lands several damage events in under a
+## second, and a bar that just shrinks says nothing about how many hits it took
+## or how big each was. The scrollback records them, but the floater is what
+## makes the sequence legible while it happens.
+func _float_damage(target_side: int, amount: int) -> void:
+	if amount <= 0:
+		return
+	var anchor: Control = _hacker_box if target_side == Types.Side.PLAYER else _system_box
+	var tag := Label.new()
+	tag.text = "-%d" % amount
+	tag.add_theme_color_override("font_color", PacketStyle.DAMAGE)
+	tag.add_theme_font_size_override("font_size", 26)
+	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tag.position = anchor.global_position + Vector2(anchor.size.x * 0.5, anchor.size.y * 0.5)
+	add_child(tag)
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(tag, "position:y", tag.position.y - 34.0, 0.6)
+	tween.tween_property(tag, "modulate:a", 0.0, 0.6)
+	tween.chain().tween_callback(tag.queue_free)
 
 
 ## Appends to the visible scrollback, keeping the most recent few lines.
@@ -413,51 +578,66 @@ func _refresh_board() -> void:
 
 
 func _refresh_bars() -> void:
-	var link_max: int = state.config["player_hp"]
-	var ice_max: int = state.config["enemy_hp"]
-	_link_bar.max_value = link_max
-	_link_bar.value = maxi(0, state.hp[Types.Side.PLAYER])
-	_ice_bar.max_value = ice_max
-	_ice_bar.value = maxi(0, state.hp[Types.Side.ENEMY])
-
-	var shield_p := Resolve.shield_value(state, Types.Side.PLAYER)
-	var shield_e := Resolve.shield_value(state, Types.Side.ENEMY)
-	_link_label.text = "LINK %d / %d%s" % [maxi(0, state.hp[Types.Side.PLAYER]), link_max, ("   shield %d" % shield_p) if shield_p > 0 else ""]
-	_ice_label.text = "%s   ICE %d / %d%s" % [
-		Content.system(state.identity["opponent_id"])["name"],
-		maxi(0, state.hp[Types.Side.ENEMY]), ice_max,
-		("   shield %d" % shield_e) if shield_e > 0 else "",
-	]
+	_hacker_box.set_stat(state.hp[Types.Side.PLAYER], state.config["player_hp"])
+	_hacker_box.set_totals(
+		Resolve.shield_value(state, Types.Side.PLAYER),
+		Resolve.buff_bonus(state, Types.Side.PLAYER),
+	)
+	_system_box.title = str(Content.system(state.identity["opponent_id"])["name"])
+	_system_box.set_stat(state.hp[Types.Side.ENEMY], state.config["enemy_hp"])
+	_system_box.set_totals(
+		Resolve.shield_value(state, Types.Side.ENEMY),
+		Resolve.buff_bonus(state, Types.Side.ENEMY),
+	)
 
 
 func _refresh_programs() -> void:
-	for child in _program_rows.get_children():
-		child.queue_free()
+	var interactive := not _playing and not state.has_winner()
+	var targeting := not _pending_target.is_empty()
 
-	var units: Array = state.units[Types.Side.PLAYER]
-	for i in units.size():
-		var u: GameState.UnitState = units[i]
-		var prog := Content.program(u.program_id)
-		var cost := int(prog["cost"])
-		var ready := u.charge >= cost
-
-		var row := HBoxContainer.new()
-		var b := Button.new()
-		b.text = "%s  %d/%d" % [prog["name"], u.charge, cost]
-		b.disabled = not ready or _playing or state.has_winner()
-		var idx := i
-		b.pressed.connect(func(): _on_program_pressed(idx))
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(b)
-		_program_rows.add_child(row)
+	_fill_side(_player_boxes, Types.Side.PLAYER, interactive, targeting)
+	_fill_side(_system_boxes, Types.Side.ENEMY, false, false)
 
 	var deck := Content.deck(state.identity["deck_id"])
 	var deck_cost := int(deck["fn"]["cost"])
-	_deck_button.text = "%s  %d/%d" % [deck["name"], state.deck_charge, deck_cost]
-	_deck_button.disabled = state.deck_charge < deck_cost or _playing or state.has_winner()
+	_deck_box.label = str(deck["name"])
+	_deck_box.charge = state.deck_charge
+	_deck_box.cost = deck_cost
+	_deck_box.actionable = interactive and state.deck_charge >= deck_cost
+	var deck_armed := targeting and str(_pending_target["source"].get("kind", "")) == "deck"
+	_deck_box.armed = deck_armed
+	_deck_box.dimmed = targeting and not deck_armed
 
-	if _save_button != null:
-		_save_button.disabled = _playing or state.has_winner()
+
+## The Deck control carries no binding swatch: its charge comes from neutral
+## Packets, which by definition have neither a colour nor a shape to show.
+func _fill_side(boxes: Array[UnitBox], side: Types.Side, interactive: bool, targeting: bool) -> void:
+	var units: Array = state.units[side]
+	for i in boxes.size():
+		var box := boxes[i]
+		if i >= units.size():
+			box.visible = false
+			continue
+		box.visible = true
+		var u: GameState.UnitState = units[i]
+		var prog := Content.program(u.program_id)
+		box.label = str(prog["name"])
+		box.charge = u.charge
+		box.cost = int(prog["cost"])
+		box.set_binding(_first_or(prog["colors"]), _first_or(prog["shapes"]))
+		box.actionable = interactive and u.charge >= int(prog["cost"])
+		var armed := targeting \
+			and str(_pending_target["source"].get("kind", "")) == "program" \
+			and int(_pending_target["source"].get("idx", -1)) == i
+		box.armed = armed
+		box.dimmed = targeting and not armed
+
+
+## A Program may be bound to several Packet identities; the swatch shows the
+## first, which is enough to make the charge relationship visible without
+## turning a 44px box into a legend.
+func _first_or(values: Array) -> int:
+	return int(values[0]) if values.size() > 0 else -1
 
 
 # ---------------------------------------------------------------------------
@@ -514,12 +694,18 @@ func _begin_activation(source: Dictionary, fn: Dictionary) -> void:
 	_pending_target = {"source": source}
 	_log("Choose a Packet — tap the Function again to cancel")
 	_stream.set_targeting(state.occupied_cells())
+	# Redrawn so the armed control lights and every other one recedes: "what can
+	# I tap right now?" is answered by the layout, with no extra text.
+	_refresh_programs()
 
 
 func _cancel_targeting() -> void:
+	if _pending_target.is_empty():
+		return
 	_pending_target = {}
 	_stream.clear_targeting()
 	_log("Targeting cancelled")
+	_refresh_programs()
 
 
 func _fullest_enemy_slot() -> int:

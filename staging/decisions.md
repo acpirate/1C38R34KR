@@ -520,3 +520,45 @@ test fewer battles.
 agent — "run DEEPSCAN" — and do something else for the hour and a half. The
 memory carries the full matrix definition, the commands, the pass criterion,
 and the UTF-16 capture hazard.
+
+## D-024 — The visual pass targets the alpha's composition, not its pixels
+
+**2026-08-23.** The director asked for the alpha's title, build, battle, pause,
+and conclusion screens captured and replicated with the systems beta 0.1 has.
+Captured into `staging/design-reference/`, with a README recording every value
+read out of the alpha's own `style.css` and `view.ts` rather than eyeballed.
+
+What was replicated, and why each earns its cost:
+
+- **Packets are coloured glyphs on dark cells**, not white glyphs on coloured
+  squares. This is the alpha's own MK4.4 decision — the source says the coloured
+  field was removed and white fill "lost its purpose". It also frees the glyph
+  centre for the ownership badge, which is why the badge moved from a corner to
+  the middle. Neutrals became static rather than a grey tile: an unmatchable
+  Packet and an empty cell must not look alike.
+- **Both sides' Programs are on screen at once**, in two columns. The System's
+  charge state is what a player schedules around; the previous single-column
+  layout made every enemy activation a surprise. This is the largest single
+  legibility gain in the pass.
+- **Select-then-confirm** on the chooser screens. Commit-on-tap makes a mis-tap
+  on a scrolling phone list unrecoverable.
+- **One `Theme`** built in `ui_theme.gd` and set on the root, so a control's
+  appearance is decided in one place. Colours still come from `PacketStyle`,
+  which now carries a UI palette alongside the board palette; `test_presentation`
+  already banned hex literals under `scenes/` and still passes.
+- **Modal panels with a scrim**, so pause reads as suspending the battle.
+
+What was NOT replicated, deliberately:
+
+- The alpha's post-defeat force-win prompt. The debug bar's `win`/`lose` buttons
+  already end a battle through the real damage path; the director confirmed the
+  alpha prompt went unused.
+- Bold and letter-spaced type. Godot's fallback font has no bold face, and
+  importing one is an art-pass decision, not a beta-0.1 one.
+- Full colour and shape words on the chooser cards. The authored CSV tokens
+  (RED, TRI) are shown instead, so display cannot drift from content.
+- The result screen's metrics report. Metrics are the last logic module and are
+  not built yet; the result screen is laid out with the exits ABOVE a divider so
+  the report drops in below without moving them.
+
+Verified end-to-end on the tablet: all six screens, 942 tests, parity 150/150.

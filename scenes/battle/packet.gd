@@ -11,6 +11,10 @@ extends Control
 ## All appearance comes from `PacketStyle`. This file contains no colour value
 ## and no shape path (D-014).
 
+## Which cell this view occupies. Presentation-only: it seeds the neutral static
+## so a given cell's noise is stable across redraws, and nothing else reads it.
+var cell := Vector2i.ZERO
+
 var view: Dictionary = {}:
 	set(v):
 		view = v
@@ -28,28 +32,34 @@ var targeting := false:
 
 
 func _draw() -> void:
+	var rect := Rect2(Vector2.ZERO, size)
+	var cell := rect.grow(-1.0)
+
+	# The cell is drawn whether or not it holds a Packet, so the grid stays
+	# continuous through a destroy or a fall instead of punching holes in itself.
+	draw_rect(cell, PacketStyle.CELL_BACKGROUND, true)
+
 	if view.is_empty():
 		return
 
-	var rect := Rect2(Vector2.ZERO, size)
-	var inset := rect.grow(-size.x * 0.04)
 	var is_neutral: bool = str(view.get("kind", "standard")) == "neutral"
-	var color_index := int(view.get("color", 0))
 
-	var fill := PacketStyle.fill_for(is_neutral, color_index)
-	var border := PacketStyle.border_for(is_neutral, color_index)
-	var radius := size.x * 0.16
-
-	draw_rect(inset, fill, true)
-	draw_rect(inset, border, false, maxf(1.0, size.x * 0.05))
-
-	# A neutral has no axes, so it carries no glyph — which is also why it can
-	# never hold an overlay.
-	if not is_neutral:
+	if is_neutral:
+		# A neutral has no colour and no shape, so it gets neither — it is
+		# static. That is also why it can never hold an overlay.
+		_draw_static(cell)
+	else:
+		# The Packet IS the coloured glyph: no tile field behind it, filled in
+		# its colour and outlined in that colour's dark shade, sized so the
+		# silhouette reaches near the cell edge. A white glyph on a coloured
+		# square reads as a gem; this reads as a signal on a wire, and it leaves
+		# the glyph's centre free for the ownership badge.
+		var color_index := int(view.get("color", 0))
 		PacketStyle.draw_shape(
 			self, int(view.get("shape", 0)),
-			rect.get_center(), size.x * 0.30,
-			PacketStyle.GLYPH, border,
+			rect.get_center(), size.x * 0.46,
+			PacketStyle.COLOR_FILL[color_index],
+			PacketStyle.COLOR_BORDER[color_index],
 		)
 
 	if view.has("special"):
@@ -61,33 +71,77 @@ func _draw() -> void:
 		draw_rect(rect.grow(-1.0), PacketStyle.SELECTION, false, maxf(2.0, size.x * 0.07))
 
 
-## Overlays read as a corner badge rather than a full-Packet treatment, so the
-## underlying colour and shape stay legible — the player still has to match it.
+## Deterministic per-cell noise, seeded from the cell coordinate.
 ##
-## An ARMED overlay shows its remaining countdown; a live one shows a dot. That
-## distinction is load-bearing: a pending Buff contributes nothing until it
-## delivers, and the board must not imply otherwise.
+## Stable on purpose: a texture that reshuffles every redraw reads as activity
+## where there is none, and the board redraws constantly during playback. This
+## uses its own arithmetic rather than `Rng` — nothing here may draw from the
+## game's stream, or the renderer would be able to change the battle.
+func _draw_static(area: Rect2) -> void:
+	draw_rect(area, PacketStyle.NEUTRAL_STATIC_DARK, true)
+	var steps := 6
+	var step := area.size / float(steps)
+	var h := (cell.x * 73856093) ^ (cell.y * 19349663)
+	for y in steps:
+		for x in steps:
+			h = (h * 1103515245 + 12345) & 0x7fffffff
+			if h % 5 < 2:
+				draw_rect(Rect2(area.position + Vector2(x, y) * step, step), PacketStyle.NEUTRAL_STATIC_LIGHT, true)
+
+
+## Overlays read as a badge CENTRED in the glyph, not a full-Packet treatment:
+## the Packet's own colour and shape stay legible around it, because the player
+## still has to match it.
+##
+## Ownership is the badge's fill — light for the Hacker, dark for the System,
+## each ringed and lettered in the other. That single convention carries
+## ownership for every overlay type without a legend, which is why the badge is
+## centred rather than tucked in a corner where it competes with nothing.
+##
+## An ARMED overlay shows its remaining countdown whatever it will eventually
+## deliver. That distinction is load-bearing: a pending Buff contributes nothing
+## until it delivers, and the board must not imply otherwise.
 func _draw_overlay(rect: Rect2, special: Dictionary) -> void:
 	var type_index := ["bomb", "buff", "shield", "override"].find(str(special.get("type", "bomb")))
 	if type_index < 0:
 		type_index = 0
-	var tint: Color = PacketStyle.OVERLAY_TINT[type_index]
 
-	var badge_r := size.x * 0.19
-	var centre := Vector2(size.x - badge_r * 1.2, badge_r * 1.2)
-	draw_circle(centre, badge_r, tint)
-	draw_arc(centre, badge_r, 0, TAU, 20, PacketStyle.BOARD_BACKGROUND, badge_r * 0.22, true)
+	var player := str(special.get("owner", "player")) == "player"
+	var face: Color = PacketStyle.BADGE_PLAYER if player else PacketStyle.BADGE_ENEMY
+	var mark: Color = PacketStyle.BADGE_ENEMY if player else PacketStyle.BADGE_PLAYER
 
-	# Ownership at a glance: the enemy's overlays get a dark ring.
-	if str(special.get("owner", "player")) == "enemy":
-		draw_arc(centre, badge_r * 1.35, 0, TAU, 20, PacketStyle.BOARD_BACKGROUND, badge_r * 0.3, true)
+	var badge_r := size.x * 0.22
+	var centre := rect.get_center()
+	draw_circle(centre, badge_r, face)
+	draw_arc(centre, badge_r, 0, TAU, 24, mark, badge_r * 0.16, true)
 
-	if special.has("countdown"):
-		var font := ThemeDB.fallback_font
-		var text := str(int(special["countdown"]))
-		var fs := int(badge_r * 1.6)
-		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(
-			font, centre + Vector2(-w * 0.5, badge_r * 0.55), text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, fs, PacketStyle.BOARD_BACKGROUND,
-		)
+	# The type still has to be distinguishable at a glance, and the badge face
+	# is spoken for by ownership — so type rides a thin outer ring instead.
+	draw_arc(centre, badge_r * 1.28, 0, TAU, 24, PacketStyle.OVERLAY_TINT[type_index], badge_r * 0.2, true)
+
+	var countdown := int(special.get("countdown", 0))
+	var armed := special.has("countdown") and countdown > 0
+	var text := str(countdown) if armed else _live_glyph(str(special.get("type", "bomb")))
+	if text == "":
+		return
+
+	var font := ThemeDB.fallback_font
+	var fs := int(badge_r * 1.5)
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_string(
+		font, centre + Vector2(-w * 0.5, badge_r * 0.52), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, mark,
+	)
+
+
+## What a LIVE overlay reads as, once it is no longer counting down.
+func _live_glyph(type_name: String) -> String:
+	match type_name:
+		"shield":
+			return "S"
+		"override":
+			return "Ø"
+		"bomb":
+			return "?"
+		_:
+			return "+"

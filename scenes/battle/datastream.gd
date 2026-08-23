@@ -25,6 +25,7 @@ var _drag_start := Vector2.ZERO
 func _ready() -> void:
 	for i in Constants.BOARD_WIDTH * Constants.BOARD_HEIGHT:
 		var p := PacketView.new()
+		p.cell = Vector2i(i % Constants.BOARD_WIDTH, i / Constants.BOARD_WIDTH)
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(p)
 		_cells.append(p)
@@ -32,8 +33,10 @@ func _ready() -> void:
 	_layout()
 
 
+## The surround shows through the gaps between cells, so it is what draws the
+## grid — the cells themselves carry no border.
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), PacketStyle.BOARD_BACKGROUND)
+	draw_rect(Rect2(Vector2.ZERO, size), PacketStyle.BOARD_SURROUND)
 
 
 func cell_size() -> float:

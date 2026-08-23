@@ -50,6 +50,70 @@ const NEUTRAL_BORDER := Color("2a2a30")
 const GLYPH := Color("ffffff")
 const BOARD_BACKGROUND := Color("1b1b22")
 
+## The cell a Packet sits ON, and the surround the grid sits on.
+##
+## These exist because the Packet is a coloured glyph rather than a coloured
+## field (see `packet.gd`): with no tile fill, the cell itself has to carry the
+## grid, so its colour is now load-bearing rather than decorative.
+const CELL_BACKGROUND := Color("26262e")
+const BOARD_SURROUND := Color("111118")
+
+## Neutral static. A neutral has no colour and no shape, so it must not read as
+## an absence — an empty cell and an unmatchable Packet are different things.
+## Drawn as per-cell noise from these two values.
+const NEUTRAL_STATIC_DARK := Color("14141a")
+const NEUTRAL_STATIC_LIGHT := Color("d8d8e2")
+
+## Ownership badge fills. Player overlays are light, System overlays dark, each
+## ringed and lettered in the other — the one convention that survives from the
+## alpha unchanged, because it reads at thumb size with no legend.
+const BADGE_PLAYER := Color("ffffff")
+const BADGE_ENEMY := Color("000000")
+
+# ---------------------------------------------------------------------------
+# UI palette
+#
+# The registry holds the interface's colours for the same reason it holds the
+# board's: a hard-coded panel background is exactly as expensive to hunt down
+# later as a hard-coded Packet fill, and `test_presentation.gd` bans both.
+# ---------------------------------------------------------------------------
+
+## The wash a modal puts over what it interrupts. Deliberately translucent: the
+## battle stays visible behind the pause menu, so it reads as suspended rather
+## than exited.
+const SCRIM := Color(0, 0, 0, 0.55)
+
+const PANEL := Color("2a2a34")
+const PANEL_DEEP := Color("23232c")
+const PANEL_EDGE := Color("555555")
+const CONTROL := Color("3a3a48")
+const CONTROL_EDGE := Color("666666")
+const BOX := Color("2c2c36")
+const BOX_EDGE := Color("555555")
+
+const TEXT := Color("eeeeee")
+const TEXT_DIM := Color("aaaaaa")
+const TEXT_FAINT := Color("9a9aa8")
+const TEXT_HEADING := Color("ffffff")
+const TEXT_STATUS := Color("f0e070")
+
+## Amber is the alpha's "this is live / this is chosen" colour, everywhere. It
+## marks a charged Program, a selected option, and an active build slot, and it
+## is deliberately the same amber in all three so the meaning transfers.
+const ACCENT := Color("e0a040")
+const ACCENT_HOT := Color("ff9500")
+const READY := Color("ffffff")
+
+const LINK_BAR := Color("58c06a")
+const ICE_BAR := Color("c05858")
+const CHARGE_TRACK := Color("1c1c24")
+const CHARGE_FILL := Color("6080c0")
+const CHARGE_FILL_READY := Color("f0c040")
+const CHARGE_TEXT_READY := Color("ffe080")
+
+const DAMAGE := Color("ff5a5a")
+const SYSTEM_TURN_FRAME := Color("e03030")
+
 ## Overlay tints, indexed by `Tile.Special.Type`.
 const OVERLAY_TINT: Array[Color] = [
 	Color("ff5a3c"),  ## BOMB
