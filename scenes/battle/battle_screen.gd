@@ -45,6 +45,11 @@ var _pending_target := {}
 
 var _recent_events: Array[String] = []
 
+## The visible scrollback. Several narrative lines land per turn, so one label
+## showing only the newest is worse than useless — it implies the last thing
+## that happened was the only thing that happened.
+var _messages: Array[String] = []
+
 
 func setup(s: GameState) -> void:
 	state = s
@@ -100,10 +105,15 @@ func _build_ui() -> void:
 	_stream.packet_dragged.connect(_on_packet_dragged)
 	frame.add_child(_stream)
 
+	# A short scrollback rather than one overwritten line. A turn produces
+	# several narrative messages in quick succession, and with a single label
+	# every one but the last is gone before it can be read — which makes the
+	# playback useless for diagnosing what actually happened.
 	_message = Label.new()
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_message.custom_minimum_size.y = 34
+	_message.custom_minimum_size.y = 88
+	_message.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	root.add_child(_message)
 
 	# --- player ---
@@ -269,13 +279,13 @@ func _play_one(ev: Dictionary) -> void:
 	match t:
 		Types.EVT.SWAP, Types.EVT.REVERT:
 			_refresh_board()
-			await _pause(0.12 / speed)
+			await _pause(0.22 / speed)
 		Types.EVT.DESTROY:
 			for c in (ev["cells"] as Array):
 				var p := _stream.at(c)
 				if p != null:
 					p.modulate = PacketStyle.TINT_DESTROYED
-			await _pause(0.14 / speed)
+			await _pause(0.20 / speed)
 			_refresh_board()
 			for c in (ev["cells"] as Array):
 				var p := _stream.at(c)
@@ -283,28 +293,87 @@ func _play_one(ev: Dictionary) -> void:
 					p.modulate = PacketStyle.TINT_NONE
 		Types.EVT.FALL, Types.EVT.SPAWN, Types.EVT.SET_TILE, Types.EVT.BOARD:
 			_refresh_board()
-			await _pause(0.08 / speed)
+			await _pause(0.10 / speed)
 		Types.EVT.DETONATE:
 			for c in (ev["cells"] as Array):
 				var p := _stream.at(c)
 				if p != null:
 					p.modulate = PacketStyle.TINT_BLAST
-			await _pause(0.18 / speed)
+			await _pause(0.34 / speed)
 			for c in (ev["cells"] as Array):
 				var p := _stream.at(c)
 				if p != null:
 					p.modulate = PacketStyle.TINT_NONE
-		Types.EVT.DAMAGE, Types.EVT.SHIELD:
+
+		# Narrative events. These previously had NO dwell, which is why a turn
+		# appeared to resolve instantly: the board moved, but nothing said what
+		# had acted or why.
+		Types.EVT.ABILITY:
+			# The header for an activation. Kept even where a later message
+			# repeats the name, because it is the only event that fires for
+			# EVERY activation — several Effects emit no message at all.
+			_log("%s fires %s" % [_who(ev.get("side", 0)), ev.get("name", "?")])
+			_refresh_programs()
+			await _pause(0.40 / speed)
+		# TRANSFORM, PLACED, and COUNTDOWN_DELIVERED get dwell but no line of
+		# their own: the logic layer already emits a player-facing message for
+		# each, and narrating them twice pushes the rest of the turn out of a
+		# four-line log.
+		Types.EVT.TRANSFORM:
+			await _pause(0.30 / speed)
+		Types.EVT.PLACED:
+			await _pause(0.20 / speed)
+		Types.EVT.COUNTDOWN:
+			_refresh_board()
+			await _pause(0.24 / speed)
+		Types.EVT.COUNTDOWN_DELIVERED:
+			await _pause(0.30 / speed)
+		Types.EVT.SHAKE:
+			await _pause(0.24 / speed)
+		Types.EVT.LINE_CLEAR:
+			_log("  line clear")
+			await _pause(0.24 / speed)
+		Types.EVT.WITHHOLD:
+			# Worth surfacing: a ready Program that declines to act looks
+			# identical to one that is not charged unless it says so.
+			_log("  %s withheld — %s" % [ev.get("program_id", "?"), ev.get("reason", "")])
+			await _pause(0.30 / speed)
+		Types.EVT.OP:
+			if not ev.get("resolved", true):
+				_log("  fizzled")
+				await _pause(0.24 / speed)
+
+		Types.EVT.DAMAGE:
 			_refresh_bars()
-			await _pause(0.10 / speed)
+			_log("  %d damage to %s" % [int(ev.get("amount", 0)), _who(ev.get("target", 0))])
+			await _pause(0.24 / speed)
+		Types.EVT.SHIELD:
+			_refresh_bars()
+			_log("  shield absorbed %d" % int(ev.get("prevented", 0)))
+			await _pause(0.24 / speed)
 		Types.EVT.MSG:
-			_message.text = str(ev["text"])
-			await _pause(0.12 / speed)
+			_log(str(ev["text"]))
+			await _pause(0.42 / speed)
+		Types.EVT.AUTO_RESHUFFLE:
+			_refresh_board()
+			await _pause(0.45 / speed)
 		Types.EVT.OVER:
 			_refresh_all()
-			_message.text = "Hacker wins" if ev["winner"] == Types.Side.PLAYER else "System wins"
+			_log("Hacker wins" if ev["winner"] == Types.Side.PLAYER else "System wins")
 		_:
 			pass
+
+
+func _who(side) -> String:
+	return "Hacker" if int(side) == Types.Side.PLAYER else "System"
+
+
+## Appends to the visible scrollback, keeping the most recent few lines.
+func _log(line: String) -> void:
+	_messages.append(line)
+	while _messages.size() > 4:
+		_messages.pop_front()
+	_message.text = "\n".join(_messages)
 
 
 func _pause(seconds: float) -> void:
@@ -406,7 +475,7 @@ func _on_save_and_quit() -> void:
 	if SaveState.write(state):
 		quit_requested.emit()
 	else:
-		_message.text = "Save failed"
+		_log("Save failed")
 
 
 func _on_program_pressed(idx: int) -> void:
@@ -443,14 +512,14 @@ func _begin_activation(source: Dictionary, fn: Dictionary) -> void:
 		return
 
 	_pending_target = {"source": source}
-	_message.text = "Choose a Packet — tap the Function again to cancel"
+	_log("Choose a Packet — tap the Function again to cancel")
 	_stream.set_targeting(state.occupied_cells())
 
 
 func _cancel_targeting() -> void:
 	_pending_target = {}
 	_stream.clear_targeting()
-	_message.text = "Targeting cancelled"
+	_log("Targeting cancelled")
 
 
 func _fullest_enemy_slot() -> int:
