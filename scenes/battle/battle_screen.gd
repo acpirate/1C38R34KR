@@ -78,13 +78,13 @@ func _build_ui() -> void:
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 8)
+	root.add_theme_constant_override("separation", UiTheme.px(6))
 	add_child(root)
 	_apply_safe_area(root)
 
 	# --- header: both sides' standing, and the pause control between them ---
 	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 6)
+	header.add_theme_constant_override("separation", UiTheme.px(6))
 	root.add_child(header)
 
 	_hacker_box = AvatarBox.new()
@@ -95,7 +95,7 @@ func _build_ui() -> void:
 
 	var menu := Button.new()
 	menu.text = "≡"
-	menu.custom_minimum_size = Vector2(44, AvatarBox.HEIGHT)
+	menu.custom_minimum_size = Vector2(UiTheme.px(44), AvatarBox.height())
 	menu.pressed.connect(_toggle_pause)
 	header.add_child(menu)
 
@@ -110,16 +110,16 @@ func _build_ui() -> void:
 	# turns a turn into a decision instead of a reaction; it is the single
 	# biggest thing the alpha's battle screen gets right.
 	var grid := HBoxContainer.new()
-	grid.add_theme_constant_override("separation", 6)
+	grid.add_theme_constant_override("separation", UiTheme.px(6))
 	root.add_child(grid)
 
 	var left := VBoxContainer.new()
-	left.add_theme_constant_override("separation", 4)
+	left.add_theme_constant_override("separation", UiTheme.px(4))
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_child(left)
 
 	var right := VBoxContainer.new()
-	right.add_theme_constant_override("separation", 4)
+	right.add_theme_constant_override("separation", UiTheme.px(4))
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_child(right)
 
@@ -155,6 +155,7 @@ func _build_ui() -> void:
 
 	_turn_label = Label.new()
 	_turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_turn_label.add_theme_font_size_override("font_size", UiTheme.font_small())
 	_turn_label.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
 	root.add_child(_turn_label)
 
@@ -165,15 +166,16 @@ func _build_ui() -> void:
 	_message = Label.new()
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_message.custom_minimum_size.y = 76
+	_message.custom_minimum_size.y = UiTheme.px(64)
 	_message.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_message.add_theme_font_size_override("font_size", UiTheme.font_body())
 	_message.add_theme_color_override("font_color", PacketStyle.TEXT_STATUS)
 	root.add_child(_message)
 
 	root.add_child(_build_debug_bar())
 
 	_log_overlay = RichTextLabel.new()
-	_log_overlay.custom_minimum_size.y = 90
+	_log_overlay.custom_minimum_size.y = UiTheme.px(60)
 	_log_overlay.visible = false
 	_log_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_log_overlay)
@@ -203,42 +205,43 @@ func _build_pause_panel() -> void:
 	_pause_scrim.add_child(centre)
 
 	_pause_panel = PanelContainer.new()
-	_pause_panel.custom_minimum_size.x = 300
+	_pause_panel.custom_minimum_size.x = UiTheme.px(250)
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = PacketStyle.PANEL
 	style.border_color = PacketStyle.PANEL_EDGE
 	style.set_border_width_all(1)
-	style.set_content_margin_all(20)
+	style.set_content_margin_all(UiTheme.px(16))
 	_pause_panel.add_theme_stylebox_override("panel", style)
 	centre.add_child(_pause_panel)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", UiTheme.px(8))
 	_pause_panel.add_child(box)
 
 	var head := Label.new()
 	head.text = "PAUSED"
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	head.add_theme_font_size_override("font_size", 22)
+	head.add_theme_font_size_override("font_size", UiTheme.font_heading())
 	head.add_theme_color_override("font_color", PacketStyle.TEXT_HEADING)
 	box.add_child(head)
 
 	var mode := Label.new()
 	mode.text = "Quick Match"
 	mode.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mode.add_theme_font_size_override("font_size", UiTheme.font_subheading())
 	mode.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
 	box.add_child(mode)
 
 	var resume := Button.new()
 	resume.text = "Resume"
-	resume.custom_minimum_size.y = 48
+	resume.custom_minimum_size.y = UiTheme.control_height()
 	resume.pressed.connect(_toggle_pause)
 	box.add_child(resume)
 
 	var save := Button.new()
 	save.text = "Save and Quit"
-	save.custom_minimum_size.y = 48
+	save.custom_minimum_size.y = UiTheme.control_height()
 	save.pressed.connect(_on_save_and_quit)
 	box.add_child(save)
 
@@ -249,6 +252,7 @@ func _build_pause_panel() -> void:
 	var note := Label.new()
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.add_theme_font_size_override("font_size", UiTheme.font_small())
 	note.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
 	note.text = "seed %d · content %s" % [_battle_seed(), Content.fingerprint()]
 	box.add_child(note)
@@ -257,7 +261,7 @@ func _build_pause_panel() -> void:
 func _divider(box: Control) -> void:
 	var line := ColorRect.new()
 	line.color = PacketStyle.PANEL_EDGE
-	line.custom_minimum_size.y = 1
+	line.custom_minimum_size.y = maxi(1, UiTheme.px(1))
 	box.add_child(line)
 
 
@@ -280,10 +284,10 @@ func _apply_safe_area(root: Control) -> void:
 		return
 	var scale_x := size.x / float(screen.x)
 	var scale_y := size.y / float(screen.y)
-	root.offset_left = safe.position.x * scale_x + 8
-	root.offset_top = safe.position.y * scale_y + 8
-	root.offset_right = -((screen.x - safe.end.x) * scale_x + 8)
-	root.offset_bottom = -((screen.y - safe.end.y) * scale_y + 8)
+	root.offset_left = safe.position.x * scale_x + UiTheme.px(6)
+	root.offset_top = safe.position.y * scale_y + UiTheme.px(6)
+	root.offset_right = -((screen.x - safe.end.x) * scale_x + UiTheme.px(6))
+	root.offset_bottom = -((screen.y - safe.end.y) * scale_y + UiTheme.px(6))
 
 
 # ---------------------------------------------------------------------------
@@ -396,23 +400,38 @@ func _play_one(ev: Dictionary) -> void:
 	var speed: float = PLAYBACK_SPEEDS[_speed_index]
 
 	match t:
+		# The swap is the player's own input echoed back — the one moment they
+		# most need to see. Animated as an actual slide rather than a board
+		# rebuild, because an instant change reads as "something happened"
+		# rather than as "the move I made happened". A revert slides too: that
+		# the Packets went and came back is exactly the feedback an illegal
+		# swap owes the player.
 		Types.EVT.SWAP, Types.EVT.REVERT:
-			_refresh_board()
-			await _pause(0.22 / speed)
+			await _animate(_stream.slide(ev["a"], ev["b"], 0.20 / speed), 0.20 / speed)
+
 		Types.EVT.DESTROY:
 			for c in (ev["cells"] as Array):
 				var p := _stream.at(c)
 				if p != null:
 					p.modulate = PacketStyle.TINT_DESTROYED
 			await _pause(0.20 / speed)
-			_refresh_board()
 			for c in (ev["cells"] as Array):
 				var p := _stream.at(c)
 				if p != null:
+					p.view = {}
 					p.modulate = PacketStyle.TINT_NONE
-		Types.EVT.FALL, Types.EVT.SPAWN, Types.EVT.BOARD:
+
+		Types.EVT.FALL:
+			await _animate(_stream.fall(ev["moves"], 0.16 / speed), 0.26 / speed)
+
+		Types.EVT.SPAWN:
+			await _animate(_stream.spawn(ev["tiles"], 0.22 / speed), 0.22 / speed)
+
+		# A wholesale replacement — reshuffle or Shake. There is no motion to
+		# describe, so it snaps and holds long enough to be noticed.
+		Types.EVT.BOARD:
 			_refresh_board()
-			await _pause(0.10 / speed)
+			await _pause(0.22 / speed)
 
 		# One event per Packet, so each conversion gets its OWN beat and a
 		# flash. A Transform changes several Packets at once and the logic layer
@@ -450,6 +469,11 @@ func _play_one(ev: Dictionary) -> void:
 			# EVERY activation — several Effects emit no message at all.
 			_log("%s fires %s" % [_who(ev.get("side", 0)), ev.get("name", "?")])
 			_refresh_programs()
+			# WHICH control fired, shown on the control itself. A Function whose
+			# Effect touches no Packet — a Drain, a Buff — otherwise produced no
+			# visible change anywhere, so firing it looked like nothing at all
+			# happened. The board is not the only thing that needs to animate.
+			_flash_unit(ev)
 			await _pause(0.40 / speed)
 		# TRANSFORM, PLACED, and COUNTDOWN_DELIVERED get dwell but no line of
 		# their own: the logic layer already emits a player-facing message for
@@ -505,6 +529,33 @@ func _who(side) -> String:
 	return "Hacker" if int(side) == Types.Side.PLAYER else "System"
 
 
+## Pulses the control that just fired.
+##
+## Found by matching the event's stable Program ID against the side's roster
+## rather than by slot index, because a PASSIVE-caused activation carries the
+## PASSIVE's ID and belongs to no slot at all — in that case nothing flashes,
+## which is correct: no control fired.
+func _flash_unit(ev: Dictionary) -> void:
+	var boxes := _player_boxes if int(ev.get("side", 0)) == Types.Side.PLAYER else _system_boxes
+	var target: UnitBox = null
+
+	if int(ev.get("owner_kind", Types.OwnerKind.PROGRAM)) == Types.OwnerKind.DECK:
+		target = _deck_box
+	else:
+		var units: Array = state.units[int(ev.get("side", 0))]
+		var program_id := str(ev.get("program_id", ""))
+		for i in mini(units.size(), boxes.size()):
+			if units[i].program_id == program_id:
+				target = boxes[i]
+				break
+
+	if target == null:
+		return
+	target.modulate = PacketStyle.TINT_BLAST
+	var tween := create_tween()
+	tween.tween_property(target, "modulate", PacketStyle.TINT_NONE, 0.35)
+
+
 ## A `-N` that rises off the struck side's box and fades.
 ##
 ## Worth the twelve lines: a cascade lands several damage events in under a
@@ -518,14 +569,14 @@ func _float_damage(target_side: int, amount: int) -> void:
 	var tag := Label.new()
 	tag.text = "-%d" % amount
 	tag.add_theme_color_override("font_color", PacketStyle.DAMAGE)
-	tag.add_theme_font_size_override("font_size", 26)
+	tag.add_theme_font_size_override("font_size", UiTheme.px(26))
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tag.position = anchor.global_position + Vector2(anchor.size.x * 0.5, anchor.size.y * 0.5)
 	add_child(tag)
 
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(tag, "position:y", tag.position.y - 34.0, 0.6)
+	tween.tween_property(tag, "position:y", tag.position.y - UiTheme.px(34), 0.6)
 	tween.tween_property(tag, "modulate:a", 0.0, 0.6)
 	tween.chain().tween_callback(tag.queue_free)
 
@@ -540,6 +591,24 @@ func _log(line: String) -> void:
 
 func _pause(seconds: float) -> void:
 	await get_tree().create_timer(maxf(0.01, seconds)).timeout
+
+
+## Awaits a motion tween, falling back to a plain dwell when there was nothing
+## to animate.
+##
+## The fallback matters: `slide`, `fall`, and `spawn` all return null for an
+## empty or impossible move, and awaiting a null tween would drop the beat
+## entirely — which is the same instant-board-change problem the animation was
+## added to fix, just in a rarer case.
+func _animate(tween: Tween, fallback: float) -> void:
+	if tween == null:
+		await _pause(fallback)
+		return
+	await tween.finished
+	# Positions are authoritative again the moment the tween ends. Snapping here
+	# rather than trusting the tween's final frame means a skip mid-flight
+	# cannot leave a Packet parked between cells.
+	_stream.settle()
 
 
 ## An on-screen tail of recent events. Diagnoses most playback and ordering

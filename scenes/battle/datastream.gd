@@ -50,9 +50,20 @@ func _layout() -> void:
 	for y in Constants.BOARD_HEIGHT:
 		for x in Constants.BOARD_WIDTH:
 			var p := _cells[y * Constants.BOARD_WIDTH + x]
-			p.position = Vector2(x * cs + gap * 0.5, y * cs + gap * 0.5)
+			p.position = home_of(Vector2i(x, y))
 			p.size = Vector2(cs - gap, cs - gap)
 	queue_redraw()
+
+
+## Where a cell's view SITS when nothing is moving.
+##
+## Animation works by putting a node somewhere else and tweening it back here,
+## so this has to be the single definition of "in place" — a second copy of the
+## arithmetic is how a Packet ends up settling one gap off after a fall.
+func home_of(cell: Vector2i) -> Vector2:
+	var cs := cell_size()
+	var gap := cs * GAP_RATIO
+	return Vector2(cell.x * cs + gap * 0.5, cell.y * cs + gap * 0.5)
 
 
 func at(cell: Vector2i) -> PacketView:
@@ -69,6 +80,7 @@ func set_grid(grid: Array) -> void:
 		for x in Constants.BOARD_WIDTH:
 			var v = grid[y][x]
 			at(Vector2i(x, y)).view = {} if v == null else (v as Dictionary)
+	settle()
 
 
 func set_cell(cell: Vector2i, view) -> void:
@@ -100,6 +112,128 @@ func set_targeting(cells: Array) -> void:
 		var p := at(c)
 		if p != null:
 			p.targeting = true
+
+
+# ---------------------------------------------------------------------------
+# Motion
+#
+# Every method here MOVES NODES and then leaves the grid model exactly as it
+# found it: cell i always means cell i, and a view Dictionary always sits on the
+# node for the cell it belongs to. Motion is transient decoration over a model
+# that never moves, which is what keeps a skipped or interrupted animation from
+# leaving the board describing a position the logic layer never produced.
+#
+# Each returns the tween so the caller can await it. Without that the playback
+# loop's dwell and the animation's duration drift apart, and events start
+# overlapping the tail of the previous one's motion.
+# ---------------------------------------------------------------------------
+
+## Two Packets trading places.
+##
+## The swap is the player's own input echoed back, and it is the one moment they
+## need to see clearly — a swap that resolves as an instant board change reads
+## as "something happened", not as "the move I made happened".
+func slide(a: Vector2i, b: Vector2i, duration: float) -> Tween:
+	var pa := at(a)
+	var pb := at(b)
+	if pa == null or pb == null:
+		return null
+
+	var va := pa.view
+	var vb := pb.view
+	pa.view = vb
+	pb.view = va
+	pa.position = home_of(b)
+	pb.position = home_of(a)
+	# Raised above their neighbours so the two in motion are never partly
+	# occluded by the cells they are passing.
+	move_child(pa, get_child_count() - 1)
+	move_child(pb, get_child_count() - 1)
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(pa, "position", home_of(a), duration).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(pb, "position", home_of(b), duration).set_trans(Tween.TRANS_QUAD)
+	return tween
+
+
+## Gravity. `moves` is the logic layer's own `[{from, to}]` list.
+##
+## Every view is read BEFORE any is written: a Packet can be both the source of
+## one move and the destination of another within a single fall, and writing as
+## we go would overwrite a view that a later move still needs.
+func fall(moves: Array, duration: float) -> Tween:
+	if moves.is_empty():
+		return null
+
+	var arriving := {}
+	var departing := {}
+	for m in moves:
+		var from: Vector2i = m["from"]
+		var to: Vector2i = m["to"]
+		var node := at(from)
+		if node == null:
+			continue
+		arriving[to] = node.view
+		departing[from] = true
+
+	# A cell that something left and nothing arrived at is now empty. Clearing
+	# it first stops the vacated Packet from appearing to be in two places.
+	for cell in departing:
+		if not arriving.has(cell):
+			at(cell).view = {}
+
+	var tween := create_tween().set_parallel(true)
+	for m in moves:
+		var from: Vector2i = m["from"]
+		var to: Vector2i = m["to"]
+		if not arriving.has(to):
+			continue
+		var node := at(to)
+		node.view = arriving[to]
+		node.position = home_of(from)
+		# Fall time scales with distance, so a Packet dropping six rows does not
+		# arrive at the same instant as one dropping a single row. Everything
+		# landing simultaneously is what makes gravity read as a teleport even
+		# when it is animated.
+		var rows := maxi(1, absi(to.y - from.y))
+		tween.tween_property(node, "position", home_of(to), duration * sqrt(float(rows))) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	return tween
+
+
+## Refill. `tiles` is the logic layer's own `[{p, view}]` list.
+##
+## New Packets enter from above the board rather than materialising in place,
+## staggered by row so a column arrives as a stream instead of a block.
+func spawn(tiles: Array, duration: float) -> Tween:
+	if tiles.is_empty():
+		return null
+
+	var cs := cell_size()
+	var tween := create_tween().set_parallel(true)
+	for entry in tiles:
+		var cell: Vector2i = entry["p"]
+		var node := at(cell)
+		if node == null:
+			continue
+		node.view = entry["view"]
+		# Start one row above the top edge for the topmost cell, further up for
+		# each row below it, so they queue rather than overlap on the way in.
+		node.position = home_of(cell) - Vector2(0, cs * float(cell.y + 1))
+		tween.tween_property(node, "position", home_of(cell), duration) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	return tween
+
+
+## Snaps every node back to its home position.
+##
+## Called whenever the board is rebuilt wholesale — battle start, reshuffle, or
+## a skipped animation — because a node left mid-tween would otherwise keep the
+## offset it had when the tween was abandoned.
+func settle() -> void:
+	for y in Constants.BOARD_HEIGHT:
+		for x in Constants.BOARD_WIDTH:
+			at(Vector2i(x, y)).position = home_of(Vector2i(x, y))
 
 
 func cell_at_position(pos: Vector2) -> Vector2i:

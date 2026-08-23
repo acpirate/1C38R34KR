@@ -1,0 +1,213 @@
+# Lessons learned — 1C38R34KR beta port
+
+Written during the port, for the post-project AAR. Kept in the repo rather than
+in agent memory so it survives whoever is driving.
+
+The organising question: **what would I tell someone starting this port over?**
+Not a changelog — `decisions.md` is the changelog. These are the things that
+were not obvious in advance and cost real time.
+
+---
+
+## 0. Start this file on day one, not halfway through
+
+The first lesson, and the one that makes every other entry here worse than it
+should be: **this log was started at roughly the midpoint of the port.**
+
+Everything below the midpoint was written from memory and from re-reading
+`decisions.md` and the commit history. That means it is biased toward what was
+recent, what was painful enough to remember, and what happened to leave a
+written trace. The early phases — toolchain setup, the RNG port, content
+loading and fingerprinting — are certainly underrepresented here, not because
+they were smooth, but because their friction has already been forgotten.
+
+`decisions.md` captured *what was decided and why* from the first commit, and
+that discipline paid off completely. The gap was a parallel log for *what was
+learned the hard way* — the dead ends, the wrong assumptions, the twenty minutes
+lost to a toolchain quirk. Those do not belong in a decision log, so they went
+unrecorded.
+
+**Create `lessons-learned.md` alongside `decisions.md` at project start.** Append
+to it the moment something costs unexpected time, while the detail is still
+cheap to write down. The cost of an entry that turns out not to matter is one
+line; the cost of a missing entry is paying for the same discovery twice.
+
+---
+
+## 1. The differential harness earned its cost several times over
+
+The build authorization insisted the harness come BEFORE presentation rather
+than after, and it was right for a reason I did not anticipate. The harness was
+sold as a final gate. What it actually was is a **debugger**.
+
+Two genuine port bugs surfaced through it that no unit test would have caught,
+because both produced perfectly plausible battles that simply were not the
+alpha's:
+
+- `_cast_shake` discarded the board. `BoardOps.shake` REPLACES the board and the
+  carrier was never written back. Everything still ran.
+- A PASSIVE carrier used `inst.source_id` (the HOST) where the alpha used
+  `inst.passive["id"]` (the PASSIVE). Metrics attributed to the wrong actor.
+
+Both were found as a byte-level divergence in an event stream, with a seed that
+reproduced them headlessly in seconds. Without that, they would have surfaced
+months later as "the numbers look a bit off".
+
+**The corollary:** the harness only works if the RNG is ported EXACTLY. Porting
+mulberry32 by hand rather than reaching for Godot's PCG32 felt like pedantry at
+the time and is the foundation the entire gate rests on. Everything downstream —
+board generation, refill, Shake, Boss placement — is only comparable because the
+draw sequence is identical.
+
+## 2. More harness bugs than port bugs
+
+Worth saying plainly because it is demoralising in the moment and useful to
+expect: **most early divergences were bugs in my test fixtures, not in the
+port.** A JS object literal in a fixture generator evaluated at `return` time,
+after `reshuffleBoard` had already consumed draws. A stacking test whose premise
+was wrong because the PASSIVE was ENEMY-scoped. A charge-routing overflow test
+that could never fire because no two Programs in the fixture shared a colour —
+it would have passed vacuously forever.
+
+That last one is the dangerous class. **A test that cannot fail is worse than no
+test**, because it is counted as coverage. When writing a test for an edge case,
+first make the fixture actually reach the edge, and prove it does.
+
+## 3. Trust the reference implementation over your own reasoning
+
+Several times I concluded the alpha was wrong and was myself wrong. The alpha
+had ~15.6k lines and a long tail of deliberate decisions encoded as apparently
+arbitrary details. When the port disagreed with the alpha, the alpha was right
+substantially more often than not.
+
+The productive posture: **assume the reference is right, and find out why.**
+`port-notes.md` (P-001..P-014) exists to record every place the translation is
+non-literal, so a future reader can tell "deliberate" from "drifted".
+
+## 4. Layer purity has to be enforced, not documented
+
+`scripts/logic/` may not touch `Node`, `SceneTree`, `Tween`, `Input`,
+`DisplayServer`, or `await`. That rule is what makes the game headlessly
+testable and therefore what makes the gate possible at all — but it erodes one
+convenient `get_tree()` at a time.
+
+`test_layer_purity.gd` greps for the forbidden constructs. It has caught drift.
+The same pattern applied to the presentation registry (`test_presentation.gd`
+bans hex literals under `scenes/`) and both are worth the twenty lines.
+
+**Corollary discovered late:** a diagnostic that reaches past the abstraction is
+the same drift wearing a lab coat. The debug win/lose buttons called
+`Resolve.deal_damage` directly, bypassing `Game._collect`, and so bypassed
+metrics — producing a result screen that reported zero damage for a battle that
+plainly had some. If there is ONE funnel, everything goes through it, including
+the shortcuts.
+
+## 5. Godot/GDScript specifics that cost time
+
+- **`Color` is a builtin.** The gameplay enum had to become `PacketColor`. Check
+  for name collisions with engine types before designing the type vocabulary.
+- **Enum type annotations must be qualified** (`Types.Side`, not `Side`) even
+  where the unqualified name resolves elsewhere. This recurred several times.
+- **`Constants.get()` is a parse error** — `get` is `Object.get`. Load the script
+  into a `Script`-typed var at runtime instead.
+- **GDScript has no `%g`**, and an unsupported format character raises at
+  RUNTIME, not compile time. The playback-speed button silently had no label for
+  a while.
+- **A parse error hangs a headless test runner.** `_initialize()` aborts, so
+  `quit()` is never reached and the main loop spins forever — 200 CPU-seconds
+  before I noticed. Guard with `can_instantiate()` and add a `_process` fallback
+  that aborts on the first idle frame.
+- **`int(null)` raises and aborts the enclosing loop.** In a metrics collector
+  that meant every event after the first null field went uncounted, and the
+  totals under-reported silently. Null-guard every optional numeric field.
+- **New `class_name` types are invisible until the class cache refreshes.**
+  `godot --headless --import` after adding one, or `--check-only` reports
+  "Could not find type" for a file that is perfectly fine.
+- **CSV files are claimed by the csv_translation importer** and will not ship in
+  an export. `importer="keep"` plus a `*.csv` export filter.
+- **Godot imports images in any directory it can see.** A `.gdignore` in the
+  staging/docs directory stops reference screenshots becoming imported textures
+  bloating the APK.
+
+## 6. Windows/toolchain specifics
+
+- `cmdline-tools` 23 replaced `sdkmanager` with a new `android` CLI.
+- MAX_PATH bit during extraction; a short staging path under the user profile
+  fixed it.
+- Node's `spawnSync` fails `EINVAL` on `.cmd` shims without `shell: true`.
+- PowerShell captures UTF-16 by default; a JSONL trace captured through a
+  redirect was unparseable until forced to UTF-8.
+- **Always `git -C <path>`.** The Bash tool's cwd reverted between calls and I
+  committed to the wrong repo once.
+
+## 7. Devices
+
+- A black screen on Android is not necessarily a rendering bug. With the screen
+  asleep or locked, the activity goes `OnResume`→`OnPause`→`OnStop` immediately,
+  `adb screencap` returns a pure black PNG, and the Godot log is empty — which
+  looks exactly like a renderer failure. Check `dumpsys window` and
+  `dumpsys power` FIRST. Disabling the lock screen and setting
+  `stay_on_while_plugged_in` on a dedicated test device removes the whole class.
+- A flaky USB port is not worth fighting; `adb tcpip 5555` once and work
+  wirelessly.
+- **The desktop build is the right iteration target, not the device.** The
+  device loop is ~90 s dominated by the APK export. The desktop window is ~2 s.
+  I spent a lot of the visual pass on the slow loop out of reflex, because the
+  device is the GATE. The gate and the iteration target are different things.
+
+## 8. Presentation: what I got wrong
+
+Covered in depth in `design-reference/README.md` and D-024, but the two things
+worth restating:
+
+- **Sizes must be ratios of the design viewport, never raw pixels.** The alpha
+  laid out against a 430 px CSS viewport; this project's base viewport is
+  1080 px. Carrying its numbers across literally made every label ~2.5× too
+  small on device — unreadable at arm's length, which is fatal for a build whose
+  entire purpose is human playtesting. `UiTheme.px()` now derives the multiplier
+  from the two viewport widths so the relationship stays visible.
+- **"As large as possible" is only half a rule.** The other half is "without
+  overflowing", and that is the half that bites. At readable type a row of six
+  Buttons is wider than a phone, and an `HBoxContainer` of Buttons pushes the
+  whole panel off-screen rather than wrapping. `clip_text = true` stops a
+  Button's text setting its container's minimum width; `GridContainer` wraps a
+  row that will not fit.
+
+## 9. The POC's whitebox was worth more than anyone expected
+
+The director's initial position was that the look would be completely
+overhauled, so alpha fidelity did not matter. That understated what the alpha's
+whitebox was. It encoded real UX findings accumulated over the whole POC:
+
+- both sides' Programs visible at all times, because the opponent's charge state
+  is what a player schedules around;
+- Packets as coloured glyphs on dark cells, not white glyphs on coloured fields
+  (the alpha's own superseding decision, and it frees the glyph centre for the
+  ownership badge);
+- neutrals as static rather than absence — an unmatchable Packet and an empty
+  cell must not look alike;
+- select-then-confirm on phone lists, because a mis-tap on a scrolling list is
+  otherwise unrecoverable;
+- dim every illegal region during targeting, which answers "what can I tap right
+  now?" with no text at all.
+
+None of that is art. All of it survives an art pass. **Extract a POC's styling
+as display-independent RULES before porting**, or the same discovery gets paid
+for twice.
+
+## 10. Process
+
+- **Announce device windows.** "Plug the phone in now, here is everything that
+  will run" and "the phone can come off now" — tethering a daily-driver phone is
+  a real cost to the person holding it.
+- **Bank long-running verification behind a name.** The full 5,250-battle matrix
+  takes ~90 minutes. Codenaming it DEEPSCAN meant it could be handed to a future
+  session rather than blocking the current one.
+- **Two-tier verification.** A ~2-minute stripped parity run on every change, the
+  full matrix on demand. A gate nobody runs because it is slow is not a gate.
+- **Human playtesting finds a different class of bug than any harness.** The
+  double-fire on `UnitBox` (Android delivers a tap as BOTH an
+  `InputEventScreenTouch` and an emulated `InputEventMouseButton`, so a targeted
+  Function armed and instantly cancelled) was invisible to 1,047 tests and
+  150/150 parity, because it is not a rules bug. Get a human on the build early,
+  and take "it feels wrong" as a bug report.

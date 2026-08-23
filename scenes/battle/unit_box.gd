@@ -15,7 +15,13 @@ extends Control
 
 signal pressed
 
-const HEIGHT := 44.0
+## The alpha's 40 px box, scaled to this project's base viewport.
+##
+## Everything inside is derived from this height rather than fixed, so the box
+## stays internally proportioned if it ever changes — a 40 px layout stretched
+## to 100 px with 13 px text in it reads as a mostly-empty rectangle.
+static func height() -> float:
+	return float(UiTheme.px(40))
 
 var label := "":
 	set(v):
@@ -59,9 +65,12 @@ var dimmed := false:
 		dimmed = v
 		queue_redraw()
 
+## True between a press and its release. See `_gui_input`.
+var _latched := false
+
 
 func _init() -> void:
-	custom_minimum_size.y = HEIGHT
+	custom_minimum_size.y = height()
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
@@ -95,9 +104,12 @@ func _draw() -> void:
 		width = 3.0
 	draw_rect(rect.grow(-width * 0.5), edge, false, width)
 
-	var pad := 5.0
-	var swatch := 15.0
-	var text_x := pad + swatch + 5.0
+	# Three rows in a fixed height: name, charge, bar. Proportions rather than
+	# constants, so the box reads the same at any scale.
+	var pad := size.y * 0.10
+	var swatch := size.y * 0.30
+	var text_x := pad + swatch + pad
+	var bar_h := size.y * 0.11
 
 	if binding_color >= 0 and binding_shape >= 0:
 		PacketStyle.draw_shape(
@@ -107,20 +119,27 @@ func _draw() -> void:
 		)
 
 	var font := ThemeDB.fallback_font
-	var name_size := 13
+
+	# Shrink-to-fit rather than clip. Program names are authored content and
+	# E-BOMBER is a good deal wider than WEASEL; a name that runs off the edge
+	# of its own control is worse than one drawn a point smaller.
+	var name_size := int(size.y * 0.28)
+	var name_room := size.x - text_x - pad
+	while name_size > 10 and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, name_size).x > name_room:
+		name_size -= 1
 	draw_string(
-		font, Vector2(text_x, pad + swatch * 0.85), label,
-		HORIZONTAL_ALIGNMENT_LEFT, size.x - text_x - pad, name_size, PacketStyle.TEXT,
+		font, Vector2(text_x, pad + swatch * 0.82), label,
+		HORIZONTAL_ALIGNMENT_LEFT, name_room, name_size, PacketStyle.TEXT,
 	)
 
-	var charge_text := "%d/%d" % [charge, cost]
+	var charge_size := int(size.y * 0.22)
 	draw_string(
-		font, Vector2(pad, size.y - 11.0), charge_text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+		font, Vector2(pad, size.y - bar_h * 2.2), "%d/%d" % [charge, cost],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, charge_size,
 		PacketStyle.CHARGE_TEXT_READY if charged else PacketStyle.TEXT_DIM,
 	)
 
-	var bar := Rect2(pad, size.y - 8.0, size.x - pad * 2.0, 5.0)
+	var bar := Rect2(pad, size.y - bar_h - pad * 0.5, size.x - pad * 2.0, bar_h)
 	draw_rect(bar, PacketStyle.CHARGE_TRACK, true)
 	var filled := bar
 	filled.size.x = bar.size.x * minf(1.0, float(charge) / float(cost))
@@ -134,13 +153,27 @@ func _draw() -> void:
 ## standard cancel for every targeted Function, so the marker is identical
 ## whatever kind of target is being asked for.
 func _draw_cancel(rect: Rect2) -> void:
-	var m := 7.0
-	var c := Vector2(rect.size.x - m - 6.0, rect.size.y * 0.5)
-	draw_line(c + Vector2(-m, -m), c + Vector2(m, m), PacketStyle.DAMAGE, 3.0, true)
-	draw_line(c + Vector2(m, -m), c + Vector2(-m, m), PacketStyle.DAMAGE, 3.0, true)
+	var m := rect.size.y * 0.18
+	var c := Vector2(rect.size.x - m - rect.size.y * 0.15, rect.size.y * 0.5)
+	var w := maxf(2.0, rect.size.y * 0.06)
+	draw_line(c + Vector2(-m, -m), c + Vector2(m, m), PacketStyle.DAMAGE, w, true)
+	draw_line(c + Vector2(m, -m), c + Vector2(-m, m), PacketStyle.DAMAGE, w, true)
 
 
+## Press/release pairing, not release alone.
+##
+## Android delivers a tap as an `InputEventScreenTouch` AND an emulated
+## `InputEventMouseButton`, so emitting on every release fired this control
+## TWICE per tap. For a targeted Function that read as arming and instantly
+## cancelling: the first press armed it, the second hit the tap-again-to-cancel
+## path. Latching on press and consuming the latch on release makes the second
+## release of the pair a no-op whichever event type arrives first.
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch or event is InputEventMouseButton:
-		if not event.pressed:
-			pressed.emit()
+	if not (event is InputEventScreenTouch or event is InputEventMouseButton):
+		return
+	if event.pressed:
+		_latched = true
+		return
+	if _latched:
+		_latched = false
+		pressed.emit()

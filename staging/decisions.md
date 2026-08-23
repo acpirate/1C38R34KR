@@ -620,3 +620,43 @@ They land with the features in 0.2.
 
 Verified: 1047 tests green, parity 150/150, logs written and read back off the
 tablet.
+
+## D-026 — UI sizes are ratios of the design viewport, never raw pixels
+
+**2026-08-23.** Human playtesting returned three issues; all three are recorded
+here because each has a general form worth remembering.
+
+**Text was far too small.** The alpha laid out against a 430 px CSS viewport and
+this project's base viewport is 1080 px, so every size carried across literally
+was ~2.51× too small on device. `UiTheme` now derives `SCALE` from the two
+viewport widths and exposes `px(alpha_px)`; named sizes each trace to the alpha
+value they came from. `UnitBox` and `AvatarBox` derive their internals from their
+own height as proportions, so a box stays correctly composed at any scale.
+
+The director's rule: **as large as possible without overflowing.** The second
+half is the one that bites. At readable type a row of six Buttons is wider than
+a phone, and an `HBoxContainer` of Buttons pushes the whole panel off-screen
+rather than wrapping — the Build screen's inventory did exactly that. Fixed with
+`clip_text = true` (so a Button's text cannot set its container's minimum width)
+and a `GridContainer` wrapping six controls into two rows of three.
+
+**Board changes were teleports.** `SWAP`, `FALL`, and `SPAWN` all resolved as an
+instant `_refresh_board()`. `Datastream` gained `slide`, `fall`, `spawn`, and
+`settle`: motion is transient decoration over a model that never moves — cell i
+always means cell i — so an interrupted or skipped animation can never leave the
+board describing a position the logic layer did not produce. Fall duration
+scales with distance, because everything landing simultaneously reads as a
+teleport even when it is technically animated. Firing a Program now pulses the
+control that fired, since a Function whose Effect touches no Packet (a Drain, a
+Buff) previously produced no visible change anywhere at all.
+
+**A targeted Function armed and instantly cancelled.** Android delivers one tap
+as BOTH an `InputEventScreenTouch` and an emulated `InputEventMouseButton`, so
+`UnitBox` emitted `pressed` twice per tap: the first press armed, the second hit
+the tap-again-to-cancel path. Now latched on press and consumed on release, so
+whichever event type arrives second is a no-op.
+
+**The general lesson**, recorded in `lessons-learned.md`: 1,047 tests and 150/150
+parity had nothing to say about any of these. They are not rules bugs. A human
+on the build finds a class of defect no harness reaches, and "it feels wrong" is
+a bug report.

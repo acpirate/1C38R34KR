@@ -95,10 +95,10 @@ func _fresh_screen(compact := false) -> VBoxContainer:
 
 	_shell = MarginContainer.new()
 	_shell.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_shell.add_theme_constant_override("margin_left", 16)
-	_shell.add_theme_constant_override("margin_right", 16)
-	_shell.add_theme_constant_override("margin_top", 24)
-	_shell.add_theme_constant_override("margin_bottom", 24)
+	_shell.add_theme_constant_override("margin_left", UiTheme.px(10))
+	_shell.add_theme_constant_override("margin_right", UiTheme.px(10))
+	_shell.add_theme_constant_override("margin_top", UiTheme.px(12))
+	_shell.add_theme_constant_override("margin_bottom", UiTheme.px(12))
 	add_child(_shell)
 
 	var host: Control = _shell
@@ -108,18 +108,18 @@ func _fresh_screen(compact := false) -> VBoxContainer:
 		host = centre
 
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size.x = 300
+	_panel.custom_minimum_size.x = UiTheme.px(250)
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = PacketStyle.PANEL
 	style.border_color = PacketStyle.PANEL_EDGE
 	style.set_border_width_all(1)
-	style.set_content_margin_all(16)
+	style.set_content_margin_all(UiTheme.px(14))
 	_panel.add_theme_stylebox_override("panel", style)
 	host.add_child(_panel)
 
 	_root = VBoxContainer.new()
-	_root.add_theme_constant_override("separation", 8)
+	_root.add_theme_constant_override("separation", UiTheme.px(8))
 	_panel.add_child(_root)
 	return _root
 
@@ -130,8 +130,7 @@ func _heading(text: String) -> void:
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", 22)
-	l.add_theme_constant_override("outline_size", 0)
+	l.add_theme_font_size_override("font_size", UiTheme.font_heading())
 	l.add_theme_color_override("font_color", PacketStyle.TEXT_HEADING)
 	_root.add_child(l)
 
@@ -142,6 +141,7 @@ func _subheading(text: String) -> void:
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_theme_font_size_override("font_size", UiTheme.font_subheading())
 	l.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
 	_root.add_child(l)
 
@@ -149,7 +149,7 @@ func _subheading(text: String) -> void:
 func _button(text: String, action: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size.y = 48
+	b.custom_minimum_size.y = UiTheme.control_height()
 	b.pressed.connect(action)
 	_root.add_child(b)
 	return b
@@ -158,7 +158,7 @@ func _button(text: String, action: Callable) -> Button:
 func _divider() -> void:
 	var line := ColorRect.new()
 	line.color = PacketStyle.PANEL_EDGE
-	line.custom_minimum_size.y = 1
+	line.custom_minimum_size.y = maxi(1, UiTheme.px(1))
 	_root.add_child(line)
 
 
@@ -184,6 +184,7 @@ func _show_title(fingerprint: String) -> void:
 	# asking when a device behaves unlike the harness.
 	stamp.text = "content %s" % fingerprint
 	stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stamp.add_theme_font_size_override("font_size", UiTheme.font_small())
 	stamp.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
 	_root.add_child(stamp)
 
@@ -270,7 +271,7 @@ func _show_chooser(title: String, prompt: String, options: Array, on_choose: Cal
 	_root.add_child(scroll)
 
 	var list := VBoxContainer.new()
-	list.add_theme_constant_override("separation", 6)
+	list.add_theme_constant_override("separation", UiTheme.px(6))
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 
@@ -278,8 +279,15 @@ func _show_chooser(title: String, prompt: String, options: Array, on_choose: Cal
 		var card := Button.new()
 		card.text = "%s\n%s" % [opt["name"], "\n".join(PackedStringArray(opt["lines"]))]
 		card.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		card.custom_minimum_size.y = 64
+		card.custom_minimum_size.y = UiTheme.px(64)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# Wrap, and never let the text set the control's minimum width. A Button
+		# sizes itself to its longest line by default, which on a fixed-width
+		# phone panel pushes the whole layout wider than the screen instead of
+		# wrapping — ARENA's PASSIVE description is long enough to do exactly
+		# that.
+		card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		card.clip_text = true
 		var oid := str(opt["id"])
 		card.pressed.connect(func():
 			chosen["id"] = oid
@@ -292,7 +300,7 @@ func _show_chooser(title: String, prompt: String, options: Array, on_choose: Cal
 		cards.append(card)
 
 	confirm.text = "Choose"
-	confirm.custom_minimum_size.y = 48
+	confirm.custom_minimum_size.y = UiTheme.control_height()
 	confirm.disabled = true
 	confirm.pressed.connect(func():
 		if chosen["id"] != "":
@@ -323,13 +331,13 @@ func _show_build() -> void:
 	_root.add_child(scroll)
 
 	var list := VBoxContainer.new()
-	list.add_theme_constant_override("separation", 6)
+	list.add_theme_constant_override("separation", UiTheme.px(6))
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 
 	for slot in _build.size():
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 4)
+		row.add_theme_constant_override("separation", UiTheme.px(4))
 
 		# Each slot shows what it IS, not just its name: the binding it draws
 		# charge from and the Function it will fire. Those two facts are the
@@ -342,8 +350,10 @@ func _show_build() -> void:
 			current["fn"]["name"], int(current["cost"]),
 		]
 		summary.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		summary.custom_minimum_size.y = 52
+		summary.custom_minimum_size.y = UiTheme.px(52)
 		summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		summary.clip_text = true
 		summary.disabled = true
 		# The amber left edge is the same mark a charged Program carries in
 		# battle: this slot is live. It is not decoration — the inventory rows
@@ -358,19 +368,26 @@ func _show_build() -> void:
 		# a real decision and gets its own control rather than being implied by
 		# which Program you pick.
 		var moves := VBoxContainer.new()
-		moves.add_theme_constant_override("separation", 2)
+		moves.add_theme_constant_override("separation", UiTheme.px(2))
 		moves.add_child(_move_button("▲", slot, -1))
 		moves.add_child(_move_button("▼", slot, 1))
 		row.add_child(moves)
 		list.add_child(row)
 
-		var swap_row := HBoxContainer.new()
-		swap_row.add_theme_constant_override("separation", 4)
+		# Two rows of three rather than one row of six. At a size the text is
+		# actually readable at, six controls across is wider than the screen —
+		# and a row that overflows takes the entire panel with it.
+		var swap_row := GridContainer.new()
+		swap_row.columns = 3
+		swap_row.add_theme_constant_override("h_separation", UiTheme.px(4))
+		swap_row.add_theme_constant_override("v_separation", UiTheme.px(4))
 		for pid in inventory:
 			var prog := Content.program(pid)
 			var b := Button.new()
 			b.text = str(prog["name"])
 			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.clip_text = true
+			b.custom_minimum_size.y = UiTheme.px(34)
 			# A Program already elsewhere in the build cannot be added twice:
 			# the build is four DISTINCT Programs.
 			b.disabled = _build.has(pid) and _build[slot] != pid
@@ -422,18 +439,18 @@ func _slot_box() -> StyleBoxFlat:
 	# edge bar rather than a highlighted box.
 	box.border_color = PacketStyle.ACCENT
 	box.set_border_width_all(1)
-	box.border_width_left = 4
-	box.content_margin_left = 10
-	box.content_margin_right = 10
-	box.content_margin_top = 8
-	box.content_margin_bottom = 8
+	box.border_width_left = maxi(2, UiTheme.px(4))
+	box.content_margin_left = UiTheme.px(10)
+	box.content_margin_right = UiTheme.px(10)
+	box.content_margin_top = UiTheme.px(8)
+	box.content_margin_bottom = UiTheme.px(8)
 	return box
 
 
 func _move_button(glyph: String, slot: int, delta: int) -> Button:
 	var b := Button.new()
 	b.text = glyph
-	b.custom_minimum_size = Vector2(40, 24)
+	b.custom_minimum_size = Vector2(UiTheme.px(44), UiTheme.px(22))
 	var dest := slot + delta
 	b.disabled = dest < 0 or dest >= _build.size()
 	if not b.disabled:
@@ -559,7 +576,7 @@ func _show_result(winner: int) -> void:
 ## — it is what makes a screenshot of this screen actionable.
 func _show_metrics(state: GameState) -> void:
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.y = 200
+	scroll.custom_minimum_size.y = UiTheme.px(150)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_root.add_child(scroll)
