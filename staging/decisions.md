@@ -491,3 +491,32 @@ uninterrupted run byte-for-byte. Save/quit UI stays in Phases 5–6.
 **Why:** an incompletely captured RNG state, a dropped countdown overlay, or a
 lost stamped area pattern all pass a round-trip equality test and fail a
 continuation test.
+
+---
+
+## D-023 — Two-tier parity verification; the full matrix is codenamed DEEPSCAN
+
+**2026-08-22 · director · ACCEPTED**
+
+Measured: Godot runs roughly **1 second per battle**, so the full §6.1 matrix —
+5,250 battles per engine — takes about **90 minutes** on the Godot side. Fine as
+a release gate, far too slow for an iterate-and-check loop.
+
+**Decision: two tiers, and the matrix is NOT shrunk.**
+
+| Tier | Scope | Time | Use |
+| --- | --- | --- | --- |
+| **fast** | 3 Systems × 5 HOSTs × seeds 0–9, default settings — 150 battles | ~2.6 min | every change during the build |
+| **DEEPSCAN** | the complete §6.1 matrix, 5,250 battles | ~90 min | the release gate, run unattended |
+
+Both run through `node tools/gen/parity.mjs`; DEEPSCAN adds `--deepscan`.
+
+**Why not simply reduce coverage:** the authorization explicitly forbids
+shrinking the matrix because a naive implementation is slow. If DEEPSCAN
+becomes painful the answer is to batch more work per Godot process, not to
+test fewer battles.
+
+**DEEPSCAN is banked as a memory** so the director can hand it to a future
+agent — "run DEEPSCAN" — and do something else for the hour and a half. The
+memory carries the full matrix definition, the commands, the pass criterion,
+and the UTF-16 capture hazard.
