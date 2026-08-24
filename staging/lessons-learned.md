@@ -230,3 +230,26 @@ amount of reading the code would have surfaced, and the fix for one of them
 (swallowing the release during a gesture) had a non-obvious failure mode: the
 Button underneath stays latched and fires later. **Where a fix is about what the
 hardware does, test with what the hardware sends.**
+
+## 12. A comment describing intent is not evidence the code achieves it
+
+`Datastream.spawn` carried a comment saying new Packets start "one row above the
+top edge for the topmost cell, further up for each row below it, so they queue
+rather than overlap". The arithmetic beneath it cancelled `cell.y` out and
+started every Packet at the same point.
+
+It survived because the result *looked plausible* — Packets did drop in from
+above and did land in the right places. What it actually produced was Packets
+covering different distances in the same time, which the director noticed on a
+real device as a stall right before the board settled.
+
+Two things worth carrying forward:
+
+- **Check load-bearing arithmetic against a model, not against whether the
+  output looks reasonable.** "Every Packet in this column travels the same
+  distance" is a claim that can be verified by substitution in ten seconds. "The
+  animation looks fine" cannot.
+- **When a comment and its code disagree, the comment is the more dangerous
+  half**, because it stops the next reader from checking. This one described
+  behaviour convincingly enough that I did not re-derive it when writing the
+  duration logic on top.

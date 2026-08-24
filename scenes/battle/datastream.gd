@@ -210,6 +210,16 @@ func spawn(tiles: Array, duration: float) -> Tween:
 		return null
 
 	var cs := cell_size()
+
+	# How many Packets each column is receiving. Refill always fills a column
+	# from the top down, so a column taking `k` new Packets is filling rows
+	# `0..k-1` — which is what lets the stack below be computed from the count
+	# alone.
+	var per_column := {}
+	for entry in tiles:
+		var cell: Vector2i = entry["p"]
+		per_column[cell.x] = int(per_column.get(cell.x, 0)) + 1
+
 	var tween := create_tween().set_parallel(true)
 	for entry in tiles:
 		var cell: Vector2i = entry["p"]
@@ -217,10 +227,26 @@ func spawn(tiles: Array, duration: float) -> Tween:
 		if node == null:
 			continue
 		node.view = entry["view"]
-		# Start one row above the top edge for the topmost cell, further up for
-		# each row below it, so they queue rather than overlap on the way in.
-		node.position = home_of(cell) - Vector2(0, cs * float(cell.y + 1))
-		tween.tween_property(node, "position", home_of(cell), duration) \
+
+		# A column's new Packets enter as a RIGID STACK: the one bound for the
+		# lowest empty row starts just above the board, and each one above it
+		# starts a further cell up. Every Packet in the column therefore travels
+		# exactly `k` cells, so one duration moves them all at a single speed
+		# and the column arrives in formation.
+		#
+		# The previous arithmetic cancelled `cell.y` out and started every
+		# Packet at the same point, which meant they covered DIFFERENT distances
+		# in the same time. The ones with least to travel crawled, and — being
+		# slowest — were the last to settle, reading as a stall right before the
+		# board came to rest.
+		var k := int(per_column[cell.x])
+		var rise := cell.y + (k - cell.y)  # == k; written out to show the stack
+		node.position = home_of(cell) - Vector2(0, cs * float(rise))
+
+		# Fall time scales with the square root of the distance, matching
+		# `fall`, so a deep refill takes longer than a shallow one instead of
+		# being rushed to fit a fixed budget.
+		tween.tween_property(node, "position", home_of(cell), duration * sqrt(float(k))) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	return tween
 

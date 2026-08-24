@@ -424,8 +424,11 @@ func _play_one(ev: Dictionary) -> void:
 		Types.EVT.FALL:
 			await _animate(_stream.fall(ev["moves"], 0.16 / speed), 0.26 / speed)
 
+		# The base is lower than it looks because `spawn` now scales it by the
+		# depth of the refill — a single Packet dropping in takes 0.13, a full
+		# eight-cell column about 0.37.
 		Types.EVT.SPAWN:
-			await _animate(_stream.spawn(ev["tiles"], 0.22 / speed), 0.22 / speed)
+			await _animate(_stream.spawn(ev["tiles"], 0.13 / speed), 0.22 / speed)
 
 		# A wholesale replacement — reshuffle or Shake. There is no motion to
 		# describe, so it snaps and holds long enough to be noticed.

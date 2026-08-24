@@ -97,3 +97,45 @@ precisely in advance.
 **Not blocking the port.** The screens are all reachable and operable. This is a
 polish pass, and it belongs with whoever owns the eventual visual design rather
 than with the porting work.
+
+---
+
+## AN-003 — A force-closed battle leaves a stale save that reads as resumable
+
+**Raised by the director, 2026-08-23. Backburner — saving and loading can be
+pushed forward.** Reproduced on the tablet during the animation fix.
+
+**What happens:** close the app from the Android recents switcher rather than
+through Save and Quit, relaunch, and the title screen offers *"Continue —
+turn N"*. It restores the last EXPLICITLY saved position, which may be several
+turns behind where the player actually was, or from an entirely different battle.
+
+**Why it happens:** `SaveState.write` is called only from Save and Quit. A
+force-close writes nothing, so the previous save survives untouched — and
+`_show_title` offers Continue for any save that validates, with no notion of
+whether it corresponds to the session just ended. Nothing is corrupt; the save
+is exactly what it claims to be. The problem is that "resume" implies continuity
+with what the player was just doing, and here it silently does not have it.
+
+**Options, roughly in increasing cost:**
+
+1. **Label it honestly.** Continue already shows the turn number; showing enough
+   context to recognise a stale save (System name, turn) would at least stop it
+   being a surprise. Cheapest, and does not pretend to solve continuity.
+2. **Autosave at turn boundaries.** A save written at each `start_player_phase`
+   makes Continue mean what a player expects. The save serializer already
+   proves resume determinism, so the mechanism is in place — the question is
+   write frequency and whether flash wear on an old device matters.
+3. **Save on lifecycle events.** `NOTIFICATION_APPLICATION_PAUSED` /
+   `WM_CLOSE_REQUEST` cover the recents-switcher case specifically. Android
+   gives no guarantee a force-stop delivers these, so this complements autosave
+   rather than replacing it.
+
+**Recommendation:** option 2, with option 1 alongside. Autosaving on the turn
+boundary is the only one that makes the offer trustworthy, and the boundary is
+already the point the save format is designed around — `test_save.gd` proves an
+interrupted battle resumed from there plays out identically.
+
+**Not blocking the port.** Save and resume works correctly through the supported
+path, which is what the completion standard asks for. This is about an
+unsupported exit being handled gracefully rather than about the save format.

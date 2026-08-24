@@ -696,3 +696,40 @@ be manually targeted at a System Program rather than auto-targeting the fullest
 slot, which silently removes the decision the Function exists to create. Deferred
 because changing behaviour mid-port would put the differential gate in the
 position of failing for a reason that is correct.
+
+## D-028 — Refill enters as a rigid column, not as independent Packets
+
+**2026-08-23.** Playtesting reported a hitch: after a Sync resolved, the new
+Packets filling the gaps stalled for a few frames just before coming to rest.
+
+The cause was arithmetic in `Datastream.spawn` that did not do what its own
+comment claimed. The start position was
+
+```
+home_of(cell) - Vector2(0, cs * (cell.y + 1))
+```
+
+and `home_of(cell).y` is `cell.y * cs + gap/2`, so `cell.y` cancelled out
+entirely: **every** spawned Packet started at the same point, one cell above the
+board. They then shared a single duration, which meant they covered DIFFERENT
+distances in the same time — a Packet bound for row 0 travelled one cell while
+one bound for row 3 travelled four. With `EASE_IN`, the short-travel Packets
+crawled, and being slowest they were the last to settle. That reads exactly as
+the reported stall: the board appears to hang right before it comes to rest.
+
+Refill always fills a column from the top down, so a column taking `k` Packets
+is filling rows `0..k-1`. Starting the one bound for the lowest empty row just
+above the board and each one above it a further cell up makes **every Packet in
+that column travel exactly `k` cells** — so one duration moves them all at a
+single speed and the column arrives in formation, like a stack of objects
+falling together. Duration now scales with `sqrt(k)`, matching `fall`, so a deep
+refill takes longer rather than being rushed to fit a fixed budget.
+
+Verified on device: a mid-refill frame shows the whole column offset by a single
+uniform amount, which is what "arrives in formation" looks like.
+
+**The general lesson**, added to `lessons-learned.md`: the comment described the
+intended behaviour and the code did something else, and it survived review
+because the animation looked plausible. A comment stating intent is not evidence
+the code achieves it — and "looks plausible" is a much weaker signal than
+"matches a model of what should happen".
