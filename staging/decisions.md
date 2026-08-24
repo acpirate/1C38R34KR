@@ -733,3 +733,43 @@ intended behaviour and the code did something else, and it survived review
 because the animation looked plausible. A comment stating intent is not evidence
 the code achieves it — and "looks plausible" is a much weaker signal than
 "matches a model of what should happen".
+
+---
+
+## D-029 — Beta 0.2 builds a minimal debug Force Win, not the Alpha wizard
+
+**2026-08-24 · director · ACCEPTED**
+
+The Beta 0.2 authorization contains a gap: §23.1's tablet gate says to continue
+through Battle 3 "using debug force-win where useful", but §3.1 never lists
+wizard actions as in scope, and Beta 0.1 shipped `Types.WizardAction` as an enum
+with no implementation anywhere in `scripts/`, `scenes/`, or `tools/`. Taken
+literally the gate cannot be run as written, and §27 warns specifically against
+building past the authorized scope to close a hole like this.
+
+**Decision:** build a **debug-build-only** control that resolves the current Run
+battle as a victory — enough to reach Battle 3 on device and nothing more.
+
+Deliberately NOT built in Beta 0.2:
+
+- `RESTART_LOST_BATTLE` and `RESTART_RUN`;
+- the Alpha's step-aware `forceWinAvailable()` availability matrix, which gates
+  the control on `step < RUN_LENGTH` and on natural victory vs. defeat;
+- the wizard log record (`appendWizardLog` / `WIZARD_*` events);
+- any presence in a release build.
+
+**Why minimal rather than either extreme.** Porting the full wizard is a scope
+addition to §3.1 for something whose only Beta 0.2 consumer is a device gate;
+the Alpha's matrix is meaningfully coupled to the Battle-4 result presentation
+(`isRunComplete`), which is 0.3 work. Dropping force-win entirely was the other
+option, and was rejected because it makes every tablet iteration pay for two
+honest battles before reaching the part being tested — a recurring cost across
+the whole build, to save a control that is a few lines behind a debug guard.
+
+**Consequence to watch:** `WizardAction` stays a partially-implemented enum, and
+the `FORCE_WIN` path will not emit the Alpha's wizard log record. Anything in
+0.3 that reads wizard telemetry must not assume Beta 0.2 produced any. When the
+full matrix arrives it supersedes this entry rather than extending it — the
+availability rules are the substance, and this decision deliberately has none.
+
+Raised in `1c38r34kr-beta-0.2.0-authorization-review.md` §C2.

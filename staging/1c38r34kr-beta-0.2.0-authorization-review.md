@@ -222,14 +222,20 @@ session envelope (C6), Force Win (C2), and the new screens.
 
 ## Summary of requested rulings
 
-| # | Item | Ask |
+| # | Item | Resolution |
 | --- | --- | --- |
-| A1 | §1 Battle-4 compatibility mode | Strike it — §12 already covers this and the Alpha needs no substitute |
-| A3 | §15 "committed UPGRADE" | Remove from the state model |
-| A4 | §15 missing `settings` / `inventory` / `hackerMaxLink` | Add all three |
-| B1 | Step-4 ICE modifier (dead in Alpha) | Confirm: port all four rows verbatim |
-| C1 | Draw-for-draw route RNG | Add as an explicit requirement |
-| C2 | Force Win | Add to §3.1 scope, or remove from the §23.1 gate |
-| C6 | Save schema 3, reject schema 2 | Confirm the reshape is expected |
+| A1 | §1 Battle-4 compatibility mode | **Agent call.** Not built; §5/§12/§22.29/§27 all govern. Recorded as a deviation. |
+| A3 | §15 "committed UPGRADE" | **Agent call.** Omitted — the Alpha source has no such field. |
+| A4 | §15 missing `settings` / `inventory` / `hackerMaxLink` | **Agent call.** All three added; §15 is a stated minimum ("at least"). |
+| B1 | Step-4 ICE modifier (dead in Alpha) | **Agent call.** All four rows ported verbatim, step 4 commented as unreachable. |
+| C1 | Draw-for-draw route RNG | **Agent call.** Ported draw-for-draw; it is the cheaper option and §17 governs a mismatch. |
+| C2 | Force Win | **Director ruling, 2026-08-24 — see D-029.** Minimal debug-build-only Force Win. No `RESTART_*`, no availability matrix, no wizard log. |
+| C6 | Save schema 3, reject schema 2 | **Agent call.** Reject, do not migrate. Any in-progress Beta 0.1 save is dropped on upgrade. |
 
 Everything else in the authorization checks out against the Alpha source.
+
+**Disposition, 2026-08-24.** Only C2 needed a director ruling; it was a scope
+boundary rather than an ambiguity, and §27's warning about exceeding scope made
+it the director's call rather than the agent's. The other six resolve against
+the authorization plus the Alpha source, and are recorded in `decisions.md` as
+they are made rather than raised as questions. Phase A is unblocked.
