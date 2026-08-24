@@ -139,3 +139,52 @@ interrupted battle resumed from there plays out identically.
 **Not blocking the port.** Save and resume works correctly through the supported
 path, which is what the completion standard asks for. This is about an
 unsupported exit being handled gracefully rather than about the save format.
+
+---
+
+## AN-004 — Reported blank/stuck screen after Build on desktop
+
+**Raised by the director, 2026-08-24, relaying a third-party report. Not a
+priority; needs reproduction before it needs a fix.**
+
+**What was reported:** a friend ran the beta 0.1 build on **PC** — apparently
+through the Godot editor rather than an exported Android APK, though the exact
+launch path was not established — and reported that the screen after confirming
+the Build came up **blank and appeared stuck**, with no obvious way forward.
+
+**What is and is not known:**
+
+- Unconfirmed on any device we control. Every tablet and S25 gate for beta 0.1
+  passed through Build into Battle, so this is not a defect the Android gates
+  saw.
+- The launch path is unverified. "In the Godot interface" most likely means
+  `godot-gui` running `scenes/main.tscn` on a desktop window, which is **not a
+  configuration beta 0.1 was gated on** — beta 0.1's presentation was verified
+  on Android only, and Windows desktop is listed as a later release target.
+- The most likely explanation is therefore a **presentation/layout failure at
+  desktop window sizes**, not a logic failure: the battle screen builds against
+  a portrait mobile viewport and the `UiTheme.px()` scale (alpha CSS px
+  multiplied by ~2.51 for a 1080 px viewport). A desktop window with a very different aspect ratio or
+  DPI could plausibly lay the board out off-screen, which would read exactly as
+  "blank and stuck" while the battle underneath is running normally.
+- A genuine hang in `Game` resolution is the less likely alternative, and would
+  contradict the headless suite and DEEPSCAN, which exercise the same logic
+  path with no scene tree at all.
+
+**How to investigate when it comes up:**
+
+1. Reproduce locally with `godot-gui` on `scenes/main.tscn`, at both a default
+   editor window size and a deliberately wide one.
+2. Check the Godot output panel for a script error at the Build → Battle
+   transition. A blank screen with a clean log points at layout; a blank screen
+   with an error points at a null node reference on a desktop-only code path.
+3. If the log is clean, confirm whether input still works — a battle that
+   responds to taps in dead space is a layout failure, not a hang.
+
+**Why it is deferred:** Windows desktop is a later build target and was never
+gated for beta 0.1, so this is a defect against a configuration that has not
+been claimed to work rather than a regression against one that has. It is worth
+keeping because the **Build → Battle transition is exactly the seam beta 0.2
+extends** (Run Build before every battle), and because it is the first signal
+that the presentation layer does not survive a non-mobile viewport — which the
+Windows target will eventually have to answer anyway.
