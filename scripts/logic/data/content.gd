@@ -208,6 +208,118 @@ static func fingerprint() -> String:
 	return active().get("fingerprint", "")
 
 
+# ---------------------------------------------------------------------------
+# Ordered listings and the random pools
+# ---------------------------------------------------------------------------
+#
+# The alpha keeps an explicit `*Order` array beside each registry. GDScript
+# Dictionaries preserve insertion order and the loader inserts in CSV row order,
+# so iterating the registry IS the authored order, and a parallel array would be
+# a second thing to keep in sync. Recorded in port-notes.
+#
+# Order is not cosmetic: route generation shuffles the eligible UPGRADE array in
+# this order, so changing it changes which UPGRADEs a given route seed offers.
+
+static func _ordered(kind: String) -> Array:
+	var out: Array = []
+	var table: Dictionary = active().get(kind, {})
+	for id in table:
+		out.append(table[id])
+	return out
+
+
+static func all_systems() -> Array:
+	return _ordered("systems")
+
+
+static func all_hosts() -> Array:
+	return _ordered("hosts")
+
+
+static func all_upgrades() -> Array:
+	return _ordered("upgrades")
+
+
+static func all_bosses() -> Array:
+	return _ordered("bosses")
+
+
+## The RANDOM pools. Route offer generation and Random Quick Match sample from
+## these, never from the full listing.
+##
+## Deliberate selection screens still list EVERYTHING (director ruling
+## 2026-08-11): `in_pool` governs what may be ROLLED, not what may be chosen.
+## With current content DOORMAN and THRESHOLD are the intro-only rows held out
+## of the pools, leaving two Systems and four HOSTs.
+##
+## The loader rejects content where either pool is empty, so on validated
+## content these cannot return an empty array — a content bug surfaces at
+## startup rather than as a silent default here.
+static func pool_systems() -> Array:
+	return _in_pool(all_systems())
+
+
+static func pool_hosts() -> Array:
+	return _in_pool(all_hosts())
+
+
+static func _in_pool(rows: Array) -> Array:
+	var out: Array = []
+	for r in rows:
+		if r["in_pool"]:
+			out.append(r)
+	return out
+
+
+# ---------------------------------------------------------------------------
+# Inventory and the default build
+# ---------------------------------------------------------------------------
+#
+# Parameterized by identity, because a Run selects its own Hacker and Deck.
+# Beta 0.1 only ever needed the pinned Constructed pair, so `Session` derived
+# the build inline from the two DEFAULT_* constants.
+
+## The fixed six-Program inventory a build is drawn from: the Hacker's portfolio
+## in authored order, then the Deck's.
+static func inventory_program_ids(hacker_id: String, deck_id: String) -> Array:
+	var out: Array = []
+	out.append_array(hacker(hacker_id)["portfolio"])
+	out.append_array(deck(deck_id)["portfolio"])
+	return out
+
+
+## The DEFAULT build: Hacker portfolio entries 1 and 2, then Deck portfolio
+## entries 1 and 2.
+##
+## Derived from portfolio ORDER, never from a hardcoded list of Program IDs — a
+## content edit changes the default build, as it should. Portfolio order is
+## authored content and gameplay-significant (it becomes charge-routing
+## priority), so this must not be reordered for convenience.
+static func default_build(hacker_id: String, deck_id: String) -> Array:
+	var half := int(ACTIVE_BUILD_SIZE / 2.0)
+	var out: Array = []
+	var hacker_portfolio: Array = hacker(hacker_id)["portfolio"]
+	var deck_portfolio: Array = deck(deck_id)["portfolio"]
+	for i in half:
+		out.append(hacker_portfolio[i])
+	for i in half:
+		out.append(deck_portfolio[i])
+	return out
+
+
+## Whether `build` is a legal active build for this inventory: exactly
+## ACTIVE_BUILD_SIZE entries, all distinct, all drawn from the inventory.
+static func is_valid_build(build: Array, inventory: Array) -> bool:
+	if build.size() != ACTIVE_BUILD_SIZE:
+		return false
+	var seen := {}
+	for pid in build:
+		if seen.has(pid) or not inventory.has(pid):
+			return false
+		seen[pid] = true
+	return true
+
+
 ## Programs belonging to one side, in content order — which is the order that
 ## becomes charge-routing priority.
 static func programs_for(side: Types.Side) -> Array:

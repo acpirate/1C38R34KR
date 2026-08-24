@@ -274,3 +274,72 @@ fallback that aborts if the main loop is ever reached.
 **Why it is recorded:** a test runner that hangs instead of failing is worse
 than the bug it was reporting — it converts a clear failure into a stalled
 build. Both exit paths are now verified: 0 on pass, 1 on failure.
+
+---
+
+## Beta 0.2 Phase A — the Run session model
+
+### P-015 · Registry iteration order replaces the alpha's `*Order` arrays
+
+**Forced by:** nothing — this is a translation choice the language makes free.
+
+The alpha keeps an explicit ordering array beside each registry
+(`systemOrder`, `hostOrder`, `upgradeOrder`, `bossOrder`) because a JavaScript
+`Map` is iterated in insertion order but the alpha wanted the order stated
+rather than relied upon. GDScript `Dictionary` also preserves insertion order,
+and the loader inserts in CSV row order, so `Content._ordered()` simply iterates
+the registry.
+
+**Why it matters and is not cosmetic:** route generation shuffles the eligible
+UPGRADE array *in this order*, so the order decides which UPGRADEs a given route
+seed offers. A parallel array would be a second thing to keep in sync with the
+loader, and the failure mode if they drifted would be a silent change in offers
+rather than an error.
+
+**Risk accepted:** if a future loader ever sorts rows on the way in, or builds a
+registry from anything other than a single ordered pass, this order changes
+silently. `test_run_state.gd` asserts the eligible pool's first entry, which
+turns that into a test failure rather than a quiet reroll.
+
+The alpha's arrays and the beta's iteration agree on current content: every
+dataset's IDs are monotonic in file order.
+
+### P-016 · `Run.phase` is stored, where the alpha derives it
+
+**Forced by:** a new state with no alpha counterpart.
+
+`serializeSession()` in the alpha derives the session phase at write time:
+
+```
+onPath ? 'PENDING_PATH' : !game ? 'PENDING_BUILD' : pending ? 'PENDING_RESULT' : 'ACTIVE_BATTLE'
+```
+
+Beta 0.2 adds `PENDING_BOSS_BATTLE` (authorization §12.1), which **cannot** be
+derived from those three inputs: with no battle in progress and no pending
+offers it is indistinguishable from `PENDING_BUILD`. Deriving it would require a
+fourth boolean, and then four booleans encode sixteen combinations of which five
+are legal.
+
+**Resolution:** `Run.phase` is one explicit `Types.SessionPhase` field, and
+`Run.problems()` enforces the invariant the derivation used to guarantee for
+free — chiefly that `phase == PENDING_PATH` if and only if `pending_path` is
+non-null, and that a committed Run never wears a setup phase.
+
+The six alpha phase spellings are kept verbatim in `Types.SESSION_PHASE_NAMES`
+so a beta save still reads next to an alpha trace, which is the same discipline
+`SaveState._config_to_dict` follows for settings.
+
+### P-017 · The step-4 ICE modifier is carried as dead data
+
+**Forced by:** fidelity to a table the alpha ships with an unreachable row.
+
+`Run.RUN_ENCOUNTERS` carries all four rows including step 4's `+150`, which
+nothing can ever apply: a Boss is the only opponent that can appear at step 4,
+and a Boss takes its authored `BASE_ICE` with no modifier (ODANSHAY's authored
+250 is already the final value, so adding 150 would double-count the
+escalation). The alpha has exactly the same dead row.
+
+**Why keep it:** beta 0.3 needs the table shape, and a three-row table would be
+a divergence from the oracle that a future reader would have to re-derive.
+`test_run_state.gd` asserts the value, so removing the row later is a deliberate
+act rather than a tidy-up. Raised as §B1 of the beta 0.2 authorization review.

@@ -19,20 +19,12 @@ extends RefCounted
 ## Portfolio order is authored content and is gameplay-significant, so this
 ## derives the build rather than naming Programs — a content edit changes the
 ## default build, as it should.
+## Constructed Quick Match's pinned pair. Beta 0.2 moved the derivation itself
+## into `Content.default_build`, which a Run needs parameterized by its own
+## selected identity; this stays as the Quick Match entry point so the pin lives
+## in one place. Behaviour is unchanged — same portfolio slots, same order.
 static func default_build() -> Array:
-	var hacker := Content.hacker(Content.DEFAULT_HACKER_ID)
-	var deck := Content.deck(Content.DEFAULT_DECK_ID)
-	var inventory: Array = []
-	inventory.append_array(hacker["portfolio"])
-	inventory.append_array(deck["portfolio"])
-
-	# Hacker portfolio Programs 1 and 2, then Deck portfolio Programs 1 and 2.
-	var build: Array = []
-	build.append(inventory[0])
-	build.append(inventory[1])
-	build.append(inventory[Content.PORTFOLIO_SIZE])
-	build.append(inventory[Content.PORTFOLIO_SIZE + 1])
-	return build
+	return Content.default_build(Content.DEFAULT_HACKER_ID, Content.DEFAULT_DECK_ID)
 
 
 ## Builds a playable Quick Match.

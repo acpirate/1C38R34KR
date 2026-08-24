@@ -61,6 +61,33 @@ enum SystemSelectionSource { RUN_RANDOM = 0, QUICK_RANDOM, QUICK_CONSTRUCTED, HE
 
 enum BuildOrigin { DEFAULT = 0, RANDOM, REMEMBERED_CONSTRUCTED, CARRIED_RUN, PLAYER_EDITED }
 
+## Which setup screen a Run in setup resumes to. Boss Selection is deliberately
+## absent: committing a Boss is what CREATES the Run, so no persisted state ever
+## resumes *to* the Boss screen (beta 0.2 authorization §4.1).
+enum SetupStep { HACKER = 0, DECK }
+
+## Where a session is parked. Beta 0.1 needed no such vocabulary because a Quick
+## Match is always inside a battle; a Run is saveable with no battle at all, so
+## the phase becomes real state.
+##
+## The first six spellings are the alpha's `serializeSession()` phases, kept
+## verbatim so a beta save reads next to an alpha trace — the same discipline
+## `SaveState._config_to_dict` already follows for settings.
+##
+## `PENDING_BOSS_BATTLE` is the one addition and has no alpha counterpart. It is
+## where beta 0.2 stops, holding a fully committed Boss + HOST + UPGRADE package
+## for beta 0.3 to consume (authorization §12.1). It is NOT Run Complete and must
+## never be resolved through the alpha's `isRunComplete` path.
+enum SessionPhase {
+	SETUP_HACKER = 0,
+	SETUP_DECK,
+	PENDING_PATH,
+	PENDING_BUILD,
+	ACTIVE_BATTLE,
+	PENDING_RESULT,
+	PENDING_BOSS_BATTLE,
+}
+
 
 # ---------------------------------------------------------------------------
 # Attribution
@@ -188,6 +215,11 @@ const OPPONENT_KIND_NAMES := ["SYS", "BOS"]
 const SELECTION_SOURCE_NAMES := ["EXPLICIT_SELECTION", "QUICK_MATCH_DEFAULT"]
 const SYSTEM_SELECTION_SOURCE_NAMES := ["RUN_RANDOM", "QUICK_RANDOM", "QUICK_CONSTRUCTED", "HEADLESS_PINNED"]
 const BUILD_ORIGIN_NAMES := ["DEFAULT", "RANDOM", "REMEMBERED_CONSTRUCTED", "CARRIED_RUN", "PLAYER_EDITED"]
+const SETUP_STEP_NAMES := ["HACKER", "DECK"]
+const SESSION_PHASE_NAMES := [
+	"SETUP_HACKER", "SETUP_DECK", "PENDING_PATH", "PENDING_BUILD",
+	"ACTIVE_BATTLE", "PENDING_RESULT", "PENDING_BOSS_BATTLE",
+]
 const OWNER_KIND_NAMES := ["program", "deck", "passive", "boss"]
 const PASSIVE_SOURCE_KIND_NAMES := ["HAK", "SYS", "HST", "UPG"]
 const READINESS_NAMES := ["READY", "CHARGING", "EMPTY"]
