@@ -253,3 +253,72 @@ Two things worth carrying forward:
   half**, because it stops the next reader from checking. This one described
   behaviour convincingly enough that I did not re-derive it when writing the
   duration logic on top.
+
+## 13. Save/load was over-invested for what this project needed
+
+**The director's assessment, recorded in their terms:** for a game of this kind,
+save and load matter far less than they would for something more persistent.
+Too much time went into scoping, building, and testing the feature, too early,
+at the expense of finishing gameplay concepts.
+
+**The abstract takeaway, in the director's words:** *be judicious with any
+feature request — ideas are free, implementation costs time and tokens.*
+
+### What it actually cost
+
+Worth recording concretely rather than as a feeling, so the next estimate has
+something to calibrate against:
+
+| | |
+| --- | --- |
+| `scripts/logic/save.gd` | 267 lines |
+| `tests/test_save.gd` | 253 lines, 19 assertions |
+| Decision-log entries | D-022 (moved the serializer a whole phase earlier), plus save clauses in D-025 |
+| Schema revisions | 1 → 2, when metrics joined the envelope |
+
+Roughly 520 lines, one phase reordering, and a place in the differential gate —
+for a feature whose player-visible surface is two buttons.
+
+### Where the pressure came from, and what that suggests
+
+The scale was not arbitrary. The build authorization made save/resume a
+completion-standard item (§15.8) and required it to "preserve deterministic
+continuation", which is a differential property — so D-022 pulled the serializer
+forward into Phase 4 to sit with the harness, because a round-trip equality test
+passes with an incompletely captured RNG state, a dropped countdown overlay, or
+a lost stamped area pattern, and only a CONTINUATION test catches those.
+
+That reasoning was sound given the requirement. **The requirement is the thing
+that deserved the scrutiny.** Once "save must be provably deterministic" was
+written into the completion standard, everything downstream — the phase move,
+the continuation harness, the schema discipline — followed necessarily. The
+expensive decision was made in the specification, not in the implementation.
+
+So the practical form of the lesson is narrower and more actionable than "be
+careful what you ask for":
+
+- **A requirement that names a PROPERTY ("provably deterministic", "byte-
+  identical", "never silently repaired") is a multiplier, not a line item.** It
+  does not add a feature; it adds a proof obligation to everything the feature
+  touches. Price those words when they are written, not when they are met.
+- **Ask what the feature is worth in THIS project before asking how it should be
+  built.** A roguelike with permanent progression and hour-long runs earns a
+  rigorous save. A beta whose battles resolve in a few minutes, played by one
+  person, does not — and that difference was knowable at authorization time.
+- **Feature ideas arrive free and are accepted for free.** Nothing in the
+  process priced them at the moment they entered the authorization. A rough cost
+  estimate attached to each completion-standard item, before the build starts,
+  would have made this visible while it was still cheap to cut.
+
+### The honest counterweight
+
+Not all of it was waste, and the log should say so rather than flatter the
+lesson. The continuation harness built for save was reused unchanged to prove
+metrics survive resume (D-025), and the discipline of rejecting a save whose
+fingerprint does not match is what stops a content edit silently reinterpreting
+an old battle. Had save been built later and more cheaply, both would have had
+to be retrofitted.
+
+The misallocation was in **timing and proportion**, not in direction: the work
+was good, there was more of it than this project needed, and it came before
+gameplay concepts that were closer to the point of the exercise.
