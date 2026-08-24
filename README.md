@@ -24,8 +24,8 @@ alpha implements.
 | 4 — differential harness and parity repair | ✅ found two real port bugs |
 | 5 — whitebox presentation and touch | ✅ |
 | 6 — save, logging, metrics, integration | ✅ |
-| 7 — full headless + differential + device gate | 🟡 DEEPSCAN green; device checklist outstanding |
-| 8 — README, diff review, commit | ⬜ in progress |
+| 7 — full headless + differential + device gate | ✅ DEEPSCAN 5,250/5,250; device checklist complete |
+| 8 — README, diff review, commit | ✅ see `staging/port-handback.md` |
 
 | Gate | State |
 | --- | --- |
@@ -199,6 +199,7 @@ rejected rather than restored against different rules than it was made under.
 | `staging/decisions.md` | append-only decision log, D-001..D-027 |
 | `staging/port-notes.md` | every place the translation is non-literal, P-001..P-014 |
 | `staging/architect-notes.md` | design items raised during the port that must **not** be built as part of it |
+| `staging/port-handback.md` | **the close-out** — what shipped, what did not, and the final diff review |
 | `staging/lessons-learned.md` | what cost time and why, for the AAR |
 | `staging/design-reference/` | the alpha's screens, and the rules extracted from them |
 
