@@ -27,6 +27,53 @@ static func default_build() -> Array:
 	return Content.default_build(Content.DEFAULT_HACKER_ID, Content.DEFAULT_DECK_ID)
 
 
+# ---------------------------------------------------------------------------
+# Random Quick Match setup (beta 0.2)
+# ---------------------------------------------------------------------------
+
+## An isolated SETUP random source.
+##
+## Deliberately its own instance so that generating a build or rolling an
+## opponent cannot consume or perturb the battle's gameplay stream: a `Game`
+## seeds its RNG independently at construction, so the board, refills, and AI
+## sequence for a given gameplay seed are unaffected by setup randomness.
+##
+## The seed is returned so a run can be reproduced from the log.
+static func make_setup_random(seed_value: int = -1) -> Dictionary:
+	var s := seed_value if seed_value >= 0 else (randi() & 0x7FFFFFFF)
+	return {"rng": Rng.new(s), "seed": s}
+
+
+## Four distinct inventory Programs in an explicitly randomized order.
+##
+## One shuffle gives both properties — sampling without replacement AND a
+## random order — which is why it shuffles the whole inventory and takes a
+## slice rather than picking four times.
+static func random_build(inventory: Array, rng: Rng) -> Array:
+	var pool := inventory.duplicate()
+	rng.shuffle(pool)
+	return pool.slice(0, Content.ACTIVE_BUILD_SIZE)
+
+
+## Roll a complete Random Quick Match: build, then System, then HOST.
+##
+## THAT ORDER IS THE CONTRACT, not a convenience. All three come from ONE
+## isolated setup stream, and the alpha draws the build first. Rolling the
+## System before the build would produce a different — still legal — result for
+## the same seed. Pinned by the fixture in `tests/fixtures/route.json`.
+##
+## Random Quick Match acquires no UPGRADEs, involves no Boss, and never writes
+## to Constructed Quick Match's remembered build. It produces an ordinary
+## standalone battle and opens no Build screen.
+static func random_quick_match_setup(rng: Rng) -> Dictionary:
+	var inventory := Content.inventory_program_ids(Content.DEFAULT_HACKER_ID, Content.DEFAULT_DECK_ID)
+	return {
+		"build": random_build(inventory, rng),
+		"system_id": Route.random_system(rng),
+		"host_id": Route.random_host(rng),
+	}
+
+
 ## Builds a playable Quick Match.
 ##
 ## `build` is the ordered active build — exactly four distinct inventory

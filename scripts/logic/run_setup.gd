@@ -73,6 +73,54 @@ func commit_hacker(hacker_id_in: String) -> RunSetup:
 	return s
 
 
+## Committing the Deck COMPLETES setup: the Run gains its identity, its
+## inventory and default build, its resolved LINK maximum, and its initial Path
+## Choice offers, which are persisted immediately.
+##
+## Battle 1's encounter is the fixed DOORMAN + THRESHOLD on both offered paths
+## regardless of which Boss was chosen, so the player's first real decision is
+## which UPGRADE to take.
+##
+## The offers are generated HERE rather than on first viewing the Path Choice
+## screen, because they are state rather than a view: generating them on view
+## would reroll them on every reload.
+func commit_deck(deck_id_in: String) -> Run:
+	if Content.deck(deck_id_in).is_empty():
+		return null
+	if hacker_id == "":
+		push_error("deck committed before a hacker — setup phases ran out of order")
+		return null
+
+	var r := Run.new()
+	r.boss_id = boss_id
+	r.step = 1
+	r.settings = settings.duplicate(true)
+	r.hacker_id = hacker_id
+	r.deck_id = deck_id_in
+	r.selection_source = Types.SelectionSource.EXPLICIT_SELECTION
+	r.hacker_max_link = Run.resolve_hacker_max_link(settings, hacker_id, deck_id_in)
+	r.inventory = Content.inventory_program_ids(hacker_id, deck_id_in)
+	r.build = Content.default_build(hacker_id, deck_id_in)
+	r.build_origin = Types.BuildOrigin.DEFAULT
+	r.upgrade_ids = []
+
+	# Until a path is chosen there is no committed encounter. Both offers name
+	# the fixed Battle 1 identity, and `select_path` replaces these before any
+	# battle or Build screen can exist.
+	r.opponent_kind = Types.OpponentKind.SYS
+	r.opponent_id = Content.INITIAL_SYSTEM_ID
+	r.opponent_source = Types.SystemSelectionSource.RUN_RANDOM
+	r.host_id = Content.INITIAL_HOST_ID
+
+	var stream := route_rng()
+	r.pending_path = Route.initial_path_offers(stream, [])
+	if r.pending_path == null:
+		return null
+	r.store_route_rng(stream)
+	r.phase = Types.SessionPhase.PENDING_PATH
+	return r
+
+
 ## The session phase this setup state resumes to.
 func phase() -> Types.SessionPhase:
 	return (

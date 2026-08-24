@@ -1,0 +1,692 @@
+{
+  "note": "Generated from the alpha by tools/gen/gen_route_fixture.ts. Do not hand-edit.",
+  "bossId": "BOS_01",
+  "walks": {
+    "0": [
+      {
+        "kind": "initial",
+        "step": 1,
+        "acquired": [],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_04"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_03"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 1199730143
+      },
+      {
+        "kind": "later",
+        "step": 2,
+        "acquired": [
+          "UPG_04"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_02"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_03"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 3599190429
+      },
+      {
+        "kind": "later",
+        "step": 3,
+        "acquired": [
+          "UPG_04",
+          "UPG_02"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_01"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_03"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 4167084902
+      },
+      {
+        "kind": "boss",
+        "step": 4,
+        "acquired": [
+          "UPG_04",
+          "UPG_02",
+          "UPG_01"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_03"
+          },
+          {
+            "index": 1,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_05",
+            "upgradeId": "UPG_03"
+          }
+        ],
+        "upgradeExhausted": true,
+        "stateAfter": 1071847749
+      }
+    ],
+    "1": [
+      {
+        "kind": "initial",
+        "step": 1,
+        "acquired": [],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_04"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 1199730144
+      },
+      {
+        "kind": "later",
+        "step": 2,
+        "acquired": [
+          "UPG_04"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_01"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 3599190430
+      },
+      {
+        "kind": "later",
+        "step": 3,
+        "acquired": [
+          "UPG_04",
+          "UPG_01"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_02"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_03"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 3535249233
+      },
+      {
+        "kind": "boss",
+        "step": 4,
+        "acquired": [
+          "UPG_04",
+          "UPG_01",
+          "UPG_02"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_03"
+          },
+          {
+            "index": 1,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_03"
+          }
+        ],
+        "upgradeExhausted": true,
+        "stateAfter": 2903413563
+      }
+    ],
+    "7": [
+      {
+        "kind": "initial",
+        "step": 1,
+        "acquired": [],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_03"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 1199730150
+      },
+      {
+        "kind": "later",
+        "step": 2,
+        "acquired": [
+          "UPG_03"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_01"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 3599190436
+      },
+      {
+        "kind": "later",
+        "step": 3,
+        "acquired": [
+          "UPG_03",
+          "UPG_01"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_02"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_04"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 4167084909
+      },
+      {
+        "kind": "boss",
+        "step": 4,
+        "acquired": [
+          "UPG_03",
+          "UPG_01",
+          "UPG_02"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_04"
+          },
+          {
+            "index": 1,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_04"
+          }
+        ],
+        "upgradeExhausted": true,
+        "stateAfter": 3535249239
+      }
+    ],
+    "42": [
+      {
+        "kind": "initial",
+        "step": 1,
+        "acquired": [],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_01"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_04"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 1199730185
+      },
+      {
+        "kind": "later",
+        "step": 2,
+        "acquired": [
+          "UPG_01"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_03"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_05",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 3599190471
+      },
+      {
+        "kind": "later",
+        "step": 3,
+        "acquired": [
+          "UPG_01",
+          "UPG_03"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_05",
+            "upgradeId": "UPG_04"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 4167084944
+      },
+      {
+        "kind": "boss",
+        "step": 4,
+        "acquired": [
+          "UPG_01",
+          "UPG_03",
+          "UPG_04"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_02"
+          },
+          {
+            "index": 1,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": true,
+        "stateAfter": 3535249274
+      }
+    ],
+    "1337": [
+      {
+        "kind": "initial",
+        "step": 1,
+        "acquired": [],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_03"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 1199731480
+      },
+      {
+        "kind": "later",
+        "step": 2,
+        "acquired": [
+          "UPG_03"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_04"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_01"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 3599191766
+      },
+      {
+        "kind": "later",
+        "step": 3,
+        "acquired": [
+          "UPG_03",
+          "UPG_04"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_01"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_01",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 4167086239
+      },
+      {
+        "kind": "boss",
+        "step": 4,
+        "acquired": [
+          "UPG_03",
+          "UPG_04",
+          "UPG_01"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_02"
+          },
+          {
+            "index": 1,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_05",
+            "upgradeId": "UPG_02"
+          }
+        ],
+        "upgradeExhausted": true,
+        "stateAfter": 3535250569
+      }
+    ],
+    "2147483647": [
+      {
+        "kind": "initial",
+        "step": 1,
+        "acquired": [],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_04"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_03",
+            "hostId": "HST_01",
+            "upgradeId": "UPG_03"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 3347213790
+      },
+      {
+        "kind": "later",
+        "step": 2,
+        "acquired": [
+          "UPG_04"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_03"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_01"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 1451706780
+      },
+      {
+        "kind": "later",
+        "step": 3,
+        "acquired": [
+          "UPG_04",
+          "UPG_03"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_05",
+            "upgradeId": "UPG_02"
+          },
+          {
+            "index": 1,
+            "opponentKind": "SYS",
+            "opponentId": "SYS_02",
+            "hostId": "HST_02",
+            "upgradeId": "UPG_01"
+          }
+        ],
+        "upgradeExhausted": false,
+        "stateAfter": 2019601253
+      },
+      {
+        "kind": "boss",
+        "step": 4,
+        "acquired": [
+          "UPG_04",
+          "UPG_03",
+          "UPG_02"
+        ],
+        "offers": [
+          {
+            "index": 0,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_03",
+            "upgradeId": "UPG_01"
+          },
+          {
+            "index": 1,
+            "opponentKind": "BOS",
+            "opponentId": "BOS_01",
+            "hostId": "HST_04",
+            "upgradeId": "UPG_01"
+          }
+        ],
+        "upgradeExhausted": true,
+        "stateAfter": 1387765583
+      }
+    ]
+  },
+  "quickMatch": {
+    "0": {
+      "build": [
+        "PRG_H_006",
+        "PRG_H_005",
+        "PRG_H_003",
+        "PRG_H_004"
+      ],
+      "systemId": "SYS_02",
+      "hostId": "HST_04",
+      "stateAfter": 4231026099
+    },
+    "1": {
+      "build": [
+        "PRG_H_004",
+        "PRG_H_002",
+        "PRG_H_006",
+        "PRG_H_005"
+      ],
+      "systemId": "SYS_01",
+      "hostId": "HST_04",
+      "stateAfter": 4231026100
+    },
+    "7": {
+      "build": [
+        "PRG_H_004",
+        "PRG_H_002",
+        "PRG_H_005",
+        "PRG_H_003"
+      ],
+      "systemId": "SYS_01",
+      "hostId": "HST_03",
+      "stateAfter": 4231026106
+    },
+    "42": {
+      "build": [
+        "PRG_H_002",
+        "PRG_H_001",
+        "PRG_H_004",
+        "PRG_H_006"
+      ],
+      "systemId": "SYS_02",
+      "hostId": "HST_03",
+      "stateAfter": 4231026141
+    },
+    "1337": {
+      "build": [
+        "PRG_H_005",
+        "PRG_H_004",
+        "PRG_H_006",
+        "PRG_H_003"
+      ],
+      "systemId": "SYS_01",
+      "hostId": "HST_04",
+      "stateAfter": 4231027436
+    },
+    "2147483647": {
+      "build": [
+        "PRG_H_006",
+        "PRG_H_004",
+        "PRG_H_003",
+        "PRG_H_002"
+      ],
+      "systemId": "SYS_02",
+      "hostId": "HST_04",
+      "stateAfter": 2083542450
+    }
+  }
+}

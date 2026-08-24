@@ -29,6 +29,9 @@ const SUITES := [
 	# Beta 0.2 Phase A — the Run session model. Ahead of persistence because the
 	# save envelope is built around these shapes.
 	"res://tests/test_run_state.gd",
+	# Phase B — route generation, which the state model above is the substrate
+	# for. Fixture parity against the alpha lives here.
+	"res://tests/test_route.gd",
 	# Phase 6 — persistence, accounting.
 	"res://tests/test_save.gd",
 	"res://tests/test_metrics.gd",

@@ -343,3 +343,77 @@ escalation). The alpha has exactly the same dead row.
 a divergence from the oracle that a future reader would have to re-derive.
 `test_run_state.gd` asserts the value, so removing the row later is a deliberate
 act rather than a tidy-up. Raised as §B1 of the beta 0.2 authorization review.
+
+## Beta 0.2 Phase B — route generation
+
+### P-018 · Route generators are transcribed draw-for-draw, not reimplemented
+
+**Forced by:** nothing in the language — this is a deliberate refusal to
+improve the code, and it needs recording so a later reader does not "fix" it.
+
+Three of the four generators resolve their constraints with **retry loops over
+the ordinary sampler** rather than by exclusion, and one returns early without
+touching the stream at all. Each is a place where the obvious better
+implementation changes the result:
+
+| Generator | Alpha shape | The tempting rewrite | Why it breaks |
+| --- | --- | --- | --- |
+| `pick_offer_upgrades` | shuffle the WHOLE eligible array, take 2 | pick twice without replacement | different draw count, different picks |
+| same, one UPGRADE left | return before drawing | shuffle a 1-element array | consumes a draw the alpha never does |
+| `later_path_offers` | draw SYS+HST, retry the pair while it duplicates | filter the pool, then pick | 2 draws per retry vs 0 |
+| `boss_path_offers` | draw HOST, retry while duplicate | pick 2 distinct HOSTs | same |
+
+All four also pick UPGRADEs **first**, before any System or HOST.
+
+**Why it matters:** every one of those rewrites produces offers that are
+individually legal and satisfy every behavioural rule in `test_route.gd`. The
+divergence is invisible to behavioural testing — it shows up only as *different
+offers for the same seed*, which is exactly what the §21.2 fixed-seed fixtures
+exist to detect and exactly what they would stop detecting.
+
+**Resolution:** `tests/fixtures/route.json` is generated from the alpha by
+`tools/gen/gen_route_fixture.ts` and captures, for six seeds, a full four-battle
+route walk plus the **route RNG state after each generation**. The state is the
+part that pins the draw *count* rather than just the result: an implementation
+one draw off produces plausible offers and a wrong trailing state.
+
+Raised as §C1 of the beta 0.2 authorization review, which asked for exactly this
+to be made an explicit requirement rather than left to the implementer.
+
+### P-019 · Random Quick Match draws the BUILD before the opponent
+
+**Forced by:** the alpha's actual order, which is not the intuitive one.
+
+`startRandomQuickMatch` draws from one isolated setup stream in the order
+**build → System → HOST**. Reading the feature description ("a random opponent
+with a random build") suggests rolling the opponent first, and that ordering
+would produce a different — entirely legal — setup for the same seed.
+
+**Resolution:** `Session.random_quick_match_setup` follows the alpha's order,
+and the fixture carries a Random Quick Match case per seed with its trailing
+stream state so the order is pinned rather than commented.
+
+Found by reading `src/main.ts` rather than the prose. A reminder that §0's
+"where alpha prose and alpha source disagree, the source wins" applies to
+*ordering*, not just to values.
+
+### P-020 · Run transitions mutate in place; setup transitions return new state
+
+**Forced by:** nothing — an idiom split that is worth stating so it does not
+read as an inconsistency.
+
+The alpha is uniformly immutable: every session transition returns a new
+`RunInfo`. The beta splits this deliberately.
+
+- `RunSetup.commit_boss` / `commit_hacker` / `commit_deck` **return new
+  objects**. These are the destructive commitment boundary, the objects are
+  tiny, and a caller holding the pre-commit state must not observe it change.
+- `Run.open_path_choice` / `select_path` / `enter_pending_boss_battle`
+  **mutate in place**, matching `GameState`, which is the closest precedent in
+  this codebase and is mutated throughout resolution.
+
+**What protects the atomicity the immutable style gave for free:** each mutating
+transition is a single function that either completes or returns `false` having
+changed nothing, and `Run.problems()` asserts the resulting state is one the
+transitions can actually produce. `test_route.gd` checks `problems()` after
+every step of a full four-battle walk.

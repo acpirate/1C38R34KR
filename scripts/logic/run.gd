@@ -257,6 +257,70 @@ func eligible_upgrades() -> Array:
 # Transitions
 # ---------------------------------------------------------------------------
 
+## The Hacker's maximum LINK for this Run.
+##
+## Normal LINK ON: the Hacker's BASE_LINK plus the Deck's ADD_LINK. OFF: the
+## manual setting, which overrides both and is never silently combined with them.
+##
+## Resolved once from the Run's frozen settings snapshot, so changing the menu
+## mid-Run cannot move a committed Run's LINK ceiling.
+static func resolve_hacker_max_link(settings_in: Dictionary, hacker_id_in: String, deck_id_in: String) -> int:
+	if not settings_in["normal_link"]:
+		return int(settings_in["manual_hacker_link"])
+	return int(Content.hacker(hacker_id_in)["base_link"]) + int(Content.deck(deck_id_in)["add_link"])
+
+
+## Generate the offers for the next battle, after a win.
+##
+## Advances the persisted route stream in place, so an interrupted-and-resumed
+## Run produces the same sequence an uninterrupted one would. Reopening an
+## ALREADY generated Path Choice must never come through here — that is what
+## would reroll it — so this refuses to run when offers are already pending.
+func open_path_choice(next: int) -> bool:
+	if pending_path != null:
+		push_error("path choice reopened while offers were already pending — this would reroll them")
+		return false
+	if next < 1 or next > RUN_LENGTH:
+		return false
+
+	var stream := route_rng()
+	var generated := Route.offers_for_step(stream, next, boss_id, upgrade_ids)
+	if generated == null:
+		return false
+	store_route_rng(stream)
+
+	step = next
+	pending_path = generated
+	phase = Types.SessionPhase.PENDING_PATH
+	return true
+
+
+## Commit one of the pending offers.
+##
+## Immediate and final for that battle: acquire the UPGRADE (once), commit the
+## opponent and HOST as one package, drop the offers, and move to the pre-battle
+## Build. Back navigation cannot undo it.
+##
+## Acquiring BEFORE Build is what lets the newly taken UPGRADE affect the battle
+## it was offered alongside — including Battle 1.
+func select_path(offer_index: int) -> bool:
+	if pending_path == null:
+		return false
+	if offer_index < 0 or offer_index >= pending_path.offers.size():
+		return false
+
+	var offer: PathOffer = pending_path.offers[offer_index]
+	step = pending_path.step
+	opponent_kind = offer.opponent_kind
+	opponent_id = offer.opponent_id
+	opponent_source = Types.SystemSelectionSource.RUN_RANDOM
+	host_id = offer.host_id
+	upgrade_ids = acquire_upgrade(upgrade_ids, offer.upgrade_id)
+	pending_path = null
+	phase = Types.SessionPhase.PENDING_BUILD
+	return true
+
+
 ## §12.1 — the beta 0.2 stop point.
 ##
 ## Entered after the final path is committed and its Build confirmed. The Run
