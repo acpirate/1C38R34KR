@@ -773,3 +773,46 @@ full matrix arrives it supersedes this entry rather than extending it — the
 availability rules are the substance, and this decision deliberately has none.
 
 Raised in `1c38r34kr-beta-0.2.0-authorization-review.md` §C2.
+
+---
+
+## D-030 — Saves do not survive a beta version bump, and that needs no defence
+
+**2026-08-24 · director · ACCEPTED**
+
+**Standing policy for the whole pre-release beta line.** Assume any existing save
+is incompatible with the next beta version. Reject it and move on. Do not build
+migration paths, compatibility shims, or verification that a save survives a
+version boundary, unless a specific save has an **articulable purpose** that
+justifies the cost.
+
+This supersedes nothing, but it settles a question that was about to be asked
+once per schema change. It arrived immediately after the Beta 0.2 authorization
+review flagged that the session-envelope restructure (schema 2 → 3) would drop
+any in-progress Beta 0.1 save, and treated that as a consequence needing
+sign-off. Under this policy it is not a consequence worth reporting — it is the
+expected behaviour of a beta.
+
+**Why.** D-022 and the save/load entry in `lessons-learned.md` recorded that
+Beta 0.1 over-invested in save proof: a requirement naming a property
+("provably deterministic", "never silently repaired") is a multiplier on every
+feature it touches, and the value of that multiplier should be measured against
+what the feature is worth *in this project*. A beta played by one person, whose
+battles resolve in minutes, does not earn cross-version save durability. This
+decision converts that retrospective lesson into a forward default, so the
+cheap answer is the one that requires no argument.
+
+**What is still required.** Within-version save and resume correctness is
+untouched. An interrupted Run must still resume correctly on the *same* build —
+that is what `test_save.gd`'s continuation proof exists for, and Beta 0.2's
+§16 representative resume checks still apply. The policy governs version
+boundaries only, not whether save works.
+
+**How future authorizations should read.** A completion standard should not list
+save migration, cross-version compatibility, or "existing saves continue to
+load" as an item. If one does, it is a drafting slip rather than a requirement,
+and the implementing agent should say so rather than build to it.
+
+**Revisit as release approaches.** This is explicitly a pre-release posture. The
+first build that could plausibly reach a player who is not the director is the
+point to reopen it.

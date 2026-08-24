@@ -179,6 +179,12 @@ schema 3 and a reshape of the existing writer/reader, not an additive field set.
 Consistent with `save.gd`'s existing stance ("Alpha saves are not readable and
 there is no migration path"), schema-2 saves should be **rejected, not migrated**.
 
+**Settled by D-030 (2026-08-24):** for the whole pre-release beta line, assume a
+version bump invalidates saves and discard them. No migration path, no
+compatibility shim, and no test that a save survives a version boundary — unless
+a specific save has an articulable purpose. Within-version resume correctness is
+unaffected and §16's representative checks still apply.
+
 ---
 
 ## D. Scope relief — Beta 0.1 already carries more of this than §25 implies
@@ -230,7 +236,7 @@ session envelope (C6), Force Win (C2), and the new screens.
 | B1 | Step-4 ICE modifier (dead in Alpha) | **Agent call.** All four rows ported verbatim, step 4 commented as unreachable. |
 | C1 | Draw-for-draw route RNG | **Agent call.** Ported draw-for-draw; it is the cheaper option and §17 governs a mismatch. |
 | C2 | Force Win | **Director ruling, 2026-08-24 — see D-029.** Minimal debug-build-only Force Win. No `RESTART_*`, no availability matrix, no wizard log. |
-| C6 | Save schema 3, reject schema 2 | **Agent call.** Reject, do not migrate. Any in-progress Beta 0.1 save is dropped on upgrade. |
+| C6 | Save schema 3, reject schema 2 | **Settled by policy — see D-030.** Reject, do not migrate. Dropping an in-progress Beta 0.1 save is expected beta behaviour, not a consequence needing sign-off. |
 
 Everything else in the authorization checks out against the Alpha source.
 
