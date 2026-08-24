@@ -24,16 +24,16 @@ alpha implements.
 | 4 — differential harness and parity repair | ✅ found two real port bugs |
 | 5 — whitebox presentation and touch | ✅ |
 | 6 — save, logging, metrics, integration | ✅ |
-| 7 — full headless + differential + device gate | ⬜ device checklist outstanding |
+| 7 — full headless + differential + device gate | 🟡 DEEPSCAN green; device checklist outstanding |
 | 8 — README, diff review, commit | ⬜ in progress |
 
 | Gate | State |
 | --- | --- |
 | Headless logic tests | ✅ 1,047 passing across 16 suites |
 | Differential parity (stripped, 150 battles) | ✅ 150/150, no divergence |
-| Differential parity (full matrix, "DEEPSCAN") | ⬜ not yet run end to end |
+| Differential parity (full matrix, "DEEPSCAN") | ✅ 5,250/5,250, no divergence |
 | Android **debug** APK from CLI | ✅ 55.3 MB, arm64-v8a + armeabi-v7a |
-| Android **release** APK | ❌ no release keystore configured |
+| Android **release** APK | ✅ 50.4 MB, signed with a **temporary** beta key |
 
 Deliberately **not** in 0.1, per the build authorization: New Run, route/path
 selection, UPGRADE acquisition, Boss combat and ODANSHAY/Override mechanics,
@@ -97,9 +97,10 @@ gate.
 Godot 4.7.2 pins compileSdk/targetSdk 36 and minSdk 24. The NDK is **not**
 required unless custom Gradle builds are enabled.
 
-A **release** keystore is not configured, so `--export-release` fails. That is
-deliberate for now: an Android signing key controls app updates permanently and
-is the project owner's to create.
+Release builds are signed with a **temporary** key held outside the repo. Build
+one with `bash tools/export-release.sh`. The real key is deliberately deferred
+until the package ID is final — see `staging/release-signing-brief.md`. Debug and
+release builds carry different signatures and cannot install over one another.
 
 ## Commands
 
@@ -109,6 +110,7 @@ godot --headless --import                               # refresh the class cach
 node tools/gen/parity.mjs                               # differential gate
 
 godot --headless --export-debug "Android" build/1c38r34kr.apk
+bash tools/export-release.sh                            # signed release APK
 adb install -r build/1c38r34kr.apk
 adb shell monkey -p com.acpirate.ic38r34kr -c android.intent.category.LAUNCHER 1
 adb exec-out screencap -p > shot.png
