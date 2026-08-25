@@ -25,7 +25,8 @@ producing a plausible Battle 4.
 
 ## 2. What the verification actually caught
 
-Three defects, and where they came from is more useful than what they were.
+Four defects, and where they came from is more useful than what they were.
+Three were found by the gates; the fourth was found by a question.
 
 ### The one the fixtures were built for — and it was fine
 
@@ -72,6 +73,28 @@ the general shape of the risk in this build: **the engine is correct, and the wa
 to break it is to feed it state the 0.1 callers could never construct.**
 Memoization keys, validation that assumed an empty collection, defaults that were
 unreachable — all the same class.
+
+### The one the requirement's shape hid — the Quick Match build (P-036)
+
+Found **after every phase gate had passed**, by the director asking what the
+seed actually controls.
+
+§22.32 requires that Random Quick Match not overwrite Constructed's remembered
+build. The implementation satisfied it by never touching `_build` and passing
+the rolled array straight through. But `_start_battle` — which the result
+screen's *Replay this seed* and *New battle* both call — read `_build`. So
+replaying a random match kept the System and HOST and silently swapped the
+loadout for the constructed one.
+
+**Why no gate caught it:** the requirement is a **prohibition**, and the code
+satisfied the prohibition exactly. Nothing anywhere stated the positive half —
+that a replay must reproduce what was played — so there was no assertion to
+fail. The tests, both differentials, and both device gates were all silent,
+because none of them was ever asked the question.
+
+§22 is written almost entirely as prohibitions and existence checks. That is
+what makes it auditable, and it is also why it cannot catch this class on its
+own.
 
 ---
 
@@ -163,6 +186,22 @@ which is unchanged from 0.1.
 - No horizontal overflow or unreachable controls on any screen ✅
 - **Clean Godot log** across the whole session ✅
 
+### Scope of the device evidence
+
+**Both device gates above were run against the build immediately before the
+P-036 fix**, which landed after closeout. The fix is confined to Quick Match
+build plumbing in `main.gd` and touches no Run code path.
+
+Rather than re-run both full checklists, the changed path was verified directly
+on both devices against the final binary: on the tablet, a rolled
+`PRG_H_002/006/005/003` replayed identically and the Constructed Build screen
+still opened on the untouched default; on the phone, install, launch, and a
+clean log.
+
+That is a deliberate proportionality call, stated here so the architect can
+overrule it rather than discover it. If the Run checklist should be re-run
+end-to-end on the shipped binary, it is roughly a fifteen-minute tablet window.
+
 ---
 
 ## 6. Final diff review
@@ -172,7 +211,8 @@ New logic: `run.gd`, `run_setup.gd`, `route.gd`, `session_save.gd`,
 `content.gd` (ordered listings, the random pools, identity-parameterized
 inventory and build), `session.gd` (one battle constructor, Random Quick Match
 setup), `save.gd` (delegates file access to the envelope), `log_store.gd` (a
-fourth stream), `ui_theme.gd` (safe-area insets), `main.gd` (the Run screens),
+fourth stream), `ui_theme.gd` (safe-area insets), `main.gd` (the Run screens, and the split
+between the in-play and constructed Quick Match builds),
 `battle_screen.gd` (delegates safe-area arithmetic).
 
 Nothing in `resolve.gd`, `game.gd`, `board.gd`, `match_finder.gd`, `passive.gd`,
@@ -208,6 +248,19 @@ Four things the 0.3 author should know before writing scope:
 4. **The safe-area conversion is untestable on the tablet.** It scales physical
    screen pixels to viewport space, so an error is invisible without a cutout
    and badly wrong with one. It is structurally a phone question.
+
+**And one thing about how to write the authorization itself.** P-036 was a bug
+that every gate passed, because §22.32 was phrased as a prohibition — "does not
+overwrite Constructed remembered Build" — and the implementation satisfied the
+prohibition precisely while breaking the unstated positive half.
+
+§22 is a good checklist and this is not an argument against it. But a coverage
+item of the form "X does not affect Y" is only half a requirement. Where the
+0.3 authorization forbids something, it is worth asking what must still be
+**true** afterwards, and writing that down too. The Boss layer has several
+candidates already — Override placement not perturbing the board, a threshold
+crossing not re-triggering, CODESHATTER not consuming a Function's charge — and
+each of those has a positive half that a prohibition alone will not pin.
 
 ---
 

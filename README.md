@@ -299,8 +299,8 @@ rejected rather than restored against different rules than it was made under.
 | `staging/1c38r34kr-beta-0.2.0-build-authorization-revised.md` | the scope and completion standard this build answers to |
 | `staging/1c38r34kr-beta-0.2.0-authorization-review.md` | the pre-implementation review of it, and the seven items that needed resolving |
 | `staging/1c38r34kr-beta-0.1.0-build-authorization.md` | the previous build's scope, kept for reference |
-| `staging/decisions.md` | append-only decision log, D-001..D-030 |
-| `staging/port-notes.md` | every place the translation is non-literal, P-001..P-035 |
+| `staging/decisions.md` | append-only decision log, D-001..D-031 |
+| `staging/port-notes.md` | every place the translation is non-literal, P-001..P-036 |
 | `staging/architect-notes.md` | design items raised during the port that must **not** be built as part of it |
 | `staging/1c38r34kr-beta-0.2.0-port-handback.md` | **the close-out** — what shipped, what the verification caught, and the final diff review |
 | `staging/port-handback.md` | the beta 0.1 close-out |
