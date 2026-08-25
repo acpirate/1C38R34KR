@@ -27,6 +27,17 @@ var _host_id := ""
 var _build: Array = []
 var _seed := 0
 
+## The active session. At most one of these is non-null: a Run part-way through
+## setup, or a committed Run. Both null means Quick Match, which keeps its
+## selections in the fields above.
+var _setup: RunSetup = null
+var _run: Run = null
+
+## The origin the Build screen currently on display opened with. Committed to
+## the Run when the player confirms — the alpha's split between a Build screen's
+## own state and the Run's committed build (see port-notes P-028).
+var _build_origin: Types.BuildOrigin = Types.BuildOrigin.DEFAULT
+
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -95,10 +106,15 @@ func _fresh_screen(compact := false) -> VBoxContainer:
 
 	_shell = MarginContainer.new()
 	_shell.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_shell.add_theme_constant_override("margin_left", UiTheme.px(10))
-	_shell.add_theme_constant_override("margin_right", UiTheme.px(10))
-	_shell.add_theme_constant_override("margin_top", UiTheme.px(12))
-	_shell.add_theme_constant_override("margin_bottom", UiTheme.px(12))
+	# §20.1 — the safe area is applied HERE, at the shell every menu is built
+	# into, rather than screen by screen. Beta 0.2 adds five top-level screens;
+	# opting each one in individually is how one of them gets missed, and a
+	# missed one is unreachable controls under a cutout rather than a visible bug.
+	var insets := UiTheme.safe_area_insets(size)
+	_shell.add_theme_constant_override("margin_left", UiTheme.px(10) + insets.x)
+	_shell.add_theme_constant_override("margin_right", UiTheme.px(10) + insets.z)
+	_shell.add_theme_constant_override("margin_top", UiTheme.px(12) + insets.y)
+	_shell.add_theme_constant_override("margin_bottom", UiTheme.px(12) + insets.w)
 	add_child(_shell)
 
 	var host: Control = _shell
@@ -165,16 +181,24 @@ func _divider() -> void:
 func _show_title(fingerprint: String) -> void:
 	_fresh_screen(true)
 	_heading(TITLE)
-	_subheading("beta 0.1")
+	_subheading("beta 0.2")
+
+	# Leaving the title drops whatever session was on screen, so nothing stale
+	# survives into a new one.
+	_setup = null
+	_run = null
 
 	# Continue appears only for a save this build can actually restore. A save
 	# from different content is rejected rather than offered and then failed.
-	var saved := SaveState.read()
+	var saved := SessionSave.read()
 	if saved["ok"]:
-		var s: GameState = saved["state"]
-		_button("Continue — turn %d" % s.turn, func(): _resume(s))
+		_button(_continue_label(saved), func(): _resume_session(saved))
 
-	_button("Constructed Quick Match", _show_system_select)
+	_button("New Run", _show_boss_select)
+	_button("Constructed Quick Match", func():
+		_run = null
+		_show_system_select())
+	_button("Random Quick Match", _start_random_quick_match)
 
 	_divider()
 
@@ -322,9 +346,25 @@ func _show_build() -> void:
 	_heading("BUILD")
 	_subheading("ACTIVE BUILD (top to bottom) — order is charge priority")
 
+	# A Run builds against its OWN selected Hacker and Deck, and against a known
+	# encounter. Quick Match keeps the pinned pair.
 	var inventory: Array = []
-	inventory.append_array(Content.hacker(Content.DEFAULT_HACKER_ID)["portfolio"])
-	inventory.append_array(Content.deck(Content.DEFAULT_DECK_ID)["portfolio"])
+	if _run != null:
+		inventory = _run.inventory
+		# §20 — Run context above the build. The encounter is committed by this
+		# point, so what it is should not be something the player has to carry
+		# in their head from the previous screen.
+		for line in _run_context_lines():
+			var ctx := Label.new()
+			ctx.text = line
+			ctx.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			ctx.add_theme_font_size_override("font_size", UiTheme.font_small())
+			ctx.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
+			_root.add_child(ctx)
+		_divider()
+	else:
+		inventory.append_array(Content.hacker(Content.DEFAULT_HACKER_ID)["portfolio"])
+		inventory.append_array(Content.deck(Content.DEFAULT_DECK_ID)["portfolio"])
 
 	# TouchScroll, not ScrollContainer: these regions are wall-to-wall Buttons,
 	# and a Button eats the one-finger drag that would otherwise scroll.
@@ -337,14 +377,15 @@ func _show_build() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 
-	for slot in _build.size():
+	var active := _active_build()
+	for slot in active.size():
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", UiTheme.px(4))
 
 		# Each slot shows what it IS, not just its name: the binding it draws
 		# charge from and the Function it will fire. Those two facts are the
 		# whole basis for ordering the build, and a bare name hides both.
-		var current := Content.program(_build[slot])
+		var current := Content.program(active[slot])
 		var summary := Button.new()
 		summary.text = "%d. %s\n%s — %s (%d)" % [
 			slot + 1, current["name"],
@@ -392,12 +433,12 @@ func _show_build() -> void:
 			b.custom_minimum_size.y = UiTheme.px(34)
 			# A Program already elsewhere in the build cannot be added twice:
 			# the build is four DISTINCT Programs.
-			b.disabled = _build.has(pid) and _build[slot] != pid
-			b.modulate = PacketStyle.TINT_NONE if _build[slot] == pid else PacketStyle.TINT_INACTIVE
+			b.disabled = active.has(pid) and active[slot] != pid
+			b.modulate = PacketStyle.TINT_NONE if active[slot] == pid else PacketStyle.TINT_INACTIVE
 			var s := slot
 			var p := str(pid)
 			b.pressed.connect(func():
-				_build[s] = p
+				_edit_replace(s, p)
 				_show_build())
 			swap_row.add_child(b)
 		list.add_child(swap_row)
@@ -416,7 +457,47 @@ func _show_build() -> void:
 		seed_row.add_child(seed_field)
 		_root.add_child(seed_row)
 
-	_button("Begin", _start_battle)
+	if _run != null:
+		_button("Begin battle %d" % _run.step, _start_run_battle)
+		# Debug-only Force Win (D-029). It lives HERE, before the battle, rather
+		# than on the defeat screen: the point is to reach a later battle
+		# without playing the earlier ones, and a control that first requires
+		# playing a battle to completion saves nothing. Deliberately minimal —
+		# no RESTART_RUN, no availability matrix, no wizard log record.
+		if OS.is_debug_build() and not _run.opponent_is_boss():
+			_button("[debug] Skip battle %d" % _run.step, func():
+				_run.confirm_build(_build_origin)
+				_advance_run())
+	else:
+		_button("Begin", _start_battle)
+
+
+## The build the Build screen is editing. A Run owns its own; Quick Match keeps
+## the remembered constructed one, and the two are deliberately never shared.
+func _active_build() -> Array:
+	return _run.build if _run != null else _build
+
+
+## Build edits go through the Run so the invariant — four DISTINCT inventory
+## Programs — is enforced in one place, and so an edit marks the build as
+## player-edited rather than leaving it looking carried-forward.
+func _edit_replace(slot: int, program_id: String) -> void:
+	if _run != null:
+		if _run.replace_in_build(slot, program_id):
+			_build_origin = Types.BuildOrigin.PLAYER_EDITED
+	else:
+		_build[slot] = program_id
+
+
+func _edit_move(slot: int, delta: int) -> void:
+	if _run != null:
+		if _run.move_build_slot(slot, delta):
+			_build_origin = Types.BuildOrigin.PLAYER_EDITED
+	else:
+		var dest := slot + delta
+		var moved = _build[slot]
+		_build[slot] = _build[dest]
+		_build[dest] = moved
 
 
 ## The Packet identities a Program draws charge from, in words. Full names, not
@@ -454,12 +535,10 @@ func _move_button(glyph: String, slot: int, delta: int) -> Button:
 	b.text = glyph
 	b.custom_minimum_size = Vector2(UiTheme.px(44), UiTheme.px(22))
 	var dest := slot + delta
-	b.disabled = dest < 0 or dest >= _build.size()
+	b.disabled = dest < 0 or dest >= _active_build().size()
 	if not b.disabled:
 		b.pressed.connect(func():
-			var moved = _build[slot]
-			_build[slot] = _build[dest]
-			_build[dest] = moved
+			_edit_move(slot, delta)
 			_show_build())
 	return b
 
@@ -525,11 +604,24 @@ func _enter_battle(state: GameState) -> void:
 
 
 func _on_battle_finished(winner: int) -> void:
-	# A concluded battle is not resumable, so its save is cleared rather than
-	# left to offer a Continue that would restore a finished battle.
-	SaveState.clear()
 	if _finished_state != null:
 		LogStore.flush_battle(_finished_state, _finished_state.metrics, _finished_state.log)
+
+	if _run != null:
+		# A Run OUTLIVES its battles. The save is rewritten without the battle
+		# record rather than cleared, so quitting from the result screen still
+		# comes back to a Run in progress.
+		if winner == Types.Side.PLAYER:
+			_run.phase = Types.SessionPhase.PENDING_BUILD
+		else:
+			_run.retry_battle()
+		SessionSave.write(SessionSave.run_to_dict(_run, null))
+		_show_run_result(winner)
+		return
+
+	# A concluded Quick Match is not resumable, so its save is cleared rather
+	# than left to offer a Continue that would restore a finished battle.
+	SessionSave.clear()
 	_show_result(winner)
 
 
@@ -667,3 +759,365 @@ func state_units(_m: Metrics.Battle, side: Types.Side) -> Array:
 	for u in (_finished_state.units[side] as Array):
 		out.append(u.program_id)
 	return out
+
+
+# ---------------------------------------------------------------------------
+# Run setup and progression (beta 0.2)
+# ---------------------------------------------------------------------------
+#
+# The order is fixed: New Run -> Boss -> Hacker -> Deck -> Path -> Build ->
+# Battle, then Path -> Build -> Battle for each battle after the first.
+#
+# Every screen below persists at its COMMITMENT, not on arrival. A highlighted
+# card is never Run state — the select-then-confirm split `_show_chooser`
+# already provides is exactly the line between "looking at" and "chose".
+
+
+## What Continue offers, phrased so a stale save is recognisable before it is
+## resumed rather than after.
+func _continue_label(saved: Dictionary) -> String:
+	match str(saved["mode"]):
+		"RUN_SETUP":
+			var s: RunSetup = saved["setup"]
+			return "Continue Run — %s setup" % Content.boss(s.boss_id)["name"]
+		"RUN":
+			var r: Run = saved["run"]
+			if r.is_pending_boss_battle():
+				return "Continue Run — Boss route ready"
+			return "Continue Run — battle %d of %d" % [r.step, Run.RUN_LENGTH]
+		_:
+			return "Continue — turn %d" % (saved["state"] as GameState).turn
+
+
+func _resume_session(saved: Dictionary) -> void:
+	match str(saved["mode"]):
+		"RUN_SETUP":
+			_setup = saved["setup"]
+			_run = null
+			# Resume lands on the screen AFTER the last commitment, which is
+			# exactly what the persisted setup step records.
+			if _setup.step == Types.SetupStep.HACKER:
+				_show_hacker_select()
+			else:
+				_show_deck_select()
+		"RUN":
+			_setup = null
+			_run = saved["run"]
+			if saved["state"] != null:
+				_enter_battle(saved["state"])
+			else:
+				_resume_run_screen()
+		_:
+			_setup = null
+			_run = null
+			_resume(saved["state"])
+
+
+## Where a committed Run with no battle in progress belongs.
+func _resume_run_screen() -> void:
+	match _run.phase:
+		Types.SessionPhase.PENDING_PATH:
+			_show_path_choice()
+		Types.SessionPhase.PENDING_BOSS_BATTLE:
+			_show_pending_boss_battle()
+		_:
+			_build_origin = _run.build_origin
+			_show_build()
+
+
+# ---- setup ----
+
+## Boss Selection. The DESTRUCTIVE New-Run boundary: confirming here replaces
+## any existing save, so it is the one selection that discards prior progress.
+func _show_boss_select() -> void:
+	var options: Array = []
+	for b in Content.all_bosses():
+		options.append({
+			"id": str(b["id"]),
+			"name": "%s [%s]" % [b["name"], b["id"]],
+			"lines": [
+				"ICE %d" % int(b["base_ice"]),
+				"Strong: %s, %s" % [
+					_token_list(b["strong_colors"], Vocab.COLOR_TOKENS),
+					_token_list(b["strong_shapes"], Vocab.SHAPE_TOKENS),
+				],
+			],
+		})
+
+	var choose := func(id):
+		# The route seed is drawn ONCE, here, so the whole Run's route
+		# randomness comes from one persisted, gameplay-isolated stream.
+		var seeded := Session.make_setup_random()
+		_setup = RunSetup.commit_boss(str(id), Constants.default_settings(), int(seeded["seed"]))
+		_run = null
+		if _setup == null:
+			return
+		SessionSave.write(SessionSave.setup_to_dict(_setup))
+		_show_hacker_select()
+
+	_show_chooser(
+		"SELECT BOSS",
+		"The Run ends here. Chosen now, fought last.",
+		options, choose, func(): _show_title(Content.fingerprint())
+	)
+
+
+func _show_hacker_select() -> void:
+	var options: Array = []
+	for id in Content.active()["hackers"]:
+		var h := Content.hacker(id)
+		options.append({
+			"id": str(id),
+			"name": "%s [%s]" % [h["name"], id],
+			"lines": [
+				"LINK %d" % int(h["base_link"]),
+				"Strong: %s, %s" % [
+					_token_list(h["strong_colors"], Vocab.COLOR_TOKENS),
+					_token_list(h["strong_shapes"], Vocab.SHAPE_TOKENS),
+				],
+			],
+		})
+
+	var choose := func(id):
+		var next := _setup.commit_hacker(str(id))
+		if next == null:
+			return
+		_setup = next
+		SessionSave.write(SessionSave.setup_to_dict(_setup))
+		_show_deck_select()
+
+	# No Back to Boss Selection: the Boss is committed and fixed for the Run.
+	# Offering a way back that could not actually change it would be a lie.
+	_show_chooser("SELECT HACKER", "Choose who runs this breach", options, choose)
+
+
+func _show_deck_select() -> void:
+	var options: Array = []
+	for id in Content.active()["decks"]:
+		var d := Content.deck(id)
+		options.append({
+			"id": str(id),
+			"name": "%s [%s]" % [d["name"], id],
+			"lines": [
+				"+%d LINK" % int(d["add_link"]),
+				"Function: %s" % str(d["fn"]["name"]),
+			],
+		})
+
+	var choose := func(id):
+		# Committing the Deck completes setup and generates the Battle 1 offers,
+		# which persist immediately — they are state, not a screen.
+		var r := _setup.commit_deck(str(id))
+		if r == null:
+			return
+		_run = r
+		_setup = null
+		SessionSave.write(SessionSave.run_to_dict(_run, null))
+		_show_path_choice()
+
+	_show_chooser("SELECT DECK", "Choose the Deck you carry", options, choose)
+
+
+# ---- path choice ----
+
+## The Path Choice. Two complete encounter packages; taking one commits the
+## opponent, the HOST, and the reward together.
+func _show_path_choice() -> void:
+	var pending := _run.pending_path
+	var options: Array = []
+	for o in pending.offers:
+		var enemy := (
+			Content.boss(o.opponent_id)
+			if o.opponent_kind == Types.OpponentKind.BOS
+			else Content.system(o.opponent_id)
+		)
+		var upgrade := Content.upgrade(o.upgrade_id)
+		var host := Content.host(o.host_id)
+		options.append({
+			"id": str(o.index),
+			"name": "%s%s" % [
+				str(enemy["name"]),
+				"  ·  BOSS" if o.opponent_kind == Types.OpponentKind.BOS else "",
+			],
+			"lines": [
+				"ICE %d" % Run.resolve_run_ice(_run.settings, o.opponent_kind, o.opponent_id, pending.step),
+				"HOST: %s — %s" % [str(host["name"]), _passive_summary(host)],
+				"UPGRADE: %s — %s" % [str(upgrade["name"]), _passive_summary(upgrade)],
+			],
+		})
+
+	var choose := func(id):
+		if not _run.select_path(int(id)):
+			return
+		# The UPGRADE is acquired HERE, before Build, so it is active for the
+		# battle it was offered alongside — including Battle 1.
+		_build_origin = _run.opening_build_origin()
+		SessionSave.write(SessionSave.run_to_dict(_run, null))
+		_show_build()
+
+	var exhausted := ""
+	if pending.upgrade_exhausted:
+		exhausted = "  ·  one UPGRADE remains, so both paths offer it"
+	_show_chooser(
+		"BATTLE %d OF %d" % [pending.step, Run.RUN_LENGTH],
+		"Choose your route%s" % exhausted,
+		options, choose
+	)
+
+
+## An identity's PASSIVEs in words, for a card. Falls back to the payload
+## Function's name when a carrier has no authored display text.
+func _passive_summary(row: Dictionary) -> String:
+	var passives: Array = row.get("passives", [])
+	if passives.is_empty():
+		return "no PASSIVEs"
+	var parts := PackedStringArray()
+	for p in passives:
+		var text := str(p["display"])
+		if text == "":
+			text = str(Content.function(str(p["function_id"]))["name"])
+		parts.append(text)
+	return ", ".join(parts)
+
+
+# ---- run context, battle, result ----
+
+## The Run's standing facts, shown above Build so the encounter being built
+## against is never something the player has to remember from the last screen.
+func _run_context_lines() -> PackedStringArray:
+	var enemy := (
+		Content.boss(_run.opponent_id)
+		if _run.opponent_is_boss()
+		else Content.system(_run.opponent_id)
+	)
+	var out := PackedStringArray()
+	out.append("Battle %d of %d  ·  vs %s  ·  ICE %d" % [
+		_run.step, Run.RUN_LENGTH, str(enemy["name"]), _run.encounter_ice(),
+	])
+	out.append("HOST %s  ·  LINK %d" % [str(Content.host(_run.host_id)["name"]), _run.hacker_max_link])
+	if _run.upgrade_ids.is_empty():
+		out.append("UPGRADEs: none yet")
+	else:
+		var names := PackedStringArray()
+		for uid in _run.upgrade_ids:
+			names.append(str(Content.upgrade(uid)["name"]))
+		out.append("UPGRADEs: %s" % ", ".join(names))
+	out.append("Boss: %s" % str(Content.boss(_run.boss_id)["name"]))
+	return out
+
+
+func _start_run_battle() -> void:
+	_run.confirm_build(_build_origin)
+
+	# §12 — the Run stops before Boss combat rather than fabricating it.
+	if _run.opponent_is_boss():
+		_run.enter_pending_boss_battle()
+		SessionSave.write(SessionSave.run_to_dict(_run, null))
+		_show_pending_boss_battle()
+		return
+
+	var state := Session.create_run_battle(_run, _seed)
+	if state == null:
+		return
+	_run.phase = Types.SessionPhase.ACTIVE_BATTLE
+	SessionSave.write(SessionSave.run_to_dict(_run, state))
+	_enter_battle(state)
+
+
+## §12.1 — the beta 0.2 stop point.
+##
+## The Run holds a complete, committed Boss + HOST + UPGRADE package and is
+## deliberately NOT marked complete: beta 0.3 picks this state up from disk.
+func _show_pending_boss_battle() -> void:
+	if _content != null:
+		_content.queue_free()
+		_content = null
+
+	_fresh_screen(true)
+	_heading("ROUTE COMMITTED")
+	_subheading("Boss battle port continues in Beta 0.3")
+
+	for line in _run_context_lines():
+		var l := Label.new()
+		l.text = line
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_font_size_override("font_size", UiTheme.font_body())
+		l.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
+		_root.add_child(l)
+
+	_divider()
+	# The Run is PRESERVED, not ended. Returning to the title and continuing
+	# comes straight back here.
+	_button("Back to title", func(): _show_title(Content.fingerprint()))
+
+
+## The result of a Run battle. Progression, retry, and abandonment live here; a
+## Quick Match keeps its own result screen.
+func _show_run_result(winner: int) -> void:
+	if _content != null:
+		_content.queue_free()
+		_content = null
+
+	var won := winner == Types.Side.PLAYER
+	_fresh_screen(true)
+	_heading("VICTORY" if won else "DEFEAT")
+	_subheading(
+		"System ICE breached — battle %d of %d." % [_run.step, Run.RUN_LENGTH]
+		if won else "Hacker LINK severed."
+	)
+
+	if won:
+		_button("Continue Run", _advance_run)
+	else:
+		# A retry is the SAME encounter with the SAME build — nothing rerolls
+		# and no reward is granted twice.
+		_button("Retry battle %d" % _run.step, func():
+			_run.retry_battle()
+			_build_origin = _run.opening_build_origin()
+			SessionSave.write(SessionSave.run_to_dict(_run, null))
+			_show_build())
+
+	_button("Abandon Run", func():
+		SessionSave.clear()
+		_show_title(Content.fingerprint()))
+
+	_divider()
+	for line in _run_context_lines():
+		var l := Label.new()
+		l.text = line
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_font_size_override("font_size", UiTheme.font_small())
+		l.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
+		_root.add_child(l)
+
+	if _finished_state != null and _finished_state.metrics != null:
+		_show_metrics(_finished_state)
+
+
+## Progress past a won battle. At the last step there is no next path — the Run
+## has already committed its Boss route and stops instead of advancing.
+func _advance_run() -> void:
+	if _run.advance_after_victory():
+		SessionSave.write(SessionSave.run_to_dict(_run, null))
+		_show_path_choice()
+	else:
+		_show_pending_boss_battle()
+
+
+# ---- random quick match ----
+
+## §14 — one isolated setup stream rolls the build, then the System, then the
+## HOST, and the battle starts WITHOUT opening Build.
+##
+## It acquires no UPGRADEs, involves no Boss, and never writes to Constructed
+## Quick Match's remembered build — which is why `_build` is left alone here.
+func _start_random_quick_match() -> void:
+	_run = null
+	_setup = null
+	var seeded := Session.make_setup_random()
+	var rolled := Session.random_quick_match_setup(seeded["rng"])
+	_system_id = str(rolled["system_id"])
+	_host_id = str(rolled["host_id"])
+	_enter_battle(Session.create_quick_match(
+		_system_id, _host_id, _seed, rolled["build"], {}, true
+	))

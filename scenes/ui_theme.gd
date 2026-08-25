@@ -119,3 +119,41 @@ static func _button_box(bg: Color, edge: Color) -> StyleBoxFlat:
 	box.content_margin_top = px(8)
 	box.content_margin_bottom = px(8)
 	return box
+
+
+# ---------------------------------------------------------------------------
+# Safe area (beta 0.2 §20.1)
+# ---------------------------------------------------------------------------
+#
+# Beta 0.1 protected only the battle screen, because it was the only screen that
+# ran edge to edge. Beta 0.2 adds several top-level screens, so the policy moves
+# here and every screen queries the same answer.
+#
+# Queried at runtime, never hardcoded: a cutout is per-device, and a constant
+# that happened to suit the S25 would be wrong on the tablet and wrong again on
+# the next phone.
+
+## The safe-area inset, in this Control's coordinate space.
+##
+## `control_size` is the size of the Control the insets will be applied to.
+## DisplayServer reports the safe area in PHYSICAL screen pixels, while the
+## viewport is stretched, so the ratio between them is what converts one to the
+## other. Getting this wrong is invisible on a device without a cutout and
+## badly wrong on one with it.
+##
+## Returns zero insets when the display cannot answer — a desktop window, or a
+## headless run. A screen that gets no insets is still laid out correctly; it
+## just has nothing to avoid.
+static func safe_area_insets(control_size: Vector2) -> Vector4i:
+	var safe := DisplayServer.get_display_safe_area()
+	var screen := DisplayServer.screen_get_size()
+	if screen.x <= 0 or screen.y <= 0:
+		return Vector4i.ZERO
+	var scale_x := control_size.x / float(screen.x)
+	var scale_y := control_size.y / float(screen.y)
+	return Vector4i(
+		int(safe.position.x * scale_x),
+		int(safe.position.y * scale_y),
+		int((screen.x - safe.end.x) * scale_x),
+		int((screen.y - safe.end.y) * scale_y),
+	)

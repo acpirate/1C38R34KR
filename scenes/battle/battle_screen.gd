@@ -277,17 +277,17 @@ func _toggle_pause() -> void:
 ## The safe area keeps status text and controls clear of a display cutout and
 ## rounded corners. Queried rather than hardcoded, because a cutout is
 ## per-device.
+##
+## Beta 0.2 §20.1 — the inset arithmetic moved to `UiTheme.safe_area_insets` so
+## every top-level screen gets the same answer from one place. The padding added
+## on top of it is this screen's own, and the resulting behaviour is unchanged.
 func _apply_safe_area(root: Control) -> void:
-	var safe := DisplayServer.get_display_safe_area()
-	var screen := DisplayServer.screen_get_size()
-	if screen.x <= 0 or screen.y <= 0:
-		return
-	var scale_x := size.x / float(screen.x)
-	var scale_y := size.y / float(screen.y)
-	root.offset_left = safe.position.x * scale_x + UiTheme.px(6)
-	root.offset_top = safe.position.y * scale_y + UiTheme.px(6)
-	root.offset_right = -((screen.x - safe.end.x) * scale_x + UiTheme.px(6))
-	root.offset_bottom = -((screen.y - safe.end.y) * scale_y + UiTheme.px(6))
+	var insets := UiTheme.safe_area_insets(size)
+	var pad := UiTheme.px(6)
+	root.offset_left = insets.x + pad
+	root.offset_top = insets.y + pad
+	root.offset_right = -(insets.z + pad)
+	root.offset_bottom = -(insets.w + pad)
 
 
 # ---------------------------------------------------------------------------

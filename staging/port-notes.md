@@ -628,3 +628,55 @@ path, the right path, and every mixture rather than walking one edge of the tree
 **Cost, for the record:** 2,000 walks take under two seconds across both
 engines, against the battle matrix's ~90 minutes for 5,250 battles. There is
 deliberately no DEEPSCAN tier for run walks — the range is simply set wide.
+
+## Beta 0.2 Phase F — presentation
+
+### P-031 · The safe area moved to the shell, not to each new screen
+
+**Forced by:** §20.1, and by the arithmetic being easy to get subtly wrong.
+
+Beta 0.1 applied the safe area in `battle_screen._apply_safe_area` only, because
+the battle was the one screen running edge to edge. Beta 0.2 adds five top-level
+screens, and opting each one in individually is how one of them gets missed —
+with the failure being unreachable controls under a cutout rather than anything
+that looks wrong in a screenshot.
+
+**Resolution:** `UiTheme.safe_area_insets(control_size)` owns the arithmetic;
+`main._fresh_screen` adds it to the shell margins every menu is built into, so a
+new screen is covered by existing. The battle screen keeps its own padding and
+delegates the insets, and its behaviour is unchanged.
+
+The conversion is the part worth guarding: `DisplayServer` reports the safe area
+in PHYSICAL screen pixels while the viewport is stretched, so the ratio between
+them converts one to the other. Getting that wrong is invisible on a device with
+no cutout and badly wrong on one with it — the tablet cannot detect this class
+of bug at all, which is what makes it an S25 question.
+
+### P-032 · The debug skip is not the only force-win, and that is worth knowing
+
+Beta 0.1's battle screen already carries a debug bar with `win` and `lose`
+buttons. With a Run active those now flow through the Run result screen, so
+**force-win at battle level already existed** before D-029 was written.
+
+What Phase F adds is a `[debug] Skip battle N` on the Run BUILD screen, which
+resolves the encounter as a victory without constructing a battle at all. It
+was placed there rather than on the defeat screen deliberately: the point of
+D-029 is to reach a later battle without playing the earlier ones, and a control
+that first requires playing a battle to completion saves nothing.
+
+The two are complementary — the debug bar exercises the real result path, the
+Build skip is faster on the tablet — but D-029 was written as though no force
+win existed, and it slightly over-scoped as a result. Nothing needs undoing;
+recorded so the 0.3 wizard work starts from what is actually there.
+
+The skip is correctly absent on the Boss route: skipping there would fabricate
+the Battle 4 result §12 forbids.
+
+### P-033 · No Back from Hacker Selection to Boss Selection
+
+The Boss is committed and FIXED at the moment it is chosen — that commit is the
+destructive New-Run boundary. A Back button from Hacker Selection would either
+be a lie (it cannot change the Boss) or a second destructive boundary hiding
+behind an ordinary-looking control.
+
+Boss Selection itself has Back, to the title, because nothing is committed yet.
