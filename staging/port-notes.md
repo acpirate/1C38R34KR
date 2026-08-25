@@ -680,3 +680,37 @@ be a lie (it cannot change the Boss) or a second destructive boundary hiding
 behind an ordinary-looking control.
 
 Boss Selection itself has Back, to the title, because nothing is committed yet.
+
+## Beta 0.2 Phase G — logging
+
+### P-034 · The route seed IS the Run identity
+
+**Not a deviation** — a choice worth stating, because the obvious alternative is
+worse.
+
+§15 asks for a "Run ID/identity as needed by existing logging". A generated UUID
+would have served for joining records, and nothing else. The route seed already
+exists, is already persisted, is unique per Run in practice, and — unlike a UUID
+— **reproduces the Run**: seed plus choice sequence regenerates every offer.
+
+So `Run.route_seed` is kept alongside the advancing `route_rng_state` and stamped
+on every session record as `run`. One grep reassembles a Run from a log file, and
+a Run reported from a device replays in the harness from the same value.
+
+### P-035 · A fourth stream, not a second pipeline
+
+§19 forbids a second instrumentation pipeline. `SessionLog` writes through
+`LogStore.append` into `session.jsonl`, beside `battles`, `turns`, and `events`,
+with the existing budget and trim policy. It owns no file handling of its own.
+
+Records are written at BASIC and above. The volume argument that gates per-turn
+logging does not apply here — a complete Run produces about a dozen records —
+and a release build that could not say which route a player took would defeat
+the point of having the stream.
+
+**On schema parity:** these deliberately do NOT reproduce the alpha's menu-log
+shapes. §19 says to prefer compact records that answer development questions
+over faithful shapes with no consumer, and nothing reads the alpha's menu logs.
+What is preserved is the join model: `RUN_BATTLE_STARTED` carries `battle_id`,
+which is the key into the battle streams, so routing decisions connect to how
+the battle actually went.

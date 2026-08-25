@@ -611,7 +611,9 @@ func _on_battle_finished(winner: int) -> void:
 		# A Run OUTLIVES its battles. The save is rewritten without the battle
 		# record rather than cleared, so quitting from the result screen still
 		# comes back to a Run in progress.
-		if winner == Types.Side.PLAYER:
+		var won := winner == Types.Side.PLAYER
+		SessionLog.run_result(_run, won, "ADVANCE" if won else "RETRY")
+		if won:
 			_run.phase = Types.SessionPhase.PENDING_BUILD
 		else:
 			_run.retry_battle()
@@ -844,14 +846,22 @@ func _show_boss_select() -> void:
 			],
 		})
 
+	var offered: Array = []
+	for o in options:
+		offered.append(o["id"])
+	SessionLog.boss_offered(offered)
+
 	var choose := func(id):
 		# The route seed is drawn ONCE, here, so the whole Run's route
 		# randomness comes from one persisted, gameplay-isolated stream.
 		var seeded := Session.make_setup_random()
-		_setup = RunSetup.commit_boss(str(id), Constants.default_settings(), int(seeded["seed"]))
+		var seed_value := int(seeded["seed"])
+		_setup = RunSetup.commit_boss(str(id), Constants.default_settings(), seed_value)
 		_run = null
 		if _setup == null:
 			return
+		SessionLog.boss_selected(seed_value, str(id))
+		SessionLog.run_created(seed_value, str(id))
 		SessionSave.write(SessionSave.setup_to_dict(_setup))
 		_show_hacker_select()
 
@@ -883,6 +893,7 @@ func _show_hacker_select() -> void:
 		if next == null:
 			return
 		_setup = next
+		SessionLog.hacker_selected(_setup.route_seed, str(id))
 		SessionSave.write(SessionSave.setup_to_dict(_setup))
 		_show_deck_select()
 
@@ -912,6 +923,8 @@ func _show_deck_select() -> void:
 			return
 		_run = r
 		_setup = null
+		SessionLog.deck_selected(_run.route_seed, str(id), _run.inventory, _run.build)
+		SessionLog.path_offered(_run)
 		SessionSave.write(SessionSave.run_to_dict(_run, null))
 		_show_path_choice()
 
@@ -949,6 +962,7 @@ func _show_path_choice() -> void:
 	var choose := func(id):
 		if not _run.select_path(int(id)):
 			return
+		SessionLog.path_selected(_run, int(id))
 		# The UPGRADE is acquired HERE, before Build, so it is active for the
 		# battle it was offered alongside — including Battle 1.
 		_build_origin = _run.opening_build_origin()
@@ -1012,6 +1026,7 @@ func _start_run_battle() -> void:
 	# §12 — the Run stops before Boss combat rather than fabricating it.
 	if _run.opponent_is_boss():
 		_run.enter_pending_boss_battle()
+		SessionLog.run_stopped(_run)
 		SessionSave.write(SessionSave.run_to_dict(_run, null))
 		_show_pending_boss_battle()
 		return
@@ -1019,6 +1034,7 @@ func _start_run_battle() -> void:
 	var state := Session.create_run_battle(_run, _seed)
 	if state == null:
 		return
+	SessionLog.battle_started(_run, state.battle_id)
 	_run.phase = Types.SessionPhase.ACTIVE_BATTLE
 	SessionSave.write(SessionSave.run_to_dict(_run, state))
 	_enter_battle(state)
@@ -1078,6 +1094,7 @@ func _show_run_result(winner: int) -> void:
 			_show_build())
 
 	_button("Abandon Run", func():
+		SessionLog.run_abandoned(_run)
 		SessionSave.clear()
 		_show_title(Content.fingerprint()))
 
@@ -1098,6 +1115,7 @@ func _show_run_result(winner: int) -> void:
 ## has already committed its Boss route and stops instead of advancing.
 func _advance_run() -> void:
 	if _run.advance_after_victory():
+		SessionLog.path_offered(_run)
 		SessionSave.write(SessionSave.run_to_dict(_run, null))
 		_show_path_choice()
 	else:
@@ -1118,6 +1136,9 @@ func _start_random_quick_match() -> void:
 	var rolled := Session.random_quick_match_setup(seeded["rng"])
 	_system_id = str(rolled["system_id"])
 	_host_id = str(rolled["host_id"])
+	SessionLog.quick_random_rolled(
+		int(seeded["seed"]), _system_id, _host_id, rolled["build"]
+	)
 	_enter_battle(Session.create_quick_match(
 		_system_id, _host_id, _seed, rolled["build"], {}, true
 	))

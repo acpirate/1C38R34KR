@@ -25,10 +25,15 @@ const DIR := "user://logs"
 ## Per-stream byte caps. Turns and events are the volume; battle records are one
 ## per battle and are the most valuable thing here, so they get room to survive
 ## a long session of noisy ones.
+##
+## `session` (beta 0.2) carries Run setup, routing, and progression — about a
+## dozen records per complete Run, so it needs no more room than battle records
+## and is never the stream that forces a trim.
 const BUDGET := {
 	"battles": 1024 * 1024,
 	"turns": 2 * 1024 * 1024,
 	"events": 2 * 1024 * 1024,
+	"session": 1024 * 1024,
 }
 
 ## Fraction of a file kept when it is trimmed. Trimming to exactly the cap would

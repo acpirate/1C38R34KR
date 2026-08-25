@@ -189,6 +189,11 @@ var upgrade_ids: Array = []
 ## battle's gameplay RNG.
 var route_rng_state := 0
 
+## The seed the route stream started from. This is the Run's IDENTITY in the
+## logs: every session record carries it, so a whole Run can be reassembled from
+## a log file, and a Run reported from a device can be replayed in the harness.
+var route_seed := 0
+
 ## The exact pending offers while the Run sits on a Path Choice. Null otherwise.
 var pending_path: PendingPath = null
 
@@ -560,6 +565,7 @@ func to_dict() -> Dictionary:
 		"opponent_source": Types.SYSTEM_SELECTION_SOURCE_NAMES[opponent_source],
 		"host_id": host_id,
 		"upgrade_ids": upgrade_ids.duplicate(),
+		"route_seed": route_seed,
 		"route_rng_state": route_rng_state,
 		"pending_path": null if pending_path == null else pending_path.to_dict(),
 		"pending_result": null if pending_result.is_empty() else {
@@ -618,6 +624,7 @@ static func from_dict(d: Dictionary) -> Run:
 
 	r.step = int(d.get("step", 0))
 	r.hacker_max_link = int(d.get("hacker_max_link", 0))
+	r.route_seed = int(d.get("route_seed", 0))
 	r.route_rng_state = int(d.get("route_rng_state", 0))
 	r.settings = _settings_from_dict(d.get("settings", {}))
 

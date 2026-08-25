@@ -35,6 +35,11 @@ var settings := {}
 ## gameplay stream — see `Run.route_rng`.
 var route_rng_state := 0
 
+## The seed the route stream started from. Kept alongside the advancing state
+## because it is the Run's IDENTITY in the logs, and because it is what makes a
+## Run reported from a device reproducible in the harness.
+var route_seed := 0
+
 
 ## §4.1 — commit the Boss and create the Run.
 ##
@@ -53,6 +58,7 @@ static func commit_boss(boss_id_in: String, settings_in: Dictionary, route_seed:
 	s.step = Types.SetupStep.HACKER
 	s.hacker_id = ""
 	s.settings = settings_in.duplicate(true)
+	s.route_seed = route_seed
 	s.route_rng_state = Rng.new(route_seed).get_state()
 	return s
 
@@ -69,6 +75,7 @@ func commit_hacker(hacker_id_in: String) -> RunSetup:
 	s.step = Types.SetupStep.DECK
 	s.hacker_id = hacker_id_in
 	s.settings = settings.duplicate(true)
+	s.route_seed = route_seed
 	s.route_rng_state = route_rng_state
 	return s
 
@@ -103,6 +110,7 @@ func commit_deck(deck_id_in: String) -> Run:
 	r.build = Content.default_build(hacker_id, deck_id_in)
 	r.build_origin = Types.BuildOrigin.DEFAULT
 	r.upgrade_ids = []
+	r.route_seed = route_seed
 
 	# Until a path is chosen there is no committed encounter. Both offers name
 	# the fixed Battle 1 identity, and `select_path` replaces these before any
@@ -151,6 +159,7 @@ func to_dict() -> Dictionary:
 		"step": Types.SETUP_STEP_NAMES[step],
 		"hacker_id": hacker_id,
 		"settings": settings.duplicate(true),
+		"route_seed": route_seed,
 		"route_rng_state": route_rng_state,
 	}
 
@@ -178,5 +187,6 @@ static func from_dict(d: Dictionary) -> RunSetup:
 		return null
 
 	s.settings = Run._settings_from_dict(d.get("settings", {}))
+	s.route_seed = int(d.get("route_seed", 0))
 	s.route_rng_state = int(d.get("route_rng_state", 0))
 	return s

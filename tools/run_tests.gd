@@ -39,6 +39,8 @@ const SUITES := [
 	# Phase D — the session envelope wrapped around that battle record.
 	"res://tests/test_session_save.gd",
 	"res://tests/test_metrics.gd",
+	# Phase G — Run/session observability, through the same store.
+	"res://tests/test_session_log.gd",
 	"res://tests/test_layer_purity.gd",
 	"res://tests/test_data_present.gd",
 ]
