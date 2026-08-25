@@ -109,6 +109,43 @@ static func create_quick_match(
 	})
 
 
+## A headless BOSS battle for the differential instrument only.
+##
+## Beta 0.3 §20 / Alpha 0.7.0 §45 — player-facing Quick Match stays System-only,
+## and automated coverage reaches a Boss battle through a harness entry point
+## instead. This is the beta's counterpart to the alpha's `headlessBoss`, and it
+## deliberately carries no UPGRADEs: a trace compares combat, and acquisitions
+## belong to the Run layer.
+##
+## `HEADLESS_PINNED` keeps the selection source honest — it is never in play.
+static func create_boss_trace_battle(
+	boss_id: String,
+	host_id: String,
+	seed_value: int,
+	build: Array,
+	settings: Dictionary = {},
+	with_accounting := false,
+) -> GameState:
+	return _create_battle({
+		"hacker_id": Content.DEFAULT_HACKER_ID,
+		"deck_id": Content.DEFAULT_DECK_ID,
+		"opponent_kind": Types.OpponentKind.BOS,
+		"opponent_id": boss_id,
+		"opponent_source": Types.SystemSelectionSource.HEADLESS_PINNED,
+		"host_id": host_id,
+		"upgrade_ids": [],
+		"build": build,
+		"build_origin": Types.BuildOrigin.DEFAULT,
+		"seed": seed_value,
+		"settings": settings,
+		"battle_id": "qm-%s-%s-%d" % [boss_id, host_id, seed_value],
+		# The Boss takes its authored ICE, exactly as it does in a Run.
+		"player_hp": -1,
+		"enemy_hp": -1,
+		"with_accounting": with_accounting,
+	})
+
+
 ## Builds a playable RUN battle from committed Run state.
 ##
 ## Everything here was decided earlier and is merely read: the encounter was

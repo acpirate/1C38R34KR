@@ -172,7 +172,15 @@ func _fullest_row_cell(state: GameState) -> Vector2i:
 # ---------------------------------------------------------------------------
 
 func _play(sys: String, host: String, variant: String, settings: Dictionary, seed_value: int, keep_records: bool) -> Dictionary:
-	var state := Session.create_quick_match(sys, host, seed_value, Session.default_build(), settings)
+	# Beta 0.3 §20 — a `BOS_*` id in `--sys` selects a BOSS opponent, mirroring
+	# the alpha instrument exactly so the two remain comparable. Quick Match
+	# itself stays System-only; this is the headless fixture route, matching the
+	# alpha's `headlessBoss` (Alpha 0.7.0 §45).
+	var state := (
+		Session.create_boss_trace_battle(sys, host, seed_value, Session.default_build(), settings)
+		if sys.begins_with("BOS_")
+		else Session.create_quick_match(sys, host, seed_value, Session.default_build(), settings)
+	)
 	var game := Game.new(state)
 
 	var ctx := {"count": 0, "records": [] as Array, "hash": HashingContext.new()}

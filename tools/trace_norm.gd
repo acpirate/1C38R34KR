@@ -17,6 +17,12 @@ extends RefCounted
 ## unchanged, which is correct for the many single-word keys.
 const KEY_MAP := {
 	"owner_kind": "ownerKind",
+	# Beta 0.3 — the ODANSHAY mechanic event. The beta writes snake_case
+	# throughout and the alpha's spelling wins at the trace boundary, exactly as
+	# it does for every key above.
+	"boss_id": "bossId",
+	"count_before": "countBefore",
+	"count_after": "countAfter",
 	"program_id": "programId",
 	"fn_id": "fnId",
 	"effect_id": "effectId",
