@@ -34,6 +34,8 @@ const SUITES := [
 	"res://tests/test_route.gd",
 	# Phase C — battle creation from committed Run state.
 	"res://tests/test_run_battle.gd",
+	# Beta 0.3 — the ODANSHAY mechanic layer.
+	"res://tests/test_boss.gd",
 	# Phase 6 — persistence, accounting.
 	"res://tests/test_save.gd",
 	# Phase D — the session envelope wrapped around that battle record.

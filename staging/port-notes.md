@@ -797,3 +797,61 @@ live concern, see D-026).
 **Verified on device**, since neither fix is visible to a headless test: the
 board's top edge measured y=670 before and after the status area gained lines,
 and the debug bar showed a random gameplay seed rather than 0.
+
+## Beta 0.3 Phases C-E — the ODANSHAY mechanic layer
+
+### P-039 · The mechanic is its own file, hooked at two turn edges
+
+`scripts/logic/boss.gd` holds the Override overlay, the threshold, and the
+end-of-turn placement. `Game.run_enemy_phase` gains exactly two calls, both
+guarded by `Boss.is_boss_battle`, so an ordinary System battle pays one
+comparison per turn edge and nothing else changes.
+
+Beta 0.1 had already reserved the whole vocabulary — `Tile.Special.Type.OVERRIDE`,
+`Types.OwnerKind.BOSS`, `Types.EVT.BOSS_MECHANIC`, the `OVERRIDE_*` constants,
+the three `FN_*` IDs, an OVERRIDE tint in the presentation registry, and a
+generic special serializer — and even left comments in `run_enemy_phase` marking
+where the two hooks belong. Phase C's "overlay state, render, save
+compatibility" needed no new representation at all.
+
+`Game.cast_boss_mechanic` is the one new entry point: it invokes an authored
+Function through the ordinary `_cast_actor` path with `OwnerKind.BOSS` and the
+Boss's ID, at no charge cost. There is no bespoke SHAKE and no bespoke ATTACK.
+
+### P-040 · Three test premises that were wrong, and what they revealed
+
+Every one of these was the test being wrong rather than the code, but each named
+something worth writing down.
+
+**DATABEND recovers capacity by destroying its own Overrides.** The first
+cap-exhaustion test blanketed the board in Boss Overrides expecting capacity to
+stay at zero, since DATABEND retains Boss overlays. It does — but it also
+resolves the Syncs it creates, and resolution destroys Packets *with their
+overlays*. Capacity recovered on the first attempt. That is the mechanic working
+exactly as intended, and it means the cap is genuinely close to unreachable in
+play, as the alpha's own comment says.
+
+Forcing the cap needs a board DATABEND cannot regenerate: every cell standard
+(a neutral carries no overlay, so it is always regenerated) **and** match-free
+(or the substitution creates a Sync, which cascades, which frees capacity
+again). `_make_all_standard_match_free` searches colour/shape pairs per cell for
+one that leaves the board with no match.
+
+**CODESHATTER lands 69, not 70, on a completed Run.** BRACER reduces damage from
+all sources by 1 and is one of the four UPGRADEs a Run necessarily holds by
+Battle 4. The raw value is asserted against a Run with no UPGRADEs; the
+modifier applying is asserted separately, because "CODESHATTER is ordinary
+Function damage" is the actual requirement (§21.36) and a hardcoded 70 would
+have quietly asserted the opposite.
+
+**A hardcoded board coordinate is a board roll.** `Vector2i(5, 5)` happened to
+be a neutral, which cannot carry an overlay, so the replacement test measured
+nothing. Tests that need an axis-bearing cell now search for one.
+
+### P-041 · The cap's off-by-one, asserted rather than commented
+
+`place_end_of_turn` iterates `0..OVERRIDE_DATABEND_RETRY_LIMIT` **inclusive** —
+6 capacity checks and 5 DATABEND casts, because the final iteration abandons
+instead of casting. The test asserts both numbers independently rather than
+trusting the loop to be read correctly, since `for i in LIMIT` is the natural
+GDScript spelling and gets both wrong.

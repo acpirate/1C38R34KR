@@ -279,6 +279,33 @@ func _cast_actor(owner: Types.Side, actor: Dictionary, events: Array, target = n
 
 ## Every occupied coordinate — the candidate pool for an immediately resolving
 ## Effect's RANDOM mode, which places no overlay and so accepts any Packet.
+## Invoke a Boss mechanic payload Function at NO charge cost, attributed to the
+## Boss itself (§7).
+##
+## The actor kind is `BOSS` and the actor ID is the Boss, so every event the
+## payload emits carries Boss causal identity rather than a fake Program, a fake
+## PASSIVE, or a fake System. The payload runs through the ordinary
+## Function → Effect machinery — there is no Boss-specific SHAKE or ATTACK.
+##
+## Zero-cost means exactly that: the four Boss Program charge pools are
+## untouched by CODESHATTER, DATABEND, and REBOOT.
+func cast_boss_mechanic(fn_id: String, events: Array) -> void:
+	var fn := Content.function(fn_id)
+	if fn.is_empty():
+		# The loader guarantees these resolve; defensive only.
+		return
+	_cast_actor(
+		Types.Side.ENEMY,
+		{
+			"kind": Types.OwnerKind.BOSS,
+			"id": Boss.boss_id(state),
+			"name": str(fn["name"]),
+			"fn": fn,
+		},
+		events,
+	)
+
+
 func _occupied_cells(exclude: Dictionary) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for y in Constants.BOARD_HEIGHT:
@@ -958,12 +985,17 @@ func run_enemy_phase() -> Array:
 	# The same ordering the Hacker's turn uses: START_OF_TURN PASSIVEs resolve
 	# fully, THEN countdowns tick. A HOST carrier fires at the start of BOTH
 	# agents' turns; the resolution owner here is the System.
-	#
-	# The ODANSHAY Override threshold would sit between these two steps, and the
-	# end-of-turn Override placement after everything below. Both are beta 0.3.
 	_run_start_of_turn_passives(Types.Side.ENEMY, events)
 	if state.has_winner():
 		return _collect(events)
+
+	# The ODANSHAY threshold sits HERE — after HOST START_OF_TURN, before
+	# countdowns (§12). There is no Boss identity PASSIVE layer between them:
+	# the BOS schema has no PASSIVES column, deliberately.
+	if Boss.is_boss_battle(state):
+		Boss.resolve_threshold(self, events)
+		if state.has_winner():
+			return _collect(events)
 
 	_tick_countdowns(Types.Side.ENEMY, events)
 	if state.has_winner():
@@ -997,5 +1029,13 @@ func run_enemy_phase() -> Array:
 
 	if state.has_winner():
 		return _collect(events)
+
+	# The final action of a NON-TERMINAL Boss turn (§10). The winner check above
+	# is what makes it non-terminal: a battle that already ended places nothing.
+	if Boss.is_boss_battle(state):
+		Boss.place_end_of_turn(self, events)
+		if state.has_winner():
+			return _collect(events)
+
 	state.turn += 1
 	return _collect(events)
