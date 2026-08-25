@@ -27,6 +27,9 @@ func run(t: TestCase) -> void:
 	_test_threshold_sequence(t)
 	_test_reboot(t)
 	_test_zero_cost(t)
+	_test_retry_preserves_encounter(t)
+	_test_mid_boss_save(t)
+	_test_metrics(t)
 
 	Content.clear()
 	Passives.clear_cache()
@@ -362,6 +365,158 @@ func _test_zero_cost(t: TestCase) -> void:
 
 
 # ---------------------------------------------------------------------------
+# Phase F — result and session integration
+# ---------------------------------------------------------------------------
+
+## §21.47 / §21.48 — losing to the Boss uses the ordinary Run-loss path, and the
+## retry is the SAME encounter. Nothing rerolls and no reward is granted twice.
+func _test_retry_preserves_encounter(t: TestCase) -> void:
+	t.group("Boss retry")
+
+	var r := Run.new()
+	r.boss_id = Content.BOSS_MECHANIC_BOSS_ID
+	r.step = Run.RUN_LENGTH
+	r.settings = Constants.default_settings()
+	r.hacker_id = Content.DEFAULT_HACKER_ID
+	r.deck_id = Content.DEFAULT_DECK_ID
+	r.hacker_max_link = 150
+	r.inventory = Content.inventory_program_ids(r.hacker_id, r.deck_id)
+	r.build = Content.default_build(r.hacker_id, r.deck_id)
+	for u in Content.all_upgrades():
+		r.upgrade_ids.append(u["id"])
+	r.opponent_kind = Types.OpponentKind.BOS
+	r.opponent_id = Content.BOSS_MECHANIC_BOSS_ID
+	r.host_id = "HST_03"
+	r.phase = Types.SessionPhase.ACTIVE_BATTLE
+
+	var boss_before := r.boss_id
+	var host_before := r.host_id
+	var upgrades_before: Array = r.upgrade_ids.duplicate()
+	var build_before: Array = r.build.duplicate()
+
+	r.retry_battle()
+
+	t.eq("retry returns to Build", r.phase, Types.SessionPhase.PENDING_BUILD)
+	t.eq("the Boss is unchanged", r.boss_id, boss_before)
+	t.eq("the committed HOST is not rerolled", r.host_id, host_before)
+	t.eq("no UPGRADE is granted again", r.upgrade_ids, upgrades_before)
+	t.eq("the Build is preserved", r.build, build_before)
+	t.eq("still the last step", r.step, Run.RUN_LENGTH)
+	t.check("still facing the Boss", r.opponent_is_boss())
+	t.check("no route was generated", r.pending_path == null)
+
+	# The retried battle is built from the same committed package.
+	var again := Session.create_run_battle(r, 99)
+	t.eq("same opponent", again.identity["opponent_id"], boss_before)
+	t.eq("same HOST", again.identity["host_id"], host_before)
+	t.eq("same UPGRADEs", again.identity["upgrade_ids"], upgrades_before)
+	t.eq("Boss ICE is still the authored value", again.hp[Types.Side.ENEMY],
+		int(Content.boss(boss_before)["base_ice"]))
+
+
+## §17 / §21.49 — a representative mid-Boss save. One check, not a matrix: the
+## authorization is explicit that this should not multiply into a
+## save-at-every-mechanic-step program.
+func _test_mid_boss_save(t: TestCase) -> void:
+	t.group("mid-Boss save")
+
+	var s := _boss_state()
+	# Get the battle into a state worth saving: Overrides on the board, a
+	# Hacker overlay among them, and charge in the Boss's pools.
+	_seed_overrides(s, 7)
+	_give_special(s, _last_standard(s), Tile.Special.Type.BOMB, Types.Side.PLAYER)
+	for u in (s.units[Types.Side.ENEMY] as Array):
+		u.charge = 3
+	s.turn = 6
+
+	var overrides_before := Boss.override_count(s)
+	var restored := SaveState.from_dict(SaveState.to_dict(s))
+	t.check("the battle restores", restored["ok"])
+	var back: GameState = restored["state"]
+
+	# Boss identity survives as a Boss, not as a System.
+	t.eq("opponent kind", back.identity["opponent_kind"], Types.OpponentKind.BOS)
+	t.eq("opponent", back.identity["opponent_id"], Content.BOSS_MECHANIC_BOSS_ID)
+	t.eq("HOST", back.identity["host_id"], s.identity["host_id"])
+	t.eq("acquired UPGRADEs", back.identity["upgrade_ids"], s.identity["upgrade_ids"])
+	t.eq("Build", back.identity["hacker_programs"], s.identity["hacker_programs"])
+	t.eq("current Boss ICE", back.hp[Types.Side.ENEMY], s.hp[Types.Side.ENEMY])
+	t.eq("turn", back.turn, s.turn)
+
+	# The Override board state is the Boss-specific half, and it is what a
+	# generic overlay serializer could plausibly lose.
+	t.eq("every Override restored", Boss.override_count(back), overrides_before)
+	for y in Constants.BOARD_HEIGHT:
+		for x in Constants.BOARD_WIDTH:
+			var a: Tile = s.board[y][x]
+			var b: Tile = back.board[y][x]
+			t.check("cell %d,%d overlay presence matches" % [x, y], a.has_special() == b.has_special())
+			if a.has_special():
+				t.eq("cell %d,%d overlay type" % [x, y], b.special.type, a.special.type)
+				t.eq("cell %d,%d overlay owner" % [x, y], b.special.owner, a.special.owner)
+
+	# Boss Program charge restores, so a resumed Boss turn is not handed free or
+	# missing charge.
+	t.eq("Boss Program charge", _enemy_charge(back), _enemy_charge(s))
+
+	# And the restored battle still behaves as a Boss battle.
+	t.check("still recognised as a Boss battle", Boss.is_boss_battle(back))
+
+
+# ---------------------------------------------------------------------------
+# Phase G — telemetry
+# ---------------------------------------------------------------------------
+
+## §18 — Boss aggregates come off the EXISTING event funnel, not a parallel Boss
+## accounting tree, and they survive resume like every other counter.
+func _test_metrics(t: TestCase) -> void:
+	t.group("Boss metrics")
+
+	var s := _boss_state()
+	Session.attach_accounting(s)
+	var game := Game.new(s)
+
+	# A placement batch, then a threshold sequence.
+	var events: Array = []
+	Boss.place_end_of_turn(game, events)
+	_seed_overrides(s, Content.OVERRIDE_THRESHOLD)
+	Boss.resolve_threshold(game, events)
+	Metrics.consume(s.metrics, events)
+
+	t.eq("three Overrides counted", s.metrics.overrides_placed, Content.OVERRIDE_PLACEMENT_COUNT)
+	t.check("the peak was recorded", s.metrics.overrides_peak >= Content.OVERRIDE_THRESHOLD)
+	t.eq("one threshold trigger", s.metrics.threshold_triggers, 1)
+	t.eq("one CODESHATTER", s.metrics.codeshatter_activations, 1)
+	t.eq("one REBOOT", s.metrics.reboot_activations, 1)
+
+	# The peak is the diagnostically useful figure: total placed says how busy
+	# the mechanic was, the peak says how close the board came to firing it.
+	t.check("peak is at least the total placed", s.metrics.overrides_peak >= Content.OVERRIDE_PLACEMENT_COUNT)
+
+	# Boss activations must NOT become phantom per-Program rows — the Boss owns
+	# no Program slot, so crediting its ID would corrupt the Program figures.
+	var enemy := s.metrics.side(Types.Side.ENEMY)
+	t.check("no phantom Program row for the Boss", not enemy.units.has(Content.BOSS_MECHANIC_BOSS_ID))
+
+	# §18 / beta 0.1's resume contract: the accumulator is part of the save, so a
+	# battle continued from disk reports the same figures.
+	var restored := SaveState.from_dict(SaveState.to_dict(s))
+	var back: GameState = restored["state"]
+	t.eq("Overrides placed survives resume", back.metrics.overrides_placed, s.metrics.overrides_placed)
+	t.eq("peak survives resume", back.metrics.overrides_peak, s.metrics.overrides_peak)
+	t.eq("threshold count survives resume", back.metrics.threshold_triggers, s.metrics.threshold_triggers)
+	t.eq("CODESHATTER count survives resume", back.metrics.codeshatter_activations, s.metrics.codeshatter_activations)
+	t.eq("REBOOT count survives resume", back.metrics.reboot_activations, s.metrics.reboot_activations)
+
+	# An ordinary System battle carries the same record shape with the Boss
+	# fields simply at zero — one battle record, not two.
+	var qm := Session.create_quick_match("SYS_01", "HST_02", 5, Session.default_build(), {}, true)
+	t.eq("a System battle places no Overrides", qm.metrics.overrides_placed, 0)
+	t.eq("and triggers no threshold", qm.metrics.threshold_triggers, 0)
+	t.check("but has the fields", qm.metrics.to_dict().has("overrides_peak"))
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -449,6 +604,18 @@ func _first_standard(s: GameState) -> Vector2i:
 			if tile != null and not tile.is_neutral():
 				return Vector2i(x, y)
 	return Vector2i(-1, -1)
+
+
+## The last standard cell, row-major — far from the ones `_seed_overrides`
+## consumes, so the two do not collide.
+func _last_standard(s: GameState) -> Vector2i:
+	var found := Vector2i(-1, -1)
+	for y in Constants.BOARD_HEIGHT:
+		for x in Constants.BOARD_WIDTH:
+			var tile: Tile = s.board[y][x]
+			if tile != null and not tile.is_neutral() and not tile.has_special():
+				found = Vector2i(x, y)
+	return found
 
 
 func _standard_count(s: GameState) -> int:

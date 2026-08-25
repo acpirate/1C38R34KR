@@ -230,6 +230,21 @@ class Battle extends RefCounted:
 	var enemy_shield_instances := 0
 	var enemy_shield_prevented := 0
 
+	# ODANSHAY mechanic aggregates (beta 0.3 §18). Zero in every System battle,
+	# which is why they live here rather than in a Boss-only accounting tree:
+	# one battle record shape, and the Boss fields simply stay at zero.
+	#
+	# `overrides_peak` is the interesting one for balance work — total placed
+	# says how busy the mechanic was, but the PEAK says how close the board came
+	# to the threshold, which is what actually decides whether CODESHATTER fires.
+	var overrides_placed := 0
+	var overrides_peak := 0
+	var hacker_specials_overwritten := 0
+	var databend_activations := 0
+	var codeshatter_activations := 0
+	var reboot_activations := 0
+	var threshold_triggers := 0
+
 	var sides: Array[SideMetrics] = []
 
 	func side(s: Types.Side) -> SideMetrics:
@@ -244,6 +259,13 @@ class Battle extends RefCounted:
 			"enemy_shield_removed": enemy_shield_removed,
 			"enemy_shield_instances": enemy_shield_instances,
 			"enemy_shield_prevented": enemy_shield_prevented,
+			"overrides_placed": overrides_placed,
+			"overrides_peak": overrides_peak,
+			"hacker_specials_overwritten": hacker_specials_overwritten,
+			"databend_activations": databend_activations,
+			"codeshatter_activations": codeshatter_activations,
+			"reboot_activations": reboot_activations,
+			"threshold_triggers": threshold_triggers,
 			"sides": [sides[0].to_dict(), sides[1].to_dict()],
 		}
 
@@ -259,6 +281,13 @@ class Battle extends RefCounted:
 		b.enemy_shield_removed = int(d.get("enemy_shield_removed", 0))
 		b.enemy_shield_instances = int(d.get("enemy_shield_instances", 0))
 		b.enemy_shield_prevented = int(d.get("enemy_shield_prevented", 0))
+		b.overrides_placed = int(d.get("overrides_placed", 0))
+		b.overrides_peak = int(d.get("overrides_peak", 0))
+		b.hacker_specials_overwritten = int(d.get("hacker_specials_overwritten", 0))
+		b.databend_activations = int(d.get("databend_activations", 0))
+		b.codeshatter_activations = int(d.get("codeshatter_activations", 0))
+		b.reboot_activations = int(d.get("reboot_activations", 0))
+		b.threshold_triggers = int(d.get("threshold_triggers", 0))
 		var raw: Array = d.get("sides", [])
 		for i in 2:
 			b.sides.append(SideMetrics.from_dict(raw[i] if i < raw.size() else {}))
@@ -303,6 +332,20 @@ static func consume(m: Battle, events: Array) -> void:
 
 static func _consume_one(m: Battle, ev: Dictionary) -> void:
 	match StringName(ev["t"]):
+		Types.EVT.BOSS_MECHANIC:
+			# One event kind carries the whole mechanic, so the aggregates come
+			# off the same funnel as everything else rather than from a parallel
+			# Boss accounting path (§18).
+			match str(ev.get("kind", "")):
+				"OVERRIDE_PLACED":
+					m.overrides_placed += int(ev.get("placed", 0))
+					m.hacker_specials_overwritten += int(ev.get("overwrote", 0))
+					m.overrides_peak = maxi(m.overrides_peak, int(ev.get("count_after", 0)))
+				"THRESHOLD":
+					m.threshold_triggers += 1
+					# The threshold reading is a peak by definition: it is the
+					# highest the count reached before REBOOT cleared it.
+					m.overrides_peak = maxi(m.overrides_peak, int(ev.get("count_before", 0)))
 		Types.EVT.DAMAGE:
 			_consume_damage(m, ev)
 
@@ -311,9 +354,16 @@ static func _consume_one(m: Battle, ev: Dictionary) -> void:
 			var kind := int(ev["owner_kind"])
 			# A Boss activation is a mechanic, not a Program. Routing it through
 			# `_unit` would invent a phantom per-Program row keyed by the Boss ID
-			# and corrupt the Program figures.
+			# and corrupt the Program figures. It is counted as a mechanic
+			# activation instead (§18).
 			if kind == Types.OwnerKind.BOSS:
-				pass
+				match str(ev.get("fn", "")):
+					Content.FN_DATABEND:
+						m.databend_activations += 1
+					Content.FN_CODESHATTER:
+						m.codeshatter_activations += 1
+					Content.FN_REBOOT:
+						m.reboot_activations += 1
 			elif kind == Types.OwnerKind.DECK:
 				sm.deck.fires += 1
 			else:
