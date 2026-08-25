@@ -45,6 +45,7 @@ const PATH_SELECTED := "PATH_SELECTED"
 const RUN_BATTLE_STARTED := "RUN_BATTLE_STARTED"
 const RUN_RESULT := "RUN_RESULT"
 const RUN_STOPPED := "RUN_STOPPED"
+const RUN_COMPLETED := "RUN_COMPLETED"
 const RUN_ABANDONED := "RUN_ABANDONED"
 
 ## Quick Match.
@@ -180,6 +181,19 @@ static func run_stopped(r: Run) -> void:
 		"build": r.build.duplicate(),
 		"link": r.hacker_max_link,
 		"ice": r.encounter_ice(),
+	})
+
+
+## §15.1 — the Run finished. The counterpart to `RUN_STOPPED`: that record meant
+## beta 0.2 declined to fight the Boss, this one means the Boss lost.
+static func run_completed(r: Run, turns: int) -> void:
+	_emit(RUN_COMPLETED, r.route_seed, {
+		"boss_id": r.boss_id,
+		"host_id": r.host_id,
+		"upgrades": r.upgrade_ids.duplicate(),
+		"build": r.build.duplicate(),
+		"boss_ice": r.encounter_ice(),
+		"turns": turns,
 	})
 
 

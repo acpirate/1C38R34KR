@@ -24,7 +24,8 @@ func run(t: TestCase) -> void:
 	_test_passive_cache_key(t)
 	_test_build_editing(t)
 	_test_retry_and_progression(t)
-	_test_boss_battle_refused(t)
+	_test_boss_battle(t)
+	_test_run_completion(t)
 
 	Content.clear()
 	Passives.clear_cache()
@@ -291,26 +292,89 @@ func _test_retry_and_progression(t: TestCase) -> void:
 	t.eq("and the Run stays on the last step", last.step, Run.RUN_LENGTH)
 
 
-## §22.29 / §12 — beta 0.2 must never fabricate the Boss encounter.
-func _test_boss_battle_refused(t: TestCase) -> void:
-	t.group("Boss battle refused")
+## Beta 0.3 §21 items 2-8 — the Boss battle is built, and it is built as a BOSS.
+##
+## Beta 0.2 asserted the opposite here: that `create_run_battle` REFUSED a Boss.
+## That guard existed to stop 0.2 fabricating Battle 4, and 0.3 replaces it with
+## the real encounter.
+func _test_boss_battle(t: TestCase) -> void:
+	t.group("Boss battle construction")
 
-	var r := _run_on_build()
-	r.step = Run.RUN_LENGTH
-	r.opponent_kind = Types.OpponentKind.BOS
-	r.opponent_id = r.boss_id
+	var r := _boss_run()
+	var s := Session.create_run_battle(r, 4242)
+	t.check("a Boss battle is created", s != null)
 
-	t.check("creating a Boss battle is refused", Session.create_run_battle(r, 1) == null)
+	# §21.2 — an honest union, never a synthesized SYS_ID.
+	t.eq("opponent kind is BOS", s.identity["opponent_kind"], Types.OpponentKind.BOS)
+	t.eq("opponent is ODANSHAY", s.identity["opponent_id"], Content.BOSS_MECHANIC_BOSS_ID)
 
-	# And it refuses rather than quietly substituting a System, which is the
-	# failure mode that would look like a working Battle 4.
-	r.enter_pending_boss_battle()
-	t.check("the Run parks at the stop point instead", r.is_pending_boss_battle())
-	t.check("opponent is still the Boss", r.opponent_is_boss())
+	# §21.3 / §21.4 — authored ICE, and NOT the double-counted ladder value.
+	var boss := Content.boss(Content.BOSS_MECHANIC_BOSS_ID)
+	t.eq("Boss ICE is the authored 250", s.hp[Types.Side.ENEMY], int(boss["base_ice"]))
+	t.check("Boss ICE is not 400", s.hp[Types.Side.ENEMY] != int(boss["base_ice"]) + 150)
+
+	# §21.5 — axes come from the BOS row, not from any System.
+	t.eq("Boss strong colours", s.config["strong_colors"][Types.Side.ENEMY], boss["strong_colors"])
+	t.eq("Boss strong shapes", s.config["strong_shapes"][Types.Side.ENEMY], boss["strong_shapes"])
+
+	# §21.6 — authored Program order, which is charge-routing priority.
+	t.eq("Boss Programs in authored order", s.identity["system_programs"], boss["programs"])
+	var names := PackedStringArray()
+	for pid in (s.identity["system_programs"] as Array):
+		names.append(str(Content.program(pid)["name"]))
+	t.eq("which is DISABLER, SHIELDER, SPAMBOT, ATTACKER",
+		names, PackedStringArray(["DISABLER", "SHIELDER", "SPAMBOT", "ATTACKER"]))
+	t.eq("and they are resolved as units", (s.units[Types.Side.ENEMY] as Array).size(), boss["programs"].size())
+
+	# §21.7 — the committed HOST and every acquired UPGRADE reach the battle.
+	t.eq("committed HOST reaches the battle", s.identity["host_id"], r.host_id)
+	t.eq("every acquired UPGRADE reaches the battle", s.identity["upgrade_ids"], r.upgrade_ids)
+	t.eq("all four of them", (s.identity["upgrade_ids"] as Array).size(), Content.all_upgrades().size())
+	t.eq("the confirmed Build reaches the battle", s.identity["hacker_programs"], r.build)
+	t.eq("the frozen LINK ceiling is used", s.hp[Types.Side.PLAYER], r.hacker_max_link)
+
+	# §21.8 / §6.1 — the BOS schema has no PASSIVES column, so no identity
+	# PASSIVE is contributed merely because the opponent is a Boss. HOST and
+	# UPGRADE PASSIVEs must still be present; the mechanic is its own layer.
+	Passives.clear_cache()
+	var active := Passives.active(s.identity)
+	var kinds := {}
+	for inst in active:
+		kinds[inst.source_kind] = true
+	t.check("no synthetic Boss identity PASSIVE", not kinds.has(Types.PassiveSourceKind.SYS))
+	t.check("UPGRADE PASSIVEs still apply", kinds.has(Types.PassiveSourceKind.UPG))
 
 	# A Run still sitting on a Path Choice has no committed encounter to build.
 	var unchosen := _committed_run()
 	t.check("no battle without a committed path", Session.create_run_battle(unchosen, 1) == null)
+
+
+## §15.1 — beating the Boss ends the Run, and it is terminal.
+func _test_run_completion(t: TestCase) -> void:
+	t.group("Run completion")
+
+	var r := _boss_run()
+	t.check("the last step has no next route", not r.advance_after_victory())
+	t.check("and the Run stays on the last step", r.step == Run.RUN_LENGTH)
+
+	r.complete_run()
+	t.check("the Run is complete", r.is_complete())
+	t.eq("phase spelling", Types.SESSION_PHASE_NAMES[r.phase], "RUN_COMPLETE")
+	t.check("which is not the beta 0.2 stop point", not r.is_pending_boss_battle())
+	t.check("no route was generated", r.pending_path == null)
+	t.check("the completed Run is still coherent state", r.problems().is_empty())
+
+
+## A Run that has committed its final Boss route and confirmed its Build — the
+## state beta 0.2 parked at and beta 0.3 fights from.
+func _boss_run() -> Run:
+	var r := _committed_run()
+	for step in [1, 2, 3]:
+		r.select_path(0)
+		r.advance_after_victory()
+	r.select_path(0)
+	r.phase = Types.SessionPhase.PENDING_BUILD
+	return r
 
 
 ## A Run that has committed its Battle 1 path and is sitting on Build.

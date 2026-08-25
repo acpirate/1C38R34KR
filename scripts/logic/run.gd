@@ -483,6 +483,19 @@ func is_pending_boss_battle() -> bool:
 	return phase == Types.SessionPhase.PENDING_BOSS_BATTLE
 
 
+## §15.1 — the Boss is beaten and the Run is over.
+##
+## Terminal: no fifth route is generated, no further reward is granted, and no
+## Boss mechanic executes after this. Distinct from `PENDING_BOSS_BATTLE`, which
+## meant the opposite — a Run poised to *begin* Battle 4.
+func complete_run() -> void:
+	phase = Types.SessionPhase.RUN_COMPLETE
+
+
+func is_complete() -> bool:
+	return phase == Types.SessionPhase.RUN_COMPLETE
+
+
 ## Whether the committed opponent is the Run's Boss rather than a System.
 func opponent_is_boss() -> bool:
 	return opponent_kind == Types.OpponentKind.BOS

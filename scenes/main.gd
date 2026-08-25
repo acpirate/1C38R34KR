@@ -881,7 +881,13 @@ func _resume_run_screen() -> void:
 		Types.SessionPhase.PENDING_PATH:
 			_show_path_choice()
 		Types.SessionPhase.PENDING_BOSS_BATTLE:
-			_show_pending_boss_battle()
+			# A beta 0.2 save parked at the old stop point. Beta 0.3 consumes it
+			# rather than dead-ending: the committed package is already complete,
+			# so the Run resumes at the pre-battle Build for Battle 4.
+			_build_origin = _run.build_origin
+			_show_build()
+		Types.SessionPhase.RUN_COMPLETE:
+			_show_run_complete()
 		_:
 			_build_origin = _run.build_origin
 			_show_build()
@@ -1083,14 +1089,6 @@ func _run_context_lines() -> PackedStringArray:
 func _start_run_battle() -> void:
 	_run.confirm_build(_build_origin)
 
-	# §12 — the Run stops before Boss combat rather than fabricating it.
-	if _run.opponent_is_boss():
-		_run.enter_pending_boss_battle()
-		SessionLog.run_stopped(_run)
-		SessionSave.write(SessionSave.run_to_dict(_run, null))
-		_show_pending_boss_battle()
-		return
-
 	# F-002 applies to Run battles too. The alpha does not pass a seed to
 	# `createRunBattle` either, so every Run battle draws a fresh board; beta
 	# 0.1's fixed seed would otherwise have made all four battles of every Run
@@ -1103,6 +1101,37 @@ func _start_run_battle() -> void:
 	_run.phase = Types.SessionPhase.ACTIVE_BATTLE
 	SessionSave.write(SessionSave.run_to_dict(_run, state))
 	_enter_battle(state)
+
+
+## §15.1 — the Run is over: ODANSHAY's ICE reached zero.
+##
+## The save is CLEARED here rather than kept. A finished Run is not resumable,
+## and offering Continue on one would restore a Run with nothing left to do.
+func _show_run_complete() -> void:
+	if _content != null:
+		_content.queue_free()
+		_content = null
+
+	var boss_name := str(Content.boss(_run.boss_id)["name"])
+	_fresh_screen(true)
+	_heading("RUN COMPLETE")
+	_subheading("%s is breached." % boss_name)
+
+	for line in _run_context_lines():
+		var l := Label.new()
+		l.text = line
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_font_size_override("font_size", UiTheme.font_body())
+		l.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
+		_root.add_child(l)
+
+	_divider()
+	_button("Back to title", func():
+		SessionSave.clear()
+		_show_title(Content.fingerprint()))
+
+	if _finished_state != null and _finished_state.metrics != null:
+		_show_metrics(_finished_state)
 
 
 ## §12.1 — the beta 0.2 stop point.
@@ -1148,7 +1177,10 @@ func _show_run_result(winner: int) -> void:
 	)
 
 	if won:
-		_button("Continue Run", _advance_run)
+		_button(
+			"Complete Run" if _run.step == Run.RUN_LENGTH else "Continue Run",
+			_advance_run
+		)
 	else:
 		# A retry is the SAME encounter with the SAME build — nothing rerolls
 		# and no reward is granted twice.
@@ -1178,13 +1210,20 @@ func _show_run_result(winner: int) -> void:
 
 ## Progress past a won battle. At the last step there is no next path — the Run
 ## has already committed its Boss route and stops instead of advancing.
+## Progress past a won battle. At the last step there is no next route — beating
+## ODANSHAY ends the Run.
 func _advance_run() -> void:
 	if _run.advance_after_victory():
 		SessionLog.path_offered(_run)
 		SessionSave.write(SessionSave.run_to_dict(_run, null))
 		_show_path_choice()
-	else:
-		_show_pending_boss_battle()
+		return
+
+	# §15.1 — Boss down. Terminal: no fifth route, no further reward.
+	_run.complete_run()
+	SessionLog.run_completed(_run, _finished_state.turn if _finished_state != null else 0)
+	SessionSave.write(SessionSave.run_to_dict(_run, null))
+	_show_run_complete()
 
 
 # ---- random quick match ----

@@ -116,14 +116,14 @@ static func create_quick_match(
 ## completed, and the settings snapshot was frozen at Boss commitment. Nothing
 ## is rederived from current menu settings and nothing is rerolled.
 ##
-## Beta 0.2 REFUSES to build a Boss battle. The Run reaches step 4 holding a
-## committed Boss package and stops at `PENDING_BOSS_BATTLE`; anything that
-## reached here with a Boss opponent would be fabricating the encounter beta 0.3
-## is meant to port, so it fails loudly rather than substituting a System.
+## Beta 0.3 builds the Boss battle too. Where beta 0.2 refused a `BOS` opponent
+## outright — the Run stopped at `PENDING_BOSS_BATTLE` rather than fabricating
+## Battle 4 — the opponent union now resolves through `_opponent_content`, and a
+## Boss is an ordinary opponent to everything below this line.
+##
+## What stays Boss-specific is ICE resolution (authored value, no step modifier)
+## and the mechanic layer, neither of which lives here.
 static func create_run_battle(r: Run, seed_value: int, with_accounting := true) -> GameState:
-	if r.opponent_kind == Types.OpponentKind.BOS:
-		push_error("beta 0.2 cannot create a Boss battle — the Run stops at PENDING_BOSS_BATTLE")
-		return null
 	if r.phase == Types.SessionPhase.PENDING_PATH:
 		push_error("no committed encounter — the Run is still on a Path Choice")
 		return null

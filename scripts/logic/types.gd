@@ -74,10 +74,14 @@ enum SetupStep { HACKER = 0, DECK }
 ## verbatim so a beta save reads next to an alpha trace — the same discipline
 ## `SaveState._config_to_dict` already follows for settings.
 ##
-## `PENDING_BOSS_BATTLE` is the one addition and has no alpha counterpart. It is
-## where beta 0.2 stops, holding a fully committed Boss + HOST + UPGRADE package
-## for beta 0.3 to consume (authorization §12.1). It is NOT Run Complete and must
-## never be resolved through the alpha's `isRunComplete` path.
+## `PENDING_BOSS_BATTLE` was beta 0.2's stopping place, holding a fully committed
+## Boss + HOST + UPGRADE package. Beta 0.3 passes straight through it into the
+## Boss battle, so ordinary play no longer parks here — it survives because a
+## beta 0.2 save may still carry it, and resuming one continues into Battle 4
+## rather than dead-ending.
+##
+## `RUN_COMPLETE` is beta 0.3's terminal state: ODANSHAY's ICE reached zero and
+## the Run is finished. No fifth route, battle, or reward follows it.
 enum SessionPhase {
 	SETUP_HACKER = 0,
 	SETUP_DECK,
@@ -86,6 +90,7 @@ enum SessionPhase {
 	ACTIVE_BATTLE,
 	PENDING_RESULT,
 	PENDING_BOSS_BATTLE,
+	RUN_COMPLETE,
 }
 
 
@@ -218,7 +223,7 @@ const BUILD_ORIGIN_NAMES := ["DEFAULT", "RANDOM", "REMEMBERED_CONSTRUCTED", "CAR
 const SETUP_STEP_NAMES := ["HACKER", "DECK"]
 const SESSION_PHASE_NAMES := [
 	"SETUP_HACKER", "SETUP_DECK", "PENDING_PATH", "PENDING_BUILD",
-	"ACTIVE_BATTLE", "PENDING_RESULT", "PENDING_BOSS_BATTLE",
+	"ACTIVE_BATTLE", "PENDING_RESULT", "PENDING_BOSS_BATTLE", "RUN_COMPLETE",
 ]
 const OWNER_KIND_NAMES := ["program", "deck", "passive", "boss"]
 const PASSIVE_SOURCE_KIND_NAMES := ["HAK", "SYS", "HST", "UPG"]
