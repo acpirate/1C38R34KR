@@ -25,7 +25,23 @@ var _finished_state: GameState = null
 var _system_id := ""
 var _host_id := ""
 var _build: Array = []
-var _seed := 0
+
+## The gameplay seed of the battle IN PLAY. Recorded so Replay reproduces the
+## battle that was actually played rather than re-rolling a new one.
+var _gameplay_seed := 0
+
+## A seed the tester has PINNED through the debug field, or -1 for none.
+##
+## F-002: beta 0.1 used one `_seed` field initialised to 0 for both purposes, so
+## every battle in a release build — where the debug field does not exist —
+## started on the same board forever. The alpha never passes a seed at all and
+## draws a fresh one per battle; this restores that, while keeping the pinned
+## seed available as the diagnostic it was meant to be.
+##
+## The field starts EMPTY. A blank field means "roll one"; only a typed value
+## pins. Pre-populating it with the current seed would silently re-pin whatever
+## the last battle used, which is the behaviour being fixed.
+var _seed_override := -1
 
 ## The build the Quick Match currently IN PLAY is using.
 ##
@@ -458,11 +474,17 @@ func _show_build() -> void:
 		seed_label.text = "seed"
 		seed_row.add_child(seed_label)
 		var seed_field := LineEdit.new()
-		seed_field.text = str(_seed)
+		# EMPTY means "roll a fresh seed", and the placeholder shows what the
+		# last battle actually used so it can be typed back in to reproduce it.
+		# Pre-filling the field would re-pin that seed silently, which is the
+		# F-002 behaviour being fixed.
+		seed_field.text = ""
+		seed_field.placeholder_text = "random (last: %d)" % _gameplay_seed
 		seed_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		# Seed entry is the highest-leverage diagnostic: it makes a battle
 		# observed on the phone reproducible in the headless harness.
-		seed_field.text_changed.connect(func(t): _seed = int(t))
+		seed_field.text_changed.connect(func(t):
+			_seed_override = int(t) if t.strip_edges() != "" else -1)
 		seed_row.add_child(seed_field)
 		_root.add_child(seed_row)
 
@@ -577,17 +599,32 @@ func _token_list(values: Array, vocab: Dictionary) -> String:
 # Battle
 # ---------------------------------------------------------------------------
 
+## The gameplay seed for a NEWLY started battle: the pinned one if the tester
+## typed a value, otherwise a fresh draw.
+##
+## Deliberately its own source, unrelated to setup RNG. Setup randomness picks
+## identities; this picks the board, and §17 requires the two never to feed each
+## other.
+func _next_gameplay_seed() -> int:
+	if _seed_override >= 0:
+		return _seed_override
+	return int(Session.make_setup_random()["seed"])
+
+
 ## Starts a CONSTRUCTED Quick Match from the build currently on the Build screen.
 func _start_battle() -> void:
 	_qm_build = _build.duplicate()
+	_gameplay_seed = _next_gameplay_seed()
 	_replay_battle()
 
 
-## Replays the Quick Match in play — same identities, same build, whatever
-## `_seed` now says. Used by both result-screen exits, so neither can drift from
-## what was actually played.
+## Replays the Quick Match in play — the same identities, the same build, and
+## the same gameplay seed. Used by both result-screen exits, so neither can
+## drift from what was actually played.
 func _replay_battle() -> void:
-	_enter_battle(Session.create_quick_match(_system_id, _host_id, _seed, _qm_build, {}, true))
+	_enter_battle(
+		Session.create_quick_match(_system_id, _host_id, _gameplay_seed, _qm_build, {}, true)
+	)
 
 
 ## A save written before accounting existed, or by a harness run that carried
@@ -665,7 +702,12 @@ func _show_result(winner: int) -> void:
 	# reproduce a visual bug: a fresh seed means a fresh board.
 	_button("Replay this seed", _replay_battle)
 	_button("New battle", func():
-		_seed += 1
+		# A new battle means a new board. With a seed pinned, step it so the
+		# tester still walks a reproducible sequence instead of replaying one
+		# board forever.
+		if _seed_override >= 0:
+			_seed_override += 1
+		_gameplay_seed = _next_gameplay_seed()
 		_replay_battle())
 	_button("Back to title", func(): _show_title(Content.fingerprint()))
 
@@ -675,7 +717,7 @@ func _show_result(winner: int) -> void:
 	stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stamp.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stamp.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
-	stamp.text = "seed %d · content %s" % [_seed, Content.fingerprint()]
+	stamp.text = "seed %d · content %s" % [_gameplay_seed, Content.fingerprint()]
 	_root.add_child(stamp)
 
 	if _finished_state != null and _finished_state.metrics != null:
@@ -1049,7 +1091,12 @@ func _start_run_battle() -> void:
 		_show_pending_boss_battle()
 		return
 
-	var state := Session.create_run_battle(_run, _seed)
+	# F-002 applies to Run battles too. The alpha does not pass a seed to
+	# `createRunBattle` either, so every Run battle draws a fresh board; beta
+	# 0.1's fixed seed would otherwise have made all four battles of every Run
+	# identical in a release build.
+	_gameplay_seed = _next_gameplay_seed()
+	var state := Session.create_run_battle(_run, _gameplay_seed)
 	if state == null:
 		return
 	SessionLog.battle_started(_run, state.battle_id)
@@ -1154,12 +1201,14 @@ func _start_random_quick_match() -> void:
 	var rolled := Session.random_quick_match_setup(seeded["rng"])
 	_system_id = str(rolled["system_id"])
 	_host_id = str(rolled["host_id"])
+	# The ROLLED build becomes the one in play; the gameplay seed is drawn
+	# separately so setup and gameplay randomness stay independent (§17).
+	_gameplay_seed = _next_gameplay_seed()
 	SessionLog.quick_random_rolled(
-		int(seeded["seed"]), _system_id, _host_id, rolled["build"]
+		int(seeded["seed"]), _gameplay_seed, _system_id, _host_id, rolled["build"]
 	)
-	# The ROLLED build becomes the one in play, while `_build` — the remembered
-	# constructed build — is left untouched. Both halves matter: replaying must
-	# use what was played, and a random match must not overwrite the build the
-	# player assembled by hand.
+	# `_build` — the remembered constructed build — is left untouched. Both
+	# halves matter: replaying must use what was played, and a random match must
+	# not overwrite the build the player assembled by hand.
 	_qm_build = (rolled["build"] as Array).duplicate()
 	_replay_battle()

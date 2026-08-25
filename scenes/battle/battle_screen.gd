@@ -50,6 +50,11 @@ var _recent_events: Array[String] = []
 ## that happened was the only thing that happened.
 var _messages: Array[String] = []
 
+## How many scrollback lines are shown, and therefore how much vertical space is
+## reserved for them. One number so the trim in `_log` and the reserved height
+## cannot disagree — if they did, the board would start moving again (F-001).
+const MESSAGE_LINES := 4
+
 
 func setup(s: GameState) -> void:
 	state = s
@@ -157,6 +162,10 @@ func _build_ui() -> void:
 	_turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_turn_label.add_theme_font_size_override("font_size", UiTheme.font_small())
 	_turn_label.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
+	# F-001 — carry text from the start. An empty Label has no height, so the
+	# first render would otherwise GROW this row and steal the space from the
+	# board frame below, which is the only vertically expanding child.
+	_turn_label.text = "Turn 1"
 	root.add_child(_turn_label)
 
 	# A short scrollback rather than one overwritten line. A turn produces
@@ -166,11 +175,17 @@ func _build_ui() -> void:
 	_message = Label.new()
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_message.custom_minimum_size.y = UiTheme.px(64)
 	_message.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_message.add_theme_font_size_override("font_size", UiTheme.font_body())
 	_message.add_theme_color_override("font_color", PacketStyle.TEXT_STATUS)
+	# F-001 — the scrollback's height is FIXED at its full capacity rather than
+	# floored at a minimum. A minimum lets the label grow as lines accumulate,
+	# and every pixel it gains comes out of the board frame, which re-centres
+	# the Datastream inside its AspectRatioContainer. Capping the visible lines
+	# as well means overflow can never push past the reserved space either.
+	_message.max_lines_visible = MESSAGE_LINES
 	root.add_child(_message)
+	_message.custom_minimum_size.y = _reserved_message_height()
 
 	root.add_child(_build_debug_bar())
 
@@ -272,6 +287,21 @@ func _toggle_pause() -> void:
 	if _playing:
 		return
 	_pause_scrim.visible = not _pause_scrim.visible
+
+
+## The exact height `MESSAGE_LINES` of body text occupies, measured from the
+## resolved theme font rather than guessed from the font size — line height is
+## not the same as font size, and a guess that is close enough at one scale
+## stops being close enough at another.
+##
+## Falls back to a font-size multiple if the theme font cannot be resolved,
+## which keeps a headless or partially themed context from reserving nothing.
+func _reserved_message_height() -> int:
+	var size := UiTheme.font_body()
+	var font := _message.get_theme_font("font")
+	if font == null:
+		return int(size * 1.5) * MESSAGE_LINES
+	return font.get_height(size) * MESSAGE_LINES
 
 
 ## The safe area keeps status text and controls clear of a display cutout and
@@ -587,7 +617,7 @@ func _float_damage(target_side: int, amount: int) -> void:
 ## Appends to the visible scrollback, keeping the most recent few lines.
 func _log(line: String) -> void:
 	_messages.append(line)
-	while _messages.size() > 4:
+	while _messages.size() > MESSAGE_LINES:
 		_messages.pop_front()
 	_message.text = "\n".join(_messages)
 

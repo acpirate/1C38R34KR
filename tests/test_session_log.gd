@@ -140,7 +140,7 @@ func _test_quick_random(t: TestCase) -> void:
 	LogStore.clear()
 	var rng := Rng.new(4242)
 	var rolled := Session.random_quick_match_setup(rng)
-	SessionLog.quick_random_rolled(4242, rolled["system_id"], rolled["host_id"], rolled["build"])
+	SessionLog.quick_random_rolled(4242, 777, rolled["system_id"], rolled["host_id"], rolled["build"])
 
 	var records := _of(_read(SessionLog.STREAM), SessionLog.QUICK_RANDOM_ROLLED)
 	t.eq("the roll is recorded", records.size(), 1)
@@ -148,6 +148,12 @@ func _test_quick_random(t: TestCase) -> void:
 	# in place of the run seed.
 	t.eq("no Run is claimed", int(records[0]["run"]), 0)
 	t.eq("the setup seed is recorded", int(records[0]["setup_seed"]), 4242)
+	# F-002 — both seeds, in separate fields. The setup seed reproduces the
+	# SELECTION and the gameplay seed reproduces the BOARD; neither alone
+	# reproduces the match, and merging them would recouple setup to gameplay
+	# randomness in exactly the way §17 forbids.
+	t.eq("the gameplay seed is recorded too", int(records[0]["gameplay_seed"]), 777)
+	t.check("and they are distinct fields", records[0]["setup_seed"] != records[0]["gameplay_seed"])
 	t.eq("System", str(records[0]["system_id"]), str(rolled["system_id"]))
 	t.eq("HOST", str(records[0]["host_id"]), str(rolled["host_id"]))
 	t.eq("build", records[0]["build"], rolled["build"])

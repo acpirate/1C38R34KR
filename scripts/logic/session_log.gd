@@ -193,9 +193,18 @@ static func run_abandoned(r: Run) -> void:
 
 ## The rolled setup, with the seed that produced it. Random Quick Match has no
 ## Run, so `run` is 0 and the setup seed carries the reproducibility instead.
-static func quick_random_rolled(setup_seed: int, system_id: String, host_id: String, build: Array) -> void:
+## BOTH seeds are recorded, and they are deliberately separate fields.
+##
+## `setup_seed` reproduces the SELECTION — which build, System, and HOST were
+## rolled. `gameplay_seed` reproduces the BOARD. Conflating them into one number
+## would reintroduce exactly the coupling §17 forbids, and neither one alone
+## reproduces the match.
+static func quick_random_rolled(
+	setup_seed: int, gameplay_seed: int, system_id: String, host_id: String, build: Array
+) -> void:
 	_emit(QUICK_RANDOM_ROLLED, 0, {
 		"setup_seed": setup_seed,
+		"gameplay_seed": gameplay_seed,
 		"system_id": system_id,
 		"host_id": host_id,
 		"build": build.duplicate(),

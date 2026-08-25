@@ -746,3 +746,54 @@ exactly. Nothing stated the positive half — that a replay must reproduce what
 was played — so there was no assertion to fail. §22.32 is a one-directional
 requirement, and one-directional requirements are satisfiable in ways that break
 their unstated other half.
+
+## Beta 0.3 Phase A — preflight corrections
+
+### P-037 · F-002 applied to Run battles as well as Quick Match
+
+§2.2 scopes the fresh-gameplay-seed correction to Quick Match. The same
+divergence exists for Run battles: `main.gd` passed the single `_seed` field to
+`Session.create_run_battle` too, and the alpha does not pass a seed to
+`createRunBattle` either (`main.ts` calls it with two arguments).
+
+Fixing only Quick Match would have left every Run battle — all four, including
+the Boss battle 0.3 is about to add — starting on seed 0 in a release build,
+where the debug field does not exist. Fixed both.
+
+**The state split that makes it work:** `_seed_override` is what the tester
+pinned (-1 for none) and `_gameplay_seed` is what the battle in play actually
+used. Only the second is what *Replay this seed* replays. Collapsing them is how
+P-036 happened; keeping them apart is what stops the same class recurring.
+
+The debug field now starts **empty**, with the last seed shown as placeholder
+text. Pre-filling it with the current value would silently re-pin whatever the
+previous battle used, which is precisely the behaviour being fixed.
+
+`QUICK_RANDOM_ROLLED` now carries `setup_seed` **and** `gameplay_seed` as
+separate fields. Neither alone reproduces a match — one picks the identities,
+the other the board — and merging them would recouple setup to gameplay
+randomness in the way §17 forbids.
+
+### P-038 · F-001 fixed by reserving space, not by reacting to it
+
+The battle root's board `frame` is the only child with `SIZE_EXPAND_FILL`, so it
+absorbs whatever the labels below leave unused. `_turn_label` began with no text
+and `_message` was floored at a *minimum* height, so both grew on the first
+action and the board lost the difference — re-centring inside its
+`AspectRatioContainer`, which reads as a jump.
+
+Both now reserve their final size up front: `_turn_label` carries "Turn 1" from
+construction, and `_message` has a **fixed** height computed from the resolved
+theme font (`get_height(font_size) × MESSAGE_LINES`) with `max_lines_visible`
+capped to match, so neither growth nor overflow can change the board's
+allocation. `MESSAGE_LINES` is one constant shared by the reservation and the
+scrollback trim, so they cannot disagree.
+
+The height is measured from the font rather than guessed from the font size —
+line height is not font size, and a guess close enough at one viewport scale
+stops being close enough at another (the alpha→beta ~2.51× scale makes that a
+live concern, see D-026).
+
+**Verified on device**, since neither fix is visible to a headless test: the
+board's top edge measured y=670 before and after the status area gained lines,
+and the debug bar showed a random gameplay seed rather than 0.
