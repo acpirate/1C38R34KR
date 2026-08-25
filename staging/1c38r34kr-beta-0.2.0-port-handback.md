@@ -85,7 +85,7 @@ unreachable — all the same class.
 | Battle parity, fast tier | 150/150, no divergence |
 | Battle parity, DEEPSCAN | 5,250/5,250, no divergence |
 | Tablet device gate | complete, clean log |
-| S25 phone gate | see §5 |
+| S25 phone gate | complete, clean log |
 
 DEEPSCAN was run rather than relied on from 0.1, because Phase C consolidated
 Quick Match and Run onto a single battle constructor. §21.1 makes a fresh run
@@ -146,7 +146,22 @@ context, and no repeated multi-second stalls appeared on 2016 hardware. Battle
 entry is the slowest transition and is dominated by battle-scene construction,
 which is unchanged from 0.1.
 
-**S25 phone gate** — see the note in §7.
+**Phone (Galaxy S25 Ultra, SM-S938U, Android 16, arm64-v8a, 1080×2340)** —
+§23.2 sign-off, one window:
+
+- New Run flow usable one-handed; Boss, Hacker, and Deck selection fit and
+  scroll ✅
+- **Safe area correct on every new top-level screen** — the check the tablet
+  structurally cannot make ✅
+- Path Choice cards readable at phone width; long UPGRADE text wraps rather than
+  overflowing ✅
+- Build remains usable with the Run context block above it; both actions
+  reachable without scrolling ✅
+- `PENDING_BOSS_BATTLE` state understandable ✅
+- Stop point persists across a return to the title ✅
+- Random Quick Match works ✅
+- No horizontal overflow or unreachable controls on any screen ✅
+- **Clean Godot log** across the whole session ✅
 
 ---
 

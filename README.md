@@ -42,6 +42,7 @@ build carry-forward, and a session save that survives with no battle in progress
 | Battle parity (fast, 150 battles) | ✅ 150/150, no divergence |
 | Battle parity (full matrix, "DEEPSCAN") | ✅ 5,250/5,250, no divergence |
 | Tablet device gate | ✅ full Run loop, both relaunch cases, clean log |
+| S25 phone gate | ✅ layout, safe area, and scroll on every new screen |
 
 **Battle 4 stops deliberately.** The Run reaches its committed Boss route,
 persists the complete `Boss + HOST + UPGRADE` package, and enters
