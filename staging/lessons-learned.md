@@ -388,3 +388,25 @@ The related trap in this project is the class cache: after adding a
 `class_name`, the headless runner reports the type as undeclared until
 `godot --headless --import` runs. Both are the same shape — a stale
 intermediate presenting as a code defect — and both cost time in this build.
+
+## Test the wrong implementation with a value that actually distinguishes it
+
+ODANSHAY's authored ICE is 250. A normal 100-base System at Run step 4 also
+happens to be 250 after the +150 ladder modifier. That coincidence can make the
+correct rule and a wrong implementation appear identical.
+
+**When two algorithms coincide on current content, build the test around a
+counterfactual or invariant that separates them.** An assertion that merely
+checks the shipped number can certify the wrong rule for years.
+
+## Current runtime data must outrank stale implementation prose
+
+The Alpha 0.7 handoff still records ODANSHAY `BASE_ICE=100`, while the shipped
+runtime/Beta port uses 250. The handoff became stale after a deliberate content
+update.
+
+**Authority hierarchies need a freshness rule, not just a document ranking.**
+For a port, current validated runtime data and shipped source are stronger
+evidence than an older requirement's copied example value. Record discrepancies
+explicitly so a future agent does not “fix” the game back to an obsolete
+requirement.
