@@ -714,3 +714,35 @@ over faithful shapes with no consumer, and nothing reads the alpha's menu logs.
 What is preserved is the join model: `RUN_BATTLE_STARTED` carries `battle_id`,
 which is the key into the battle streams, so routing decisions connect to how
 the battle actually went.
+
+### P-036 · The build in play is separate from the constructed build
+
+**Found after the phase gates, by a question about what the seed controls.**
+
+Random Quick Match rolls its own build and must not overwrite Constructed Quick
+Match's remembered one (§22.32). Beta 0.2 first satisfied that by never touching
+`_build` at all and passing the rolled array straight into
+`Session.create_quick_match`.
+
+That was right about the preset and wrong about everything downstream.
+`_start_battle` — which is what the result screen's **Replay this seed** and
+**New battle** call — read `_build`. So after a Random Quick Match, replaying
+kept the same System and HOST and silently swapped the loadout for the
+constructed one. A control that says "replay" changed what was played.
+
+**Resolution:** `_qm_build` is the build the Quick Match currently in play is
+using, and `_build` stays the constructed working build. Both are duplicated on
+assignment, so neither can alias into the other, and editing the Build screen
+cannot mutate a battle already under way. Verified on device: a rolled
+`PRG_H_002/006/005/003` replayed identically, and the Constructed Build screen
+still opened on the untouched default.
+
+This is the alpha's own arrangement — `session.build` is separate from the
+remembered preset — and collapsing the two is what created the bug.
+
+**Why no gate caught it:** the requirement was expressed as a prohibition
+("must not overwrite"), and the implementation satisfied the prohibition
+exactly. Nothing stated the positive half — that a replay must reproduce what
+was played — so there was no assertion to fail. §22.32 is a one-directional
+requirement, and one-directional requirements are satisfiable in ways that break
+their unstated other half.

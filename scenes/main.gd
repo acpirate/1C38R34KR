@@ -27,6 +27,15 @@ var _host_id := ""
 var _build: Array = []
 var _seed := 0
 
+## The build the Quick Match currently IN PLAY is using.
+##
+## Deliberately distinct from `_build`, which is the CONSTRUCTED working build.
+## Random Quick Match rolls its own and must not overwrite the remembered
+## constructed one — but "Replay this seed" still has to replay the build that
+## was actually played. The alpha keeps this in its session for the same reason;
+## collapsing the two makes a replay silently swap the loadout.
+var _qm_build: Array = []
+
 ## The active session. At most one of these is non-null: a Run part-way through
 ## setup, or a committed Run. Both null means Quick Match, which keeps its
 ## selections in the fields above.
@@ -568,8 +577,17 @@ func _token_list(values: Array, vocab: Dictionary) -> String:
 # Battle
 # ---------------------------------------------------------------------------
 
+## Starts a CONSTRUCTED Quick Match from the build currently on the Build screen.
 func _start_battle() -> void:
-	_enter_battle(Session.create_quick_match(_system_id, _host_id, _seed, _build, {}, true))
+	_qm_build = _build.duplicate()
+	_replay_battle()
+
+
+## Replays the Quick Match in play — same identities, same build, whatever
+## `_seed` now says. Used by both result-screen exits, so neither can drift from
+## what was actually played.
+func _replay_battle() -> void:
+	_enter_battle(Session.create_quick_match(_system_id, _host_id, _seed, _qm_build, {}, true))
 
 
 ## A save written before accounting existed, or by a harness run that carried
@@ -645,10 +663,10 @@ func _show_result(winner: int) -> void:
 	#
 	# Same seed replays an identical battle, which is the only reliable way to
 	# reproduce a visual bug: a fresh seed means a fresh board.
-	_button("Replay this seed", _start_battle)
+	_button("Replay this seed", _replay_battle)
 	_button("New battle", func():
 		_seed += 1
-		_start_battle())
+		_replay_battle())
 	_button("Back to title", func(): _show_title(Content.fingerprint()))
 
 	_divider()
@@ -1139,6 +1157,9 @@ func _start_random_quick_match() -> void:
 	SessionLog.quick_random_rolled(
 		int(seeded["seed"]), _system_id, _host_id, rolled["build"]
 	)
-	_enter_battle(Session.create_quick_match(
-		_system_id, _host_id, _seed, rolled["build"], {}, true
-	))
+	# The ROLLED build becomes the one in play, while `_build` — the remembered
+	# constructed build — is left untouched. Both halves matter: replaying must
+	# use what was played, and a random match must not overwrite the build the
+	# player assembled by hand.
+	_qm_build = (rolled["build"] as Array).duplicate()
+	_replay_battle()
