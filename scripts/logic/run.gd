@@ -192,6 +192,19 @@ var route_rng_state := 0
 ## The exact pending offers while the Run sits on a Path Choice. Null otherwise.
 var pending_path: PendingPath = null
 
+## A concluded battle whose result has not been accepted yet.
+##
+## REAL saveable state, not renderer state: the player can close the app on a
+## result screen and must come back to it. Empty when no result is pending.
+##
+##   natural        — Types.NaturalOutcome, the honest outcome of the battle
+##   forced_win     — a wizard Force Win was applied; it never overwrites
+##                    `natural`, so a forced victory stays distinguishable from
+##                    an earned one in the record
+##   metrics_logged — guards against double-appending the battle record across a
+##                    save and resume boundary
+var pending_result := {}
+
 ## Where the Run is parked.
 ##
 ## The alpha DERIVES this at serialization time from "is there a pending path /
@@ -475,6 +488,13 @@ func problems() -> Array:
 	if phase == Types.SessionPhase.SETUP_HACKER or phase == Types.SessionPhase.SETUP_DECK:
 		out.append("committed Run carrying a setup phase")
 
+	# The pending-result invariant, the same shape as the pending-path one.
+	var on_result := phase == Types.SessionPhase.PENDING_RESULT
+	if on_result and pending_result.is_empty():
+		out.append("PENDING_RESULT with no result")
+	if not on_result and not pending_result.is_empty():
+		out.append("result held outside PENDING_RESULT")
+
 	var seen := {}
 	for uid in upgrade_ids:
 		if seen.has(uid):
@@ -486,4 +506,142 @@ func problems() -> Array:
 	if not inventory.is_empty() and not Content.is_valid_build(build, inventory):
 		out.append("build is not four distinct inventory Programs")
 
+	return out
+
+
+# ---------------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------------
+#
+# Stable IDs only. Immutable definitions are never copied in — they resolve
+# through the envelope's content fingerprint, so a content edit invalidates the
+# save honestly instead of silently changing what the Run meant.
+
+func to_dict() -> Dictionary:
+	return {
+		"boss_id": boss_id,
+		"step": step,
+		"settings": settings.duplicate(true),
+		"hacker_id": hacker_id,
+		"deck_id": deck_id,
+		"selection_source": Types.SELECTION_SOURCE_NAMES[selection_source],
+		"hacker_max_link": hacker_max_link,
+		"inventory": inventory.duplicate(),
+		"build": build.duplicate(),
+		"build_origin": Types.BUILD_ORIGIN_NAMES[build_origin],
+		"opponent_kind": Types.OPPONENT_KIND_NAMES[opponent_kind],
+		"opponent_id": opponent_id,
+		"opponent_source": Types.SYSTEM_SELECTION_SOURCE_NAMES[opponent_source],
+		"host_id": host_id,
+		"upgrade_ids": upgrade_ids.duplicate(),
+		"route_rng_state": route_rng_state,
+		"pending_path": null if pending_path == null else pending_path.to_dict(),
+		"pending_result": null if pending_result.is_empty() else {
+			"natural": Types.NATURAL_OUTCOME_NAMES[int(pending_result["natural"])],
+			"forced_win": bool(pending_result.get("forced_win", false)),
+			"metrics_logged": bool(pending_result.get("metrics_logged", false)),
+		},
+		"phase": Types.SESSION_PHASE_NAMES[phase],
+	}
+
+
+## Restores a Run, or returns null.
+##
+## Every reference is revalidated against CURRENT content and every enum name
+## must resolve. Anything that does not is REJECTED rather than defaulted: a Run
+## whose Boss no longer exists is not the Run that was saved, and quietly
+## substituting one would lose the player's actual progress while appearing to
+## preserve it.
+static func from_dict(d: Dictionary) -> Run:
+	var r := Run.new()
+
+	r.boss_id = str(d.get("boss_id", ""))
+	r.hacker_id = str(d.get("hacker_id", ""))
+	r.deck_id = str(d.get("deck_id", ""))
+	r.opponent_id = str(d.get("opponent_id", ""))
+	r.host_id = str(d.get("host_id", ""))
+	if Content.boss(r.boss_id).is_empty():
+		return null
+	if Content.hacker(r.hacker_id).is_empty() or Content.deck(r.deck_id).is_empty():
+		return null
+	if Content.host(r.host_id).is_empty():
+		return null
+
+	var kind := Types.value_of(Types.OPPONENT_KIND_NAMES, str(d.get("opponent_kind", "")))
+	if kind < 0:
+		return null
+	r.opponent_kind = kind as Types.OpponentKind
+	var opponent_exists := (
+		not Content.boss(r.opponent_id).is_empty()
+		if r.opponent_kind == Types.OpponentKind.BOS
+		else not Content.system(r.opponent_id).is_empty()
+	)
+	if not opponent_exists:
+		return null
+
+	var selection := Types.value_of(Types.SELECTION_SOURCE_NAMES, str(d.get("selection_source", "")))
+	var origin := Types.value_of(Types.BUILD_ORIGIN_NAMES, str(d.get("build_origin", "")))
+	var source := Types.value_of(Types.SYSTEM_SELECTION_SOURCE_NAMES, str(d.get("opponent_source", "")))
+	var phase_value := Types.value_of(Types.SESSION_PHASE_NAMES, str(d.get("phase", "")))
+	if selection < 0 or origin < 0 or source < 0 or phase_value < 0:
+		return null
+	r.selection_source = selection as Types.SelectionSource
+	r.build_origin = origin as Types.BuildOrigin
+	r.opponent_source = source as Types.SystemSelectionSource
+	r.phase = phase_value as Types.SessionPhase
+
+	r.step = int(d.get("step", 0))
+	r.hacker_max_link = int(d.get("hacker_max_link", 0))
+	r.route_rng_state = int(d.get("route_rng_state", 0))
+	r.settings = _settings_from_dict(d.get("settings", {}))
+
+	for pid in (d.get("inventory", []) as Array):
+		r.inventory.append(str(pid))
+	for pid in (d.get("build", []) as Array):
+		r.build.append(str(pid))
+	for pid in r.inventory:
+		if Content.program(pid).is_empty():
+			return null
+
+	for uid in (d.get("upgrade_ids", []) as Array):
+		if Content.upgrade(str(uid)).is_empty():
+			return null
+		r.upgrade_ids.append(str(uid))
+
+	if d.get("pending_path", null) != null:
+		r.pending_path = PendingPath.from_dict(d["pending_path"])
+		if r.pending_path == null:
+			return null
+
+	if d.get("pending_result", null) != null:
+		var raw: Dictionary = d["pending_result"]
+		var natural := Types.value_of(Types.NATURAL_OUTCOME_NAMES, str(raw.get("natural", "")))
+		if natural < 0:
+			return null
+		r.pending_result = {
+			"natural": natural,
+			"forced_win": bool(raw.get("forced_win", false)),
+			"metrics_logged": bool(raw.get("metrics_logged", false)),
+		}
+
+	# The structural invariants are the last gate. A Run that survives every
+	# reference check can still be internally incoherent — offers for the wrong
+	# step, a phase that contradicts its data — and that is rejected too.
+	if not r.problems().is_empty():
+		return null
+	return r
+
+
+## JSON returns every number as a float. Settings are compared and used as ints
+## and bools, so they are coerced once here rather than at each use — the same
+## treatment `SaveState._config_from_dict` gives the battle config.
+static func _settings_from_dict(raw) -> Dictionary:
+	var out: Dictionary = (raw as Dictionary).duplicate(true)
+	for key in ["manual_hacker_link", "manual_system_ice", "hint_delay_seconds"]:
+		if out.has(key) and out[key] != null:
+			out[key] = int(out[key])
+	# `max_cascade_steps` uses null as an explicit infinity sentinel, NOT a large
+	# integer. Coercing null to 0 here would silently cap cascades at zero.
+	if out.has("max_cascade_steps") and out["max_cascade_steps"] != null:
+		out["max_cascade_steps"] = int(out["max_cascade_steps"])
 	return out

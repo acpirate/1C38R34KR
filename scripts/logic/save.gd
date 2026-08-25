@@ -239,29 +239,28 @@ static func _special_from_dict(raw: Dictionary) -> Tile.Special:
 # Storage
 # ---------------------------------------------------------------------------
 
+# Beta 0.2: `SessionSave` owns the file now. These remain the QUICK MATCH entry
+# points so the existing battle screen and title keep working unchanged until
+# Phase F rewires them, but they write and read the session ENVELOPE rather than
+# a bare battle record. Two writers to one path is exactly how a Run save and a
+# Quick Match save would overwrite each other.
+
 static func write(state: GameState) -> bool:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f == null:
-		push_error("cannot write %s" % SAVE_PATH)
-		return false
-	f.store_string(JSON.stringify(to_dict(state)))
-	f.close()
-	return true
+	return SessionSave.write(SessionSave.quick_match_to_dict(state))
 
 
+## Reads a QUICK MATCH session. A Run envelope is rejected here rather than
+## coerced: this entry point has nowhere to put the Run around the battle, and
+## returning the battle alone would strip it. Phase F reads through
+## `SessionSave.read` directly and handles every mode.
 static func read() -> Dictionary:
-	if not FileAccess.file_exists(SAVE_PATH):
-		return _reject("no save present")
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if f == null:
-		return _reject("cannot read %s" % SAVE_PATH)
-	var parsed = JSON.parse_string(f.get_as_text())
-	f.close()
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return _reject("save is not valid JSON")
-	return from_dict(parsed)
+	var session := SessionSave.read()
+	if not session["ok"]:
+		return _reject(session["reason"])
+	if str(session["mode"]) != Types.MODE_NAMES[Types.Mode.QUICK_MATCH]:
+		return _reject("saved session is a %s, not a Quick Match" % session["mode"])
+	return {"ok": true, "state": session["state"], "reason": ""}
 
 
 static func clear() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	SessionSave.clear()

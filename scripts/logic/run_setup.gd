@@ -134,3 +134,49 @@ func phase() -> Types.SessionPhase:
 ## initial path offers (beta 0.2 Phase B).
 func route_rng() -> Rng:
 	return Rng.new(route_rng_state)
+
+
+# ---------------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------------
+#
+# A Run in setup carries its committed Boss, whatever identity has been
+# committed so far, the settings snapshot, and the route stream — and NOTHING
+# else. There is no battle, no encounter, no build, and no inventory to
+# fabricate, which is the whole reason this is a separate shape.
+
+func to_dict() -> Dictionary:
+	return {
+		"boss_id": boss_id,
+		"step": Types.SETUP_STEP_NAMES[step],
+		"hacker_id": hacker_id,
+		"settings": settings.duplicate(true),
+		"route_rng_state": route_rng_state,
+	}
+
+
+static func from_dict(d: Dictionary) -> RunSetup:
+	var s := RunSetup.new()
+
+	s.boss_id = str(d.get("boss_id", ""))
+	if Content.boss(s.boss_id).is_empty():
+		return null
+
+	var step_value := Types.value_of(Types.SETUP_STEP_NAMES, str(d.get("step", "")))
+	if step_value < 0:
+		return null
+	s.step = step_value as Types.SetupStep
+
+	s.hacker_id = str(d.get("hacker_id", ""))
+	# An empty Hacker is legal on the HACKER step and only there: it means the
+	# screen has been reached but not confirmed. On the DECK step it means the
+	# save claims to have passed a commitment it has no record of.
+	if s.hacker_id == "":
+		if s.step != Types.SetupStep.HACKER:
+			return null
+	elif Content.hacker(s.hacker_id).is_empty():
+		return null
+
+	s.settings = Run._settings_from_dict(d.get("settings", {}))
+	s.route_rng_state = int(d.get("route_rng_state", 0))
+	return s

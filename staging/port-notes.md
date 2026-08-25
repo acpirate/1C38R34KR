@@ -489,3 +489,74 @@ them.
 the System ladder value" — that assertion fails against correct code. The
 distinguishing case is the double-count, `boss_base + 150 = 400`, and that is
 what `test_run_battle.gd` asserts against.
+
+## Beta 0.2 Phase D — persistence
+
+### P-024 · Two save schemas, versioned independently
+
+**Forced by:** the battle record ceasing to be the top level.
+
+Beta 0.1 wrote a battle and nothing else, because a Quick Match is always inside
+one. A Run is saveable with no battle at all — on a Path Choice, a Build, a
+result, or the `PENDING_BOSS_BATTLE` stop — so the battle record becomes a
+member of a session envelope.
+
+The authorization's §16 asks to "add only the new Run/setup/route fields
+needed", which reads as an additive change. It is not: it is a restructure of
+where the battle record lives. Raised as §C6 of the authorization review.
+
+**Resolution:** `SessionSave.SCHEMA = 3` versions the ENVELOPE.
+`SaveState.SCHEMA = 2` continues to version the nested battle record, and the
+beta 0.1 serializer writes and validates it **unchanged**. That serializer
+carries the continuation proof this build has no reason to re-earn (§16: "reuse
+the Beta 0.1 battle serializer and its existing deterministic-continuation
+proof"), so folding it into the envelope would have meant re-proving it.
+
+Two schemas that move independently is the honest description: a change to how
+a battle serializes need not invalidate every Run save, and vice versa.
+
+### P-025 · `SessionSave` owns the file; `SaveState` keeps the Quick Match entry points
+
+**Forced by:** one path, `user://save.json`, and now two kinds of session.
+
+`SaveState.write` / `read` / `clear` were the file API and are called from
+`battle_screen.gd` and `main.gd`. Leaving them writing bare battle records
+alongside a new Run writer would give one path two writers, and a Run save and a
+Quick Match save would overwrite each other.
+
+**Resolution:** they now delegate to `SessionSave`, writing and reading the
+envelope in `QUICK_MATCH` mode. The existing UI is untouched and keeps working.
+`SaveState.read` REJECTS a Run envelope rather than returning the battle inside
+it — that entry point has nowhere to put the Run, and handing back the bare
+battle would strip the Run around it and silently lose the progression.
+
+Phase F rewires the UI to `SessionSave.read` directly and handles every mode.
+
+### P-026 · The envelope cross-checks the Run against its battle
+
+**Not forced** — an invariant the alpha does not state, added because the shape
+of the envelope makes the failure possible.
+
+A Run envelope carries both the Run and, when one is in progress, its battle.
+Those two independently record the encounter: the Run has `opponent_id`,
+`host_id`, and `upgrade_ids`, and the battle's immutable identity has its own
+copies stamped at construction.
+
+Nothing stops a hand-edited or partially-written save from carrying a Run and a
+battle that describe DIFFERENT encounters. The result would load, and the
+player would fight one battle while the Run believed in another — the sort of
+failure that surfaces three screens later as an impossible reward.
+
+`SessionSave.from_dict` rejects the envelope when they disagree, and separately
+rejects a phase that contradicts the envelope's contents (`ACTIVE_BATTLE` with
+no battle record, or a battle held in a phase that cannot be in one).
+
+### P-027 · No migration test, deliberately
+
+Per D-030, a version bump invalidates saves for the whole pre-release beta line.
+`test_session_save.gd` asserts that a beta 0.1 bare battle record is REJECTED,
+which is the finished behaviour rather than a gap — and there is deliberately no
+test that any save survives a version boundary.
+
+Recorded because the absence is a decision, not an oversight: a future reader
+finding no migration coverage should not add some.

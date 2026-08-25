@@ -36,6 +36,8 @@ const SUITES := [
 	"res://tests/test_run_battle.gd",
 	# Phase 6 — persistence, accounting.
 	"res://tests/test_save.gd",
+	# Phase D — the session envelope wrapped around that battle record.
+	"res://tests/test_session_save.gd",
 	"res://tests/test_metrics.gd",
 	"res://tests/test_layer_purity.gd",
 	"res://tests/test_data_present.gd",
