@@ -365,9 +365,8 @@ func inactive_programs() -> Array:
 ## can adjust it before the rematch. Only the battle itself starts over.
 func retry_battle() -> void:
 	pending_path = null
+	pending_result = {}
 	phase = Types.SessionPhase.PENDING_BUILD
-	if build_origin == Types.BuildOrigin.DEFAULT:
-		build_origin = Types.BuildOrigin.CARRIED_RUN
 
 
 ## Accept a won battle and move toward the next encounter.
@@ -378,10 +377,37 @@ func advance_after_victory() -> bool:
 	var next := next_step(step)
 	if next == 0:
 		return false
-	# The build carries forward to the next battle rather than resetting.
-	if build_origin == Types.BuildOrigin.DEFAULT:
-		build_origin = Types.BuildOrigin.CARRIED_RUN
+	pending_result = {}
+	# The build itself carries forward untouched. `build_origin` is deliberately
+	# NOT changed here — see `opening_build_origin` for where CARRIED_RUN
+	# actually belongs.
 	return open_path_choice(next)
+
+
+## The origin a freshly opened Build screen starts with.
+##
+## Battle 1 opens on the DEFAULT build for a new Run; later battles, and a
+## retry, carry the current build and order forward.
+##
+## This is NOT `build_origin`. That field records the origin of the build the
+## Run has COMMITTED, and only `confirm_build` moves it — which is the alpha's
+## split between a Build screen's own state and the Run's. Stamping CARRIED_RUN
+## onto the Run when a path opens instead of when a Build is confirmed was a
+## real port defect, caught by the Phase E harness; see port-notes P-028.
+func opening_build_origin() -> Types.BuildOrigin:
+	return Types.BuildOrigin.DEFAULT if step == 1 else Types.BuildOrigin.CARRIED_RUN
+
+
+## Commit the Build screen's result to the Run.
+##
+## `origin` is the Build screen's own origin at the moment the player confirmed:
+## whatever `opening_build_origin` gave it, or PLAYER_EDITED if they changed
+## anything. Phase F calls this when the Build screen is confirmed.
+func confirm_build(origin: Types.BuildOrigin) -> bool:
+	if not Content.is_valid_build(build, inventory):
+		return false
+	build_origin = origin
+	return true
 
 
 ## Generate the offers for the next battle, after a win.

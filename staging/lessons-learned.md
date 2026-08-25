@@ -322,3 +322,39 @@ to be retrofitted.
 The misallocation was in **timing and proportion**, not in direction: the work
 was good, there was more of it than this project needed, and it came before
 gameplay concepts that were closer to the point of the exercise.
+
+## A differential harness earns its cost on the fields nobody asserts
+
+**Beta 0.2 Phase E, 2026-08-24.**
+
+The Run differential harness found a real port defect on its first comparison,
+and the interesting part is which defect.
+
+Phase B had already pinned route offer generation with fixed-seed fixtures
+generated from the alpha, because offer generation was identified up front as
+the highest-risk part of the port — retry loops, draw order, an early return
+that consumes no RNG. That analysis was right, the fixtures were built, and
+**the route generators were correct**.
+
+The bug was in `build_origin`: a telemetry field that gates no rule, stamped one
+transition too early because the alpha uses the same vocabulary for two
+different pieces of state. Every behavioural test passed. The build did carry
+forward; editing did mark the build edited; retry did preserve it. Nothing that
+asserts *gameplay* could see the difference, because there was no gameplay
+difference — only a record that would have been wrong in every log the beta
+produced.
+
+**The lesson is about where to spend proof, not how much.** The place we
+predicted risk got fixtures and was fine. The place nobody would think to write
+an assertion is where the divergence lived, and only a comparison that dumps
+*everything* and diffs it wholesale was ever going to find it. That is the
+specific thing a differential harness buys that a test suite does not, and it is
+worth remembering when the next build's verification plan is being priced: a
+harness is cheap insurance against unknown unknowns, whereas targeted fixtures
+only ever confirm the risks you already named.
+
+The cost supports this. The run harness compares 2,000 complete Run walks across
+both engines in under two seconds, because it plays no battles — the expensive
+part was already proven elsewhere. Scoping a differential to the layer being
+ported, rather than re-running everything underneath it, is what makes "compare
+everything" affordable.

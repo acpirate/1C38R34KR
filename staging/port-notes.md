@@ -560,3 +560,71 @@ test that any save survives a version boundary.
 
 Recorded because the absence is a decision, not an oversight: a future reader
 finding no migration coverage should not add some.
+
+## Beta 0.2 Phase E — the Run differential harness
+
+### P-028 · `build_origin` was stamped a step too early — found by this harness
+
+**A real port defect, caught on the harness's very first comparison.** Recording
+it in full because the way it hid is more useful than the fix.
+
+**What the beta did:** `advance_after_victory()` and `retry_battle()` set
+`Run.build_origin = CARRIED_RUN`. The reasoning seemed sound — the build carries
+forward to the next battle, so mark it carried.
+
+**What the alpha does:** `RunInfo.buildOrigin` records the origin of the build
+the Run has **COMMITTED**, and it moves only when a Build screen is CONFIRMED
+(`main.ts:2051`). `CARRIED_RUN` is the starting origin of the Build SCREEN's own
+state — `beginBuild(..., first ? 'DEFAULT' : 'CARRIED_RUN')` — which becomes
+`PLAYER_EDITED` if the player changes anything, and is committed to the Run only
+on confirmation.
+
+Two different pieces of state with the same vocabulary. The beta had collapsed
+them.
+
+**Why nothing else caught it.** Every behavioural test passed: the build DID
+carry forward, editing DID mark PLAYER_EDITED, retry DID preserve the build.
+`build_origin` is telemetry — it does not gate a rule — so no assertion about
+gameplay could see it. It is exactly the class of divergence §21.2 describes as
+"externally meaningful state" that behavioural tests do not reach.
+
+**Resolution:** `build_origin` is now moved only by `confirm_build()` and by the
+edit functions. `opening_build_origin()` supplies what a freshly opened Build
+screen starts with (DEFAULT at Battle 1, CARRIED_RUN afterwards and on retry),
+which is what Phase F will hand to the Build screen.
+
+**The general lesson**, for `lessons-learned.md`: a differential harness earns
+its cost on the fields nobody would think to assert. The route offers — the part
+we were worried about, and had already pinned with fixtures in Phase B — were
+correct. The bug was in a field that only exists to be logged.
+
+### P-029 · Run records are ordered token arrays, not stringified objects
+
+**Forced by:** hashing the same state in two languages.
+
+Hashing a serialized object across GDScript and JavaScript means depending on
+Dictionary iteration order, JS property order, and both serializers agreeing on
+number formatting — the beta already needed `Fingerprint._float_to_js` and
+`_quote` to make that work for the battle traces (P-010).
+
+Run records sidestep all of it: each is a fixed sequence of tokens joined with
+`|`, hashed as SHA-256 over the lines. There is no key order to preserve and no
+float to format, and a divergence points at a field position rather than at the
+serializer.
+
+### P-030 · The Run walk plays no battles, and the choice policy is shared
+
+The harness treats every encounter as won and never constructs a battle. Battle
+behaviour is proven by DEEPSCAN, and replaying it inside the Run walk would pay
+twice for the same evidence while making 2,000 walks unaffordable.
+
+The consequence is that **the choice policy is part of the comparison**: both
+engines must fork identically at every Path Choice or the walks diverge
+legitimately and prove nothing. `_choose(seed, step) = (seed + step) %
+PATH_CHOICE_COUNT` is duplicated verbatim in `tools/run_trace.gd` and
+`tools/gen/run_trace_alpha.ts`, alternating so a body of seeds covers the left
+path, the right path, and every mixture rather than walking one edge of the tree.
+
+**Cost, for the record:** 2,000 walks take under two seconds across both
+engines, against the battle matrix's ~90 minutes for 5,250 battles. There is
+deliberately no DEEPSCAN tier for run walks — the range is simply set wide.

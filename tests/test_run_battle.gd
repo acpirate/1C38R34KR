@@ -274,6 +274,16 @@ func _test_retry_and_progression(t: TestCase) -> void:
 	t.eq("build carried forward", r.build, edited)
 	t.check("offers are pending for the new step", r.pending_path != null)
 
+	# `build_origin` records the origin of the COMMITTED build and moves only on
+	# confirmation. CARRIED_RUN belongs to the Build SCREEN's own state, which
+	# `opening_build_origin` supplies — stamping it onto the Run when a path
+	# opens was a port defect the Phase E harness caught (P-028).
+	t.eq("advancing does not restamp the committed origin", r.build_origin, Types.BuildOrigin.PLAYER_EDITED)
+	t.eq("battle 1 opens Build on the default", _run_on_build().opening_build_origin(), Types.BuildOrigin.DEFAULT)
+	t.eq("later battles carry forward", r.opening_build_origin(), Types.BuildOrigin.CARRIED_RUN)
+	t.check("confirming stamps the screen's origin", r.confirm_build(Types.BuildOrigin.CARRIED_RUN))
+	t.eq("and the Run now records it", r.build_origin, Types.BuildOrigin.CARRIED_RUN)
+
 	# At the last step there is no next path — the caller stops instead.
 	var last := _run_on_build()
 	last.step = Run.RUN_LENGTH
