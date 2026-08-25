@@ -262,6 +262,84 @@ candidates already — Override placement not perturbing the board, a threshold
 crossing not re-triggering, CODESHATTER not consuming a Function's charge — and
 each of those has a positive half that a prohibition alone will not pin.
 
+### Minor issues found in the build, pushed forward
+
+Both found by the director playing the shipped build, after every gate had
+passed. Neither is blocking; both are recorded with the code pointers so the
+next person does not re-derive them.
+
+#### F-001 — the board shifts up a few pixels on the first action
+
+**Reported:** the whole Datastream display jumps upward by a couple of pixels on
+the first match of a battle. The director's hypothesis was that printing the
+first status line triggers a layout reflow. **That is correct**, and the
+mechanism is visible in `scenes/battle/battle_screen.gd`.
+
+The battle root is a `VBoxContainer` whose children are, in order: the header,
+the unit-box grid, the board `frame`, `_turn_label`, `_message`, and the debug
+bar. The `frame` (an `AspectRatioContainer` holding the board) is the **only
+child with `size_flags_vertical = SIZE_EXPAND_FILL`**, so it absorbs whatever
+vertical space the others do not use.
+
+Both labels below it start empty and gain text on the first action:
+
+- `_turn_label` has no text until the first render sets `"Turn %d"`, so it grows
+  from nothing to one line.
+- `_message` has `custom_minimum_size.y = UiTheme.px(64)`, which floors it at
+  roughly 1.7 lines of `font_body`. The first logged line fits under that floor;
+  the second pushes past it and the label grows.
+
+Every pixel those two gain is taken from the expanding `frame`, and because the
+board is centred inside an `AspectRatioContainer`, losing height re-centres it —
+which reads as the board jumping upward.
+
+**Fix direction:** reserve the space rather than react to it. Give `_turn_label`
+its text at construction (or a fixed height), and give `_message` a **fixed**
+height sized to its four-line scrollback instead of a minimum. Once neither can
+change size, the board's allocation is constant for the battle's lifetime.
+
+Worth doing before human testing: it is small, and a board that twitches on the
+first move is the first thing a tester notices.
+
+#### F-002 — Quick Match always starts on the same board, and this is a 0.1 divergence
+
+**Reported:** there is no way to change the seed for a random match short of
+starting a *constructed* match, editing the seed, playing it to a result, and
+coming back. Random Match should start on a random board seed, with the seed
+still recorded in the logs.
+
+**Confirmed, and it is broader than Random Match.** The beta pins the GAMEPLAY
+seed to `main.gd`'s `_seed`, which is initialised to `0` and only ever changes
+via the debug-only seed field or the result screen's *New battle* (`_seed += 1`).
+Constructed and Random Quick Match both pass it.
+
+**The alpha does not do this.** `createQuickMatchBattle`'s `seed?` parameter is
+optional and `main.ts` never supplies it, so `makeRNG(undefined)` draws a fresh
+random gameplay seed for every Quick Match, Constructed and Random alike.
+
+So this is a **beta 0.1 port divergence carried into 0.2**, not a 0.2
+regression. It stayed invisible because the seed field made it look like a
+diagnostic convenience — but the field is `OS.is_debug_build()`-only, so **in a
+release build there is no way to change it at all, and every Quick Match a player
+starts uses seed 0.** First launch is always the same board.
+
+The director's proposal matches the alpha exactly and should be adopted: draw a
+random gameplay seed per Quick Match, and keep recording it.
+
+**On the recording half — it is already partly there.** The gameplay seed is
+embedded in `battle_id` (`"qm-%s-%s-%d"`), which is stamped on every battle,
+turn, and event record, so a played battle is already reproducible from the
+logs. What is missing is the session record: `QUICK_RANDOM_ROLLED` logs the
+SETUP seed (build/System/HOST) but not the gameplay seed. Both should be there,
+and they should stay distinct — conflating them would reintroduce exactly the
+coupling §17 forbids.
+
+**Watch for one thing when implementing:** the debug seed field and *Replay this
+seed* both depend on the gameplay seed being stable and knowable. Randomising it
+at battle creation must not break replay — the rolled seed has to be captured
+into session state the way `_qm_build` now captures the rolled build (P-036),
+or *Replay this seed* becomes a lie in exactly the same way.
+
 ---
 
 ## 8. Handover facts
