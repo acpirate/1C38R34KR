@@ -358,3 +358,33 @@ both engines in under two seconds, because it plays no battles — the expensive
 part was already proven elsewhere. Scoping a differential to the layer being
 ported, rather than re-running everything underneath it, is what makes "compare
 everything" affordable.
+
+## Rebuild before you gate, or you are gating the previous build
+
+**Beta 0.2 Phase H, 2026-08-24.**
+
+The tablet gate was run, screenshotted, and half-passed against an APK built
+fourteen minutes before the phase whose feature it was verifying. The Phase G
+session log was missing on device, and the first instinct was to go looking for
+a bug in the logging code.
+
+It was not a bug. `session.jsonl` did not exist because `session_log.gd` did not
+exist in the APK. Comparing the APK's mtime against the commit timestamp
+settled it in one command.
+
+**What made it survive as long as it did:** the earlier gate steps *passed*.
+Boss selection worked, routes generated correctly, the stop point persisted —
+all genuinely true, and all true of the previous build too, because Phase G only
+added logging. A gate that mostly passes against a stale binary is far more
+misleading than one that fails outright, because nothing prompts you to question
+the binary.
+
+**The cheap habit:** when a device check disagrees with a headless test that
+passes, compare build artefact time against source time *before* debugging the
+feature. It is one `stat` against one `git log`, and it is the difference
+between a two-minute rebuild and an hour spent reading correct code.
+
+The related trap in this project is the class cache: after adding a
+`class_name`, the headless runner reports the type as undeclared until
+`godot --headless --import` runs. Both are the same shape — a stale
+intermediate presenting as a code defect — and both cost time in this build.

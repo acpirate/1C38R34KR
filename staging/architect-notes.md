@@ -188,3 +188,49 @@ keeping because the **Build → Battle transition is exactly the seam beta 0.2
 extends** (Run Build before every battle), and because it is the first signal
 that the presentation layer does not survive a non-mobile viewport — which the
 Windows target will eventually have to answer anyway.
+
+---
+
+## AN-005 — "Abandon Run" destroys a Run on one tap, with no confirmation
+
+**Raised during the beta 0.2 port, 2026-08-24. Not blocking; a design question
+rather than a port defect.**
+
+**What beta 0.2 does:** the Run result screen carries an `Abandon Run` button.
+Tapping it calls `SessionSave.clear()` and returns to the title. The Run is gone
+— every acquired UPGRADE, the committed Boss, three battles of progress —
+with no confirmation step and no undo.
+
+It sits directly below `Continue Run` on a phone-sized panel.
+
+**Why it is like that:** the alpha reaches the same outcome through
+`WIZARD_RESTART_RUN` and through starting a New Run, both of which are more
+deliberate acts than a single tap on a result screen. Beta 0.2 needed *some*
+exit from a Run for testing and gave it the plainest possible implementation.
+The port authorization does not specify the control, so inventing a confirmation
+flow would have been designing rather than porting.
+
+**Why it is worth revisiting:** the New-Run boundary is already treated as
+special — committing a Boss is documented as the destructive act, and it
+replaces the save deliberately. `Abandon Run` is equally destructive, sits one
+tap away from the button a player presses every battle, and is not marked as
+destructive in any way.
+
+**Options, roughly in increasing cost:**
+
+1. **Move it.** Put abandonment on the title screen, or behind the Run context,
+   rather than adjacent to the button pressed after every victory. Cheapest, and
+   removes the mis-tap without adding a dialog.
+2. **Confirm it.** A second tap ("Abandon — are you sure?"), matching the
+   select-then-confirm pattern every list screen already uses. Consistent with
+   the established idiom, which is an argument in its favour.
+3. **Make it recoverable.** Keep the abandoned Run recoverable until the next
+   New Run commits. More state to reason about, for a case that may not warrant
+   it.
+
+**Recommendation:** option 2, because select-then-confirm is already the answer
+this project gives to "a mis-tap on a phone should be free", and applying it to
+the one genuinely destructive control is consistent rather than novel.
+
+Related to AN-003 in spirit: both are about a control whose consequence is
+larger than its presentation suggests.

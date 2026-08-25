@@ -816,3 +816,38 @@ and the implementing agent should say so rather than build to it.
 **Revisit as release approaches.** This is explicitly a pre-release posture. The
 first build that could plausibly reach a player who is not the director is the
 point to reopen it.
+
+---
+
+## D-031 — DEEPSCAN was re-run for beta 0.2, despite §21.1 making it optional
+
+**2026-08-24 · agent → director · ACCEPTED**
+
+§21.1 says a fresh 5,250-battle DEEPSCAN is optional rather than mandatory when
+a build "changes only Run/session/UI orchestration around an untouched battle
+core and fast parity remains green". By the letter of that, beta 0.2 could have
+carried beta 0.1's result forward: `resolve.gd`, `game.gd`, `board.gd`,
+`match_finder.gd`, `passive.gd`, and `metrics.gd` were never touched.
+
+**It was re-run anyway, because Phase C consolidated Quick Match and Run onto a
+single battle constructor.**
+
+Battle *construction* is not the battle core, but it is battle-affecting: it is
+where a battle's immutable identity and config are stamped, including the
+resolved LINK and ICE and each side's strong sets. §21.1's own list includes
+"integration work gives reasonable cause to suspect battle behaviour was
+perturbed", and refactoring the one place every battle is built qualifies.
+
+The deciding argument was not the refactor itself but what was built on top of
+it: four further phases, a device gate, and a release. Fast parity is 150
+battles against DEEPSCAN's 5,250, and the cost of discovering a construction
+defect after closeout is a retracted build rather than ninety minutes.
+
+**The general rule this sets:** reuse prior proof for subsystems that were not
+edited, and re-earn it for a subsystem that was, even when the edit is
+structural rather than behavioural and even when a cheaper gate is green. "Fast
+parity passed" is evidence about 150 battles, not a licence to skip the matrix
+after touching the code every battle goes through.
+
+Fast parity was green at every phase boundary throughout, and DEEPSCAN agreed
+with it. That is the outcome to expect; it is not the reason to skip the check.
