@@ -855,3 +855,43 @@ nothing. Tests that need an axis-bearing cell now search for one.
 instead of casting. The test asserts both numbers independently rather than
 trusting the loop to be read correctly, since `for i in LIMIT` is the natural
 GDScript spelling and gets both wrong.
+
+### P-042 · The battle screen resolved a Boss as a System, and the fix is a union accessor
+
+**Found by the tablet, after every headless gate had passed.**
+
+`battle_screen._refresh_all` read the opponent's name with
+`Content.system(state.identity["opponent_id"])`. For `BOS_01` that reports an
+unknown id and returns an empty Dictionary; indexing `["name"]` on it then
+**aborted the refresh function**, so the ICE readout on the following line never
+ran. The header showed `SYSTEM / ICE 0/1` over a battle whose logic — Programs,
+axes, ICE, mechanic — was entirely correct.
+
+Two things made it invisible until a human looked at a screen:
+
+- **the scene layer has no headless coverage**, by design (`test_layer_purity`
+  exists to keep logic OUT of it), so 3,000-plus tests and 300 Boss parity
+  battles all passed;
+- **an aborted refresh looks like stale UI, not like a crash.** The battle kept
+  playing. Only the header was wrong, and only because the abort happened to
+  land between two lines.
+
+**Resolution:** `Content.opponent(kind, id)` and `Content.opponent_of_identity`
+resolve through the identity UNION, so no caller has to know which registry an
+opponent lives in. `Session._opponent_content` now defers to it as well, and an
+audit of the other six `Content.system(` callers found all of them already
+guarded by an explicit kind check.
+
+**The general shape**, worth carrying into 0.4: a union type with two registries
+invites exactly one bug — reaching for the common branch by habit. The fix is
+not vigilance, it is removing the choice from the caller.
+
+### P-043 · Two literals that outlived their build
+
+The title screen read `beta 0.2` through all of 0.3 development because the
+subheading was a typed string, and the Run result headline said "System ICE
+breached" over ODANSHAY for the same reason as P-042.
+
+Both now derive from data — the version from `Content.GAME_VERSION`, the
+headline from the opponent union. A literal that duplicates a value the build
+already knows is a small thing that is wrong on a predictable schedule.

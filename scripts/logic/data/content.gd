@@ -20,7 +20,7 @@ extends RefCounted
 ## of the content fingerprint — that is `DATA_SCHEMA_VERSION` plus the content
 ## rows — so bumping it cannot invalidate differential parity or reinterpret a
 ## battle. It identifies the BUILD; the fingerprint identifies the CONTENT.
-const GAME_VERSION := "beta-0.2.0"
+const GAME_VERSION := "beta-0.3.0"
 
 ## Bumped independently of the game version — it changes only when the shape of
 ## fingerprinted content changes. It is fingerprint input, so it must match the
@@ -206,6 +206,23 @@ static func upgrade(id: String) -> Dictionary:
 
 static func boss(id: String) -> Dictionary:
 	return _lookup("bosses", id)
+
+
+## Resolve an opponent through the identity UNION rather than by guessing a
+## registry.
+##
+## Anything holding a battle identity — the battle screen, logging, metrics —
+## must go through this. Calling `system()` with a `BOS_ID` reports an unknown
+## id and returns an empty Dictionary, and the caller then indexes it and
+## aborts mid-refresh, which is how the Boss battle shipped with a header
+## reading "SYSTEM / ICE 0/1" while the battle underneath was perfectly correct.
+static func opponent(kind: Types.OpponentKind, id: String) -> Dictionary:
+	return boss(id) if kind == Types.OpponentKind.BOS else system(id)
+
+
+## The same, taken straight from a battle identity.
+static func opponent_of_identity(identity: Dictionary) -> Dictionary:
+	return opponent(identity["opponent_kind"], str(identity["opponent_id"]))
 
 
 static func fingerprint() -> String:

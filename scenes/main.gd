@@ -206,7 +206,10 @@ func _divider() -> void:
 func _show_title(fingerprint: String) -> void:
 	_fresh_screen(true)
 	_heading(TITLE)
-	_subheading("beta 0.2")
+	# Derived from GAME_VERSION rather than typed, so a version bump cannot leave
+	# the title screen claiming the previous build. It read "beta 0.2" through
+	# the whole of 0.3 development because it was a literal.
+	_subheading(Content.GAME_VERSION.replace("beta-", "beta ").trim_suffix(".0"))
 
 	# Leaving the title drops whatever session was on screen, so nothing stale
 	# survives into a new one.
@@ -1171,8 +1174,14 @@ func _show_run_result(winner: int) -> void:
 	var won := winner == Types.Side.PLAYER
 	_fresh_screen(true)
 	_heading("VICTORY" if won else "DEFEAT")
+	# Name the opponent rather than saying "System" over a Boss (§16). The Run
+	# context below already reads ODANSHAY; the headline saying otherwise was the
+	# same assumption that broke the battle header.
+	var enemy_name := str(Content.opponent_of_identity({
+		"opponent_kind": _run.opponent_kind, "opponent_id": _run.opponent_id,
+	})["name"])
 	_subheading(
-		"System ICE breached — battle %d of %d." % [_run.step, Run.RUN_LENGTH]
+		"%s breached — battle %d of %d." % [enemy_name, _run.step, Run.RUN_LENGTH]
 		if won else "Hacker LINK severed."
 	)
 

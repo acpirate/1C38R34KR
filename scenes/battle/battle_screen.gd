@@ -682,7 +682,10 @@ func _refresh_bars() -> void:
 		Resolve.shield_value(state, Types.Side.PLAYER),
 		Resolve.buff_bonus(state, Types.Side.PLAYER),
 	)
-	_system_box.title = str(Content.system(state.identity["opponent_id"])["name"])
+	# Through the UNION, never `Content.system`: a Boss id is not in the systems
+	# registry, and the failed lookup used to abort this refresh before the ICE
+	# readout below ever ran (§16).
+	_system_box.title = str(Content.opponent_of_identity(state.identity)["name"])
 	_system_box.set_stat(state.hp[Types.Side.ENEMY], state.config["enemy_hp"])
 	_system_box.set_totals(
 		Resolve.shield_value(state, Types.Side.ENEMY),

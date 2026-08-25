@@ -30,6 +30,7 @@ func run(t: TestCase) -> void:
 	_test_retry_preserves_encounter(t)
 	_test_mid_boss_save(t)
 	_test_metrics(t)
+	_test_opponent_resolution(t)
 
 	Content.clear()
 	Passives.clear_cache()
@@ -514,6 +515,38 @@ func _test_metrics(t: TestCase) -> void:
 	t.eq("a System battle places no Overrides", qm.metrics.overrides_placed, 0)
 	t.eq("and triggers no threshold", qm.metrics.threshold_triggers, 0)
 	t.check("but has the fields", qm.metrics.to_dict().has("overrides_peak"))
+
+
+## §16 — anything holding a battle identity must resolve the opponent through
+## the UNION, never by assuming a registry.
+##
+## This shipped broken and the tablet caught it: the battle screen called
+## `Content.system()` with a BOS id, which reported an unknown id and returned an
+## empty Dictionary, and indexing that aborted the refresh BEFORE the ICE
+## readout ran. The header showed "SYSTEM / ICE 0/1" over a battle that was
+## itself completely correct.
+func _test_opponent_resolution(t: TestCase) -> void:
+	t.group("opponent resolves through the union")
+
+	var boss_state := _boss_state()
+	var resolved := Content.opponent_of_identity(boss_state.identity)
+	t.check("a Boss identity resolves", not resolved.is_empty())
+	t.eq("to ODANSHAY", str(resolved["name"]), str(Content.boss(Content.BOSS_MECHANIC_BOSS_ID)["name"]))
+	t.eq("with its authored ICE", int(resolved["base_ice"]), 250)
+
+	# The same call must still work for an ordinary System.
+	var qm := Session.create_quick_match("SYS_01", "HST_02", 1, Session.default_build())
+	var sys_resolved := Content.opponent_of_identity(qm.identity)
+	t.check("a System identity resolves", not sys_resolved.is_empty())
+	t.eq("to BOUNCER", str(sys_resolved["name"]), str(Content.system("SYS_01")["name"]))
+
+	# Both carry the fields the battle header reads, which is what the failed
+	# lookup deprived it of.
+	for row in [resolved, sys_resolved]:
+		t.check("has a name", row.has("name"))
+		t.check("has base ICE", row.has("base_ice"))
+		t.check("has strong colours", row.has("strong_colors"))
+		t.check("has Programs", row.has("programs"))
 
 
 # ---------------------------------------------------------------------------

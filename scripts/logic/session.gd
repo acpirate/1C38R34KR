@@ -277,7 +277,7 @@ static func _cache_key(p: Dictionary) -> String:
 ## Opponent content resolved through the identity union, so nothing here looks a
 ## Boss up as though it were a System.
 static func _opponent_content(kind: Types.OpponentKind, id: String) -> Dictionary:
-	return Content.boss(id) if kind == Types.OpponentKind.BOS else Content.system(id)
+	return Content.opponent(kind, id)
 
 
 ## Attaches a metrics accumulator and a battle log to a state that has none.
