@@ -417,3 +417,75 @@ transition is a single function that either completes or returns `false` having
 changed nothing, and `Run.problems()` asserts the resulting state is one the
 transitions can actually produce. `test_route.gd` checks `problems()` after
 every step of a full four-battle walk.
+
+## Beta 0.2 Phase C — battle-engine integration
+
+### P-021 · The PASSIVE cache key must include the acquired UPGRADEs
+
+**Forced by:** a latent collision that beta 0.1 could not reach.
+
+`Passives.active()` memoizes the assembled instance list on
+`identity["cache_key"]`, and beta 0.1 built that key as
+`hacker_id | opponent_id | host_id`. UPGRADEs were deliberately absent because
+Quick Match has none — the only caller — so the key was complete for everything
+that could exist.
+
+A Run breaks that. Its acquired UPGRADEs change between battles while the
+Hacker, opponent, and HOST may not: two Run battles against the same System on
+the same HOST with different UPGRADEs produce the SAME key. The second battle
+would then be handed the first battle's memoized PASSIVE list and fight with the
+wrong loadout — silently, with no error and no visible wrong value anywhere
+except the damage numbers.
+
+**Resolution:** `Session._cache_key` appends the acquired UPGRADE IDs in
+acquisition order. `test_run_battle.gd` asserts both that the keys differ and
+that the resulting lists differ, so the key cannot be "simplified" back.
+
+**Worth noting for later phases:** this is the general shape of the risk in
+beta 0.2. The battle engine is correct and proven, and the ways to break it are
+by feeding it state the beta 0.1 callers could never construct. Memoization keys,
+validation that assumed an empty collection, and defaults that were unreachable
+are all the same class.
+
+### P-022 · One battle constructor, where the alpha has three
+
+**Forced by:** nothing — a consolidation, recorded because it diverges.
+
+The alpha has `createQuickMatchBattle`, `createRunBattle`, and
+`recreateBattleFromConfig` as three entry points that each assemble a battle.
+The beta funnels Quick Match and Run through one private `_create_battle`, with
+the public functions supplying only what differs.
+
+**Why:** a battle's immutable identity and config are stamped in exactly once,
+so the two paths cannot drift in what they consider a battle's identity. The
+authorization's §2 makes duplicated battle construction "presumptively wrong",
+and two constructors that agreed today would be two to keep agreeing.
+
+**What the split still preserves:** the LINK and ICE resolution RULES differ by
+caller and stay with the caller. Quick Match resolves both maxima from the
+identities at construction; a Run passes the ceiling it froze at setup and the
+ICE its step resolved. `_create_battle` takes them as values rather than
+branching on a mode flag, so there is no `if run` inside the constructor.
+
+**Verification:** fast parity 150/150 after the refactor. The refactor touches
+battle construction, which is battle-affecting under §21.1 even though it is not
+the battle core — see the DEEPSCAN recommendation in the Phase C report.
+
+### P-023 · ODANSHAY's authored ICE coincides with the step-4 ladder value
+
+**Not a deviation** — a content coincidence that will mislead anyone reading
+these numbers, recorded so it is not rediscovered the hard way.
+
+Every authored System has `BASE_ICE = 100`, and the step-4 modifier is `+150`.
+ODANSHAY's authored `BASE_ICE` is **250**. So the correct rule (a Boss takes its
+authored ICE unmodified) and the wrong one (apply the step-4 modifier to a
+100-base System) produce the *same number*.
+
+This is almost certainly why the dead step-4 row in `RUN_ENCOUNTERS` (P-017)
+went unremarked: nothing about the shipped numbers reveals which rule produced
+them.
+
+**Consequence for testing:** a Boss ICE test cannot be written as "not equal to
+the System ladder value" — that assertion fails against correct code. The
+distinguishing case is the double-count, `boss_base + 150 = 400`, and that is
+what `test_run_battle.gd` asserts against.

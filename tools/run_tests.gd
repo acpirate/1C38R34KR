@@ -32,6 +32,8 @@ const SUITES := [
 	# Phase B — route generation, which the state model above is the substrate
 	# for. Fixture parity against the alpha lives here.
 	"res://tests/test_route.gd",
+	# Phase C — battle creation from committed Run state.
+	"res://tests/test_run_battle.gd",
 	# Phase 6 — persistence, accounting.
 	"res://tests/test_save.gd",
 	"res://tests/test_metrics.gd",

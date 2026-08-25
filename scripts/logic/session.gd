@@ -89,25 +89,96 @@ static func create_quick_match(
 	# directly in the parity run's wall clock.
 	with_accounting := false,
 ) -> GameState:
-	var hacker := Content.hacker(Content.DEFAULT_HACKER_ID)
-	var deck := Content.deck(Content.DEFAULT_DECK_ID)
-	var sys := Content.system(system_id)
+	return _create_battle({
+		"hacker_id": Content.DEFAULT_HACKER_ID,
+		"deck_id": Content.DEFAULT_DECK_ID,
+		"opponent_kind": Types.OpponentKind.SYS,
+		"opponent_id": system_id,
+		"opponent_source": Types.SystemSelectionSource.QUICK_CONSTRUCTED,
+		"host_id": host_id,
+		"upgrade_ids": [],
+		"build": build,
+		"build_origin": Types.BuildOrigin.DEFAULT,
+		"seed": seed_value,
+		"settings": settings,
+		"battle_id": "qm-%s-%s-%d" % [system_id, host_id, seed_value],
+		# Quick Match resolves both maxima from the identities at construction.
+		"player_hp": -1,
+		"enemy_hp": -1,
+		"with_accounting": with_accounting,
+	})
+
+
+## Builds a playable RUN battle from committed Run state.
+##
+## Everything here was decided earlier and is merely read: the encounter was
+## committed at the Path Choice, the LINK ceiling was resolved when setup
+## completed, and the settings snapshot was frozen at Boss commitment. Nothing
+## is rederived from current menu settings and nothing is rerolled.
+##
+## Beta 0.2 REFUSES to build a Boss battle. The Run reaches step 4 holding a
+## committed Boss package and stops at `PENDING_BOSS_BATTLE`; anything that
+## reached here with a Boss opponent would be fabricating the encounter beta 0.3
+## is meant to port, so it fails loudly rather than substituting a System.
+static func create_run_battle(r: Run, seed_value: int, with_accounting := true) -> GameState:
+	if r.opponent_kind == Types.OpponentKind.BOS:
+		push_error("beta 0.2 cannot create a Boss battle — the Run stops at PENDING_BOSS_BATTLE")
+		return null
+	if r.phase == Types.SessionPhase.PENDING_PATH:
+		push_error("no committed encounter — the Run is still on a Path Choice")
+		return null
+
+	return _create_battle({
+		"hacker_id": r.hacker_id,
+		"deck_id": r.deck_id,
+		"opponent_kind": r.opponent_kind,
+		"opponent_id": r.opponent_id,
+		"opponent_source": r.opponent_source,
+		"host_id": r.host_id,
+		"upgrade_ids": r.upgrade_ids.duplicate(),
+		"build": r.build.duplicate(),
+		"build_origin": r.build_origin,
+		"seed": seed_value,
+		"settings": r.settings,
+		"battle_id": "run-%s-b%d-%s-%d" % [r.boss_id, r.step, r.opponent_id, seed_value],
+		# Resolved from the Run rather than from the identities: the LINK ceiling
+		# was frozen at setup, and Run ICE escalates by step.
+		"player_hp": r.hacker_max_link,
+		"enemy_hp": Run.resolve_run_ice(r.settings, r.opponent_kind, r.opponent_id, r.step),
+		"with_accounting": with_accounting,
+	})
+
+
+## The one battle constructor. Quick Match and Run both come through here so
+## there is a single place where a battle's immutable identity and config are
+## stamped — duplicating this was how the two would drift.
+##
+## `player_hp` / `enemy_hp` of -1 mean "resolve from the identities", which is
+## Quick Match's rule. A Run passes its own already-resolved values.
+static func _create_battle(p: Dictionary) -> GameState:
+	var hacker := Content.hacker(p["hacker_id"])
+	var deck := Content.deck(p["deck_id"])
+	var enemy := _opponent_content(p["opponent_kind"], p["opponent_id"])
 
 	var s := GameState.new()
-	s.rng = Rng.new(seed_value)
+	s.rng = Rng.new(p["seed"])
 	s.next_id = 1
 	s.next_seq = 1
 	s.turn = 1
 	s.phase = Types.Phase.PLAYER_PRE
 	s.winner = -1
-	s.battle_id = "qm-%s-%s-%d" % [system_id, host_id, seed_value]
+	s.battle_id = p["battle_id"]
 
+	var settings: Dictionary = p["settings"]
 	var cfg := settings.duplicate() if not settings.is_empty() else Constants.default_settings()
 	# Under Normal LINK the maxima come from the selected identities; with it
 	# off the manual settings replace both.
 	if cfg["normal_link"]:
-		cfg["player_hp"] = int(hacker["base_link"]) + int(deck["add_link"])
-		cfg["enemy_hp"] = int(sys["base_ice"])
+		cfg["player_hp"] = (
+			int(p["player_hp"]) if int(p["player_hp"]) >= 0
+			else int(hacker["base_link"]) + int(deck["add_link"])
+		)
+		cfg["enemy_hp"] = int(p["enemy_hp"]) if int(p["enemy_hp"]) >= 0 else int(enemy["base_ice"])
 	else:
 		cfg["player_hp"] = int(cfg["manual_hacker_link"])
 		cfg["enemy_hp"] = int(cfg["manual_system_ice"])
@@ -115,29 +186,29 @@ static func create_quick_match(
 	# Each side's strong sets come from its OWN authored identity. Weak sets are
 	# the enum-order complement and are therefore never stored — deriving them
 	# from one authority is what keeps the two from drifting.
-	cfg["strong_colors"] = [hacker["strong_colors"], sys["strong_colors"]]
-	cfg["strong_shapes"] = [hacker["strong_shapes"], sys["strong_shapes"]]
+	cfg["strong_colors"] = [hacker["strong_colors"], enemy["strong_colors"]]
+	cfg["strong_shapes"] = [hacker["strong_shapes"], enemy["strong_shapes"]]
 	s.config = cfg
 
 	s.hp = [cfg["player_hp"], cfg["enemy_hp"]]
 
 	s.identity = {
-		"cache_key": "%s|%s|%s" % [Content.DEFAULT_HACKER_ID, system_id, host_id],
-		"hacker_id": Content.DEFAULT_HACKER_ID,
-		"deck_id": Content.DEFAULT_DECK_ID,
-		"opponent_kind": Types.OpponentKind.SYS,
-		"opponent_id": system_id,
-		"opponent_selection_source": Types.SystemSelectionSource.QUICK_CONSTRUCTED,
-		"host_id": host_id,
-		"upgrade_ids": [],
-		"hacker_programs": build,
-		"system_programs": sys["programs"],
+		"cache_key": _cache_key(p),
+		"hacker_id": p["hacker_id"],
+		"deck_id": p["deck_id"],
+		"opponent_kind": p["opponent_kind"],
+		"opponent_id": p["opponent_id"],
+		"opponent_selection_source": p["opponent_source"],
+		"host_id": p["host_id"],
+		"upgrade_ids": p["upgrade_ids"],
+		"hacker_programs": p["build"],
+		"system_programs": enemy["programs"],
 		"deck_function_id": deck["function_id"],
 		"selection_source": Types.SelectionSource.EXPLICIT_SELECTION,
-		"build_origin": Types.BuildOrigin.DEFAULT,
+		"build_origin": p["build_origin"],
 	}
 
-	s.units = [_units_for(build), _units_for(sys["programs"])]
+	s.units = [_units_for(p["build"]), _units_for(enemy["programs"])]
 	# A directly assigned Function that starts charged begins at its full pool.
 	s.deck_charge = int(deck["fn"]["cost"]) if deck["fn"]["start_charged"] else 0
 
@@ -145,10 +216,31 @@ static func create_quick_match(
 	s.board = BoardOps.generate_initial(gen)
 	s.next_id = gen.next_id
 
-	if with_accounting:
+	if p["with_accounting"]:
 		attach_accounting(s)
 
 	return s
+
+
+## The PASSIVE cache key.
+##
+## MUST include the acquired UPGRADEs. `Passives.active()` memoizes the assembled
+## instance list on this key, and a Run's UPGRADEs change between battles while
+## the Hacker, opponent, and HOST may not — two Run battles against the same
+## System on the same HOST with different UPGRADEs would otherwise collide and
+## the second would silently fight with the first's PASSIVE set.
+##
+## Beta 0.1 could omit it safely because Quick Match has no UPGRADEs at all.
+static func _cache_key(p: Dictionary) -> String:
+	var upgrades: Array = p["upgrade_ids"]
+	var suffix := "|".join(PackedStringArray(upgrades)) if not upgrades.is_empty() else "-"
+	return "%s|%s|%s|%s" % [p["hacker_id"], p["opponent_id"], p["host_id"], suffix]
+
+
+## Opponent content resolved through the identity union, so nothing here looks a
+## Boss up as though it were a System.
+static func _opponent_content(kind: Types.OpponentKind, id: String) -> Dictionary:
+	return Content.boss(id) if kind == Types.OpponentKind.BOS else Content.system(id)
 
 
 ## Attaches a metrics accumulator and a battle log to a state that has none.

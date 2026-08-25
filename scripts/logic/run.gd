@@ -270,6 +270,107 @@ static func resolve_hacker_max_link(settings_in: Dictionary, hacker_id_in: Strin
 	return int(Content.hacker(hacker_id_in)["base_link"]) + int(Content.deck(deck_id_in)["add_link"])
 
 
+## The enemy's maximum ICE for one Run encounter.
+##
+## Normal LINK ON:
+##   - a SYSTEM opponent takes its BASE_ICE plus that step's additive modifier,
+##     so the authored 100 yields the established 100/150/200 ladder;
+##   - a BOSS opponent takes its authored BASE_ICE with NO modifier at all. The
+##     authored value is already the final Boss-battle ICE — ODANSHAY's 250 —
+##     so adding the step-4 +150 would double-count the escalation.
+##
+## Normal LINK OFF: the manual enemy ICE for EVERY encounter, Boss battles
+## included. There is deliberately no separate manual Boss ICE setting, and the
+## manual value overrides both the base and the Run sequence rather than being
+## silently combined with either.
+##
+## The Boss branch is unreachable in beta 0.2, which never builds a Boss battle.
+## It is written now because the rule belongs with the rest of the table, and
+## leaving it out would invite a step-4 System ICE to be invented in 0.3.
+static func resolve_run_ice(
+	settings_in: Dictionary, kind: Types.OpponentKind, opponent_id: String, step_in: int
+) -> int:
+	if not settings_in["normal_link"]:
+		return int(settings_in["manual_system_ice"])
+	if kind == Types.OpponentKind.BOS:
+		return int(Content.boss(opponent_id)["base_ice"])
+	return int(Content.system(opponent_id)["base_ice"]) + int(encounter_for(step_in)["ice_modifier"])
+
+
+## This Run's committed encounter ICE.
+func encounter_ice() -> int:
+	return resolve_run_ice(settings, opponent_kind, opponent_id, step)
+
+
+# ---------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------
+
+## Replace one build slot with an inventory Program not already in the build.
+##
+## The build is never in an invalid intermediate state: there is no empty slot
+## to assemble from and no partially built loadout. A swap that would duplicate
+## a Program is refused rather than allowed and validated later.
+func replace_in_build(slot: int, program_id: String) -> bool:
+	if slot < 0 or slot >= build.size():
+		return false
+	if not inventory.has(program_id):
+		return false
+	if build.has(program_id) and build[slot] != program_id:
+		return false
+	build[slot] = program_id
+	build_origin = Types.BuildOrigin.PLAYER_EDITED
+	return true
+
+
+## Move a build slot up or down. Order is charge-routing priority, so this is a
+## gameplay edit rather than a cosmetic one.
+func move_build_slot(slot: int, delta: int) -> bool:
+	var to := slot + delta
+	if slot < 0 or slot >= build.size() or to < 0 or to >= build.size():
+		return false
+	var tmp = build[slot]
+	build[slot] = build[to]
+	build[to] = tmp
+	build_origin = Types.BuildOrigin.PLAYER_EDITED
+	return true
+
+
+## Inventory Programs not currently in the active build.
+func inactive_programs() -> Array:
+	var out: Array = []
+	for pid in inventory:
+		if not build.has(pid):
+			out.append(pid)
+	return out
+
+
+## Retry the battle just lost.
+##
+## The SAME encounter: the opponent is not rerolled, the HOST is unchanged, no
+## UPGRADE is granted again, and the current Build is preserved so the player
+## can adjust it before the rematch. Only the battle itself starts over.
+func retry_battle() -> void:
+	pending_path = null
+	phase = Types.SessionPhase.PENDING_BUILD
+	if build_origin == Types.BuildOrigin.DEFAULT:
+		build_origin = Types.BuildOrigin.CARRIED_RUN
+
+
+## Accept a won battle and move toward the next encounter.
+##
+## Returns false at the last step, where there is no next path to open — the
+## caller enters `PENDING_BOSS_BATTLE` instead of progressing.
+func advance_after_victory() -> bool:
+	var next := next_step(step)
+	if next == 0:
+		return false
+	# The build carries forward to the next battle rather than resetting.
+	if build_origin == Types.BuildOrigin.DEFAULT:
+		build_origin = Types.BuildOrigin.CARRIED_RUN
+	return open_path_choice(next)
+
+
 ## Generate the offers for the next battle, after a win.
 ##
 ## Advances the persisted route stream in place, so an interrupted-and-resumed
