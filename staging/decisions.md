@@ -851,3 +851,46 @@ after touching the code every battle goes through.
 
 Fast parity was green at every phase boundary throughout, and DEEPSCAN agreed
 with it. That is the outcome to expect; it is not the reason to skip the check.
+
+---
+
+## D-032 — REBOOT prevents matches; it does not decline to resolve them
+
+**2026-08-25 · agent → director · ACCEPTED**
+
+The Beta 0.3 authorization's §14 described REBOOT as regenerating the board and
+then not resolving the Syncs the rearrangement created. The shipped alpha does
+something different, and the difference is visible in play.
+
+REBOOT's authored tuple is `1:1:0:0`. The third element is
+`SHAKE_PREVENT_MATCHES`, and `board.ts` generates an arrangement **containing no
+match at all** — "the completed arrangement already satisfies the legal/stable
+post-generation invariants, so no Sync wave begins".
+
+**Why it matters:** under the original wording a port could generate freely,
+skip resolution, and leave one or more pre-made Syncs sitting inert on the
+board. The **Hacker** takes those next turn as free damage the alpha never
+grants. REBOOT is meant to be a reset, not a gift.
+
+**Why no test would have caught it:** §14's postcondition was "no post-REBOOT
+Sync/cascade resolves from the rearranged board". Both implementations satisfy
+that, because neither resolves anything *during* REBOOT. This is the P-036 shape
+again — a correctly stated prohibition whose positive half is unstated — and it
+appeared one section after the same document had systematically added positive
+postconditions everywhere else.
+
+**Decision:** §14 now states the prevent-matches invariant, and its postcondition
+asserts **the board contains zero matches immediately after REBOOT** — a
+property of the board rather than of what was skipped. Coverage item §21.43 was
+restated to match.
+
+Two adjacent confirmations were folded in at the same time, neither a change of
+intent: §10.1 now records the DATABEND loop as **5 activations across 6 capacity
+checks** (a `for i in 5` port gets both numbers wrong), and §11 now says DATABEND
+regenerates by **retention** rather than by special-ness, so a Packet carrying a
+Hacker overlay is itself regenerated.
+
+**The generalizable half**, for the AAR: when a rule says "X does not happen",
+ask whether X is *prevented* or merely *unobserved*. Those are different
+mechanisms behind the same prohibition, and only an assertion about resulting
+state tells them apart.

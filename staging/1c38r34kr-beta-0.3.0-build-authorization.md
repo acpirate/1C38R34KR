@@ -358,7 +358,7 @@ Normal terminal checks precede placement. If the battle already ended, no Overri
    - resolve DATABEND completely;
    - terminal-check;
    - if Hacker survives, recompute capacity and retry.
-4. Apply the shipped Alpha bounded retry limit identified during repository inspection (expected: **5 attempts maximum**).
+4. Apply the shipped Alpha bounded retry limit. **Inspected and confirmed:** `for (attempt = 0; attempt <= OVERRIDE_DATABEND_RETRY_LIMIT; attempt++)` with the limit `5` — that is **5 DATABEND activations across 6 capacity checks**, because the final iteration emits `PLACEMENT_ABANDONED` and returns without firing DATABEND. A loop written `for i in 5` yields 5 checks and 4 DATABENDs and is wrong in both directions.
 5. If the cap is exhausted and three valid targets still cannot be found:
    - place none;
    - end the Boss turn cleanly;
@@ -374,8 +374,8 @@ Gameplay RNG owns both Override target choice and DATABEND board randomization. 
 
 Interpret through existing SHAKE semantics:
 
-1. randomize non-special Packets;
-2. remove enemy overlays relative to the activating Boss — i.e. remove Hacker-owned overlays while preserving Boss-owned overlays;
+1. regenerate every cell whose overlay this Shake does **not** retain — the rule is retention, not special-ness, so a Packet carrying a *Hacker* overlay loses the overlay **and** is itself regenerated;
+2. remove enemy overlays relative to the activating Boss — i.e. remove Hacker-owned overlays while preserving Boss-owned overlays, each retained one keeping both its overlay and its underlying axes at its own coordinate;
 3. resolve resulting Syncs;
 4. use existing unlimited/stability cascade behavior for this tuple.
 
@@ -445,10 +445,12 @@ If Hacker survives, REBOOT fires next and the ordinary Boss turn continues from 
 
 Through existing SHAKE semantics:
 
-1. randomize non-special Packets;
+1. regenerate every cell — the tuple retains no overlay, so all 64 regenerate;
 2. remove all special overlays;
-3. do not resolve Syncs created by the rearrangement;
-4. do not run cascades from the rearrangement.
+3. generate under the **prevent-matches** invariant, so the resulting arrangement contains no Sync at all;
+4. run no cascades.
+
+> **Corrected 2026-08-25 (D-032), replacing "do not resolve Syncs created by the rearrangement".** The third element of the tuple `1:1:0:0` is `SHAKE_PREVENT_MATCHES`, and the alpha generates a board in which no match exists — it does not generate freely and then decline to resolve. The two differ in play: the looser reading can leave a pre-made Sync inert on the board for the **Hacker** to take next turn as free damage the alpha never grants. Both readings satisfy "no Sync resolves during REBOOT", which is why the postcondition below asserts the board's contents instead.
 
 REBOOT clears Overrides and ordinary Hacker/Boss/HOST board specials.
 
@@ -456,6 +458,7 @@ REBOOT does **not** clear non-board PASSIVE state.
 
 Positive postconditions:
 
+- **the board immediately after REBOOT contains zero matches** — assert the board's contents, not merely that nothing was resolved;
 - board special-overlay count is zero immediately after REBOOT under current semantics;
 - Hacker/Deck/HOST/UPGRADE PASSIVE instances remain active;
 - Program charge remains intact except for ordinary effects that resolved before REBOOT;
@@ -686,7 +689,7 @@ Cover at least:
 40. Hacker survival leads to REBOOT.
 41. REBOOT removes all board specials.
 42. REBOOT preserves non-board PASSIVE state.
-43. REBOOT does not resolve post-shake Sync/cascades.
+43. REBOOT leaves a board containing zero matches — not merely: resolves none. See §14 and D-032.
 44. Normal Boss turn continues afterward.
 45. Threshold can trigger again later.
 
