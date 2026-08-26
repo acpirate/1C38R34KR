@@ -169,8 +169,8 @@ static func run_result(r: Run, won: bool, action: String) -> void:
 	})
 
 
-## The beta 0.2 terminal state. This record is what beta 0.3 development will
-## read first: it is the complete committed package the Boss battle must consume.
+## Beta 0.2's terminal state, and now the handoff into Battle 4: the complete
+## committed package the Boss battle consumes.
 static func run_stopped(r: Run) -> void:
 	_emit(RUN_STOPPED, r.route_seed, {
 		"phase": Types.SESSION_PHASE_NAMES[r.phase],

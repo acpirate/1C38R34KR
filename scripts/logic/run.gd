@@ -302,9 +302,9 @@ static func resolve_hacker_max_link(settings_in: Dictionary, hacker_id_in: Strin
 ## manual value overrides both the base and the Run sequence rather than being
 ## silently combined with either.
 ##
-## The Boss branch is unreachable in beta 0.2, which never builds a Boss battle.
-## It is written now because the rule belongs with the rest of the table, and
-## leaving it out would invite a step-4 System ICE to be invented in 0.3.
+## The Boss branch was written in beta 0.2, one build before anything could
+## reach it, so that a step-4 System ICE could not be invented in its place.
+## Beta 0.3 routes through it unchanged.
 static func resolve_run_ice(
 	settings_in: Dictionary, kind: Types.OpponentKind, opponent_id: String, step_in: int
 ) -> int:
@@ -466,15 +466,15 @@ func select_path(offer_index: int) -> bool:
 	return true
 
 
-## §12.1 — the beta 0.2 stop point.
+## §12.1 — the gate into Battle 4.
 ##
 ## Entered after the final path is committed and its Build confirmed. The Run
-## holds a complete Boss + HOST + UPGRADE package that beta 0.3 will consume.
+## holds a complete Boss + HOST + UPGRADE package, and beta 0.3 consumes it.
 ##
-## This is NOT Run Complete. The alpha presents Run Complete on a step-4
-## RESULT, and beta 0.2 has no step-4 battle and therefore no step-4 result.
-## Nothing here may route through that path, and the Run must not be marked
-## finished, scored, or cleared.
+## This is still NOT Run Complete, and the distinction outlived the build that
+## needed it: Run Complete is presented on the step-4 RESULT, so nothing here
+## may route through that path or mark the Run finished, scored, or cleared.
+## A beta 0.2 save parked on this phase resumes into the Boss battle.
 func enter_pending_boss_battle() -> void:
 	phase = Types.SessionPhase.PENDING_BOSS_BATTLE
 

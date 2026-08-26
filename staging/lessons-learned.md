@@ -410,3 +410,65 @@ For a port, current validated runtime data and shipped source are stronger
 evidence than an older requirement's copied example value. Record discrepancies
 explicitly so a future agent does not “fix” the game back to an obsolete
 requirement.
+
+## The scene layer is where the differential stops, and it knows nothing
+
+**Beta 0.3 Phase I, 2026-08-25.**
+
+The Boss battle ran correctly and rendered a header reading `SYSTEM / ICE 0/1`.
+`battle_screen` looked the opponent up with `Content.system()`, which returns an
+empty Dictionary for a `BOS` id; indexing it aborted the refresh before the ICE
+readout ran.
+
+At the moment that shipped, the build had **3,122 headless tests, 300 Boss
+parity battles, and 5,250 DEEPSCAN battles all green**. None of them could see
+it. Layer purity is what makes the logic provable, and the exact same boundary
+is what leaves the scene layer unproven — the differential's reach ends where
+`RefCounted` does. A green harness says nothing whatsoever about the view.
+
+Two things generalize:
+
+- **A defect that aborts a refresh presents as stale UI, not as a crash.** There
+  is no stack trace and no error line; the screen simply keeps showing the last
+  thing that was true. That failure mode is invisible to anything but eyes on a
+  device, and it argues for reading device screens *as data* rather than
+  glancing at them for obvious breakage.
+- **When a lookup can legitimately fail, the fix is to remove the choice, not to
+  guard the call site.** `Content.opponent_of_identity` means no caller decides
+  which registry to consult. Auditing the other six `Content.system(` callers
+  took a minute; they were already guarded — but "already guarded" is a
+  property of today's callers, and the union is a property of the API.
+
+## A fix that degrades the diagnostic is not a fix
+
+**Beta 0.3, AN-006.**
+
+The battle screen overflowed a 1080 px phone because the debug bar's seed Label
+shared a row with the buttons — a Label's minimum width is its text, and the
+build had just replaced an always-`0` seed with ten-digit randoms. The first fix
+set `clip_text` and produced a layout that fit and a seed that read
+`seed 205953`.
+
+That was worse than the bug. A seed exists for exactly one purpose: so an
+observation made on a device can be replayed in the harness. A truncated seed
+cannot be replayed, so the fix removed the only reason the readout was on screen
+while leaving it there to look reassuring. The bug was visible; a lying readout
+would not have been.
+
+**The rule that came out of it:** a debug affordance must not participate in the
+game's layout at all — its own row, its own overlay, anywhere but in a container
+that sizes the scene. "Make it fit" was the wrong frame; "make it structurally
+incapable of pushing" was the right one.
+
+Two supporting notes:
+
+- **The defect presented as Boss-specific and was not.** The failing screenshot
+  was a Boss battle and the passing one a Quick Match, so the Boss looked like
+  the variable. It was seed digit count. Two device screenshots are a sample of
+  two, and the difference between them is rarely the difference you noticed.
+- **This is the second time the tablet was structurally unable to see a phone
+  defect** (the first being the safe-area conversion, P-031). The tablet is
+  ~120 px wider and absorbs exactly this class of problem. `adb shell wm size
+  1080x2340` reproduces the phone's geometry on the tablet and turns a
+  device-window-gated defect into ordinary iteration — reach for it before
+  asking for hardware.

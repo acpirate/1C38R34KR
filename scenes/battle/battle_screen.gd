@@ -141,7 +141,7 @@ func _build_ui() -> void:
 		_system_boxes.append(theirs)
 
 	# The Deck Function sits under the Hacker's Programs and matches them: it is
-	# a fifth control with its own pool, not a Program, and beta 0.1 does not yet
+	# a fifth control with its own pool, not a Program, and the beta does not
 	# distinguish it further.
 	_deck_box = UnitBox.new()
 	_deck_box.pressed.connect(_on_deck_pressed)

@@ -10,50 +10,44 @@ intended — see [The differential gate](#the-differential-gate).
 
 ## Status
 
-**`beta-0.2.0` — the full pre-Boss Run loop, playable on hardware.**
+**`beta-0.3.0` — the complete Alpha gameplay loop, playable on hardware.**
 
-A complete Run runs end to end on an Android device:
+A full Run now runs end to end, Boss included:
 
 ```
-New Run → Boss → Hacker → Deck → Path → Build → Battle → … ×3 → Boss route → stop
+New Run → Boss → Hacker → Deck → (Path → Build → Battle) ×3 → ODANSHAY → Run Complete
 ```
 
-Beta 0.1's battle engine is unchanged underneath it. What 0.2 adds is the
-progression layer around it: route generation, UPGRADE acquisition, Run-scoped
-build carry-forward, and a session save that survives with no battle in progress.
+With Beta 0.3 the Godot line contains the whole alpha feature skeleton: the
+battle engine, Constructed and Random Quick Match, Run setup and progression,
+the route/HOST/UPGRADE layer, Boss selection, Battle 4, the ODANSHAY mechanic,
+and Run completion.
 
 | Phase | State |
 | --- | --- |
-| A — Run/setup session model, route RNG, UPGRADE state | ✅ |
-| B — route generation and Random Quick Match setup | ✅ pinned draw-for-draw against the alpha |
-| C — battle-engine integration, ICE ladder, Run Build | ✅ caught a latent PASSIVE cache collision |
-| D — session save envelope (schema 3) | ✅ |
-| E — Run differential harness | ✅ found a real port defect on its first comparison |
-| F — Run screens and shared safe-area policy | ✅ |
-| G — Run/session logging | ✅ |
-| H — full verification, tablet and phone gates | ✅ |
-| I — README, closeout, diff review | ✅ see `staging/port-handback.md` |
+| A — preflight fixes (board jump, fresh gameplay seeds) | ✅ |
+| B — Boss identity, battle construction, Run Complete | ✅ |
+| C–E — Override overlay, Boss turn hook, mechanic payloads | ✅ |
+| F — result and session integration | ✅ |
+| G — Boss telemetry | ✅ |
+| H — Boss differential, DEEPSCAN, regression | ✅ |
+| I — device verification | ✅ tablet complete; phone layout defect found and fixed |
+| J — README, closeout, diff review | ✅ see `staging/1c38r34kr-beta-0.3.0-port-handback.md` |
 
 | Gate | State |
 | --- | --- |
-| Headless logic tests | ✅ 2,906 passing across 22 suites |
-| Route fixture parity (offers **and** draw counts) | ✅ 6 seeds × 4 generations, exact |
-| Run/session differential | ✅ 2,000/2,000 walks, no divergence |
-| Battle parity (fast, 150 battles) | ✅ 150/150, no divergence |
-| Battle parity (full matrix, "DEEPSCAN") | ✅ 5,250/5,250, no divergence |
-| Tablet device gate | ✅ full Run loop, both relaunch cases, clean log |
-| S25 phone gate | ✅ layout, safe area, and scroll on every new screen |
+| Headless logic tests | ✅ 3,122 passing across 23 suites |
+| **Boss differential vs the alpha** | ✅ **300/300** — ODANSHAY on every HOST |
+| Run/session differential | ✅ 1,000/1,000 walks |
+| Battle parity (fast, 150 battles) | ✅ 150/150 |
+| Battle parity (full matrix, "DEEPSCAN") | ✅ **5,250/5,250** |
+| Tablet device gate | ✅ full Run to RUN COMPLETE, clean log |
+| Phone layout | ✅ verified at 1080×2340 after AN-006 |
 
-**Battle 4 stops deliberately.** The Run reaches its committed Boss route,
-persists the complete `Boss + HOST + UPGRADE` package, and enters
-`PENDING_BOSS_BATTLE` rather than fabricating a battle. Beta 0.3 consumes that
-state. Beta 0.2 never substitutes a System for the Boss, and `create_run_battle`
-refuses to build one.
-
-Deliberately **not** in 0.2, per the build authorization: Boss combat and the
-ODANSHAY Override mechanics (CODESHATTER, REBOOT, DATABEND), permanent
-progression, a completion matrix, Windows/browser/iOS deployment, production art
-or audio, and any balance change.
+Deliberately **not** in 0.3: additional Bosses, a Boss scripting layer, Boss
+Quick Match, permanent progression, a completion matrix, production art or
+audio, broad balance work, Windows/browser/iOS deployment, and package-ID
+finalization.
 
 ### Devices
 
@@ -129,6 +123,23 @@ fixtures — route generation, with its retry loops and draw-order traps — tur
 out to be correct code. The divergence lived in a field nobody would think to
 write an assertion about.
 
+### The Boss differential
+
+Beta 0.3 reaches Boss combat through the same instruments rather than a third
+harness. Naming a `BOS_*` id in `--sys` selects the Boss fixture route on both
+sides — `headlessBoss` on the alpha, which Alpha 0.7.0 §45 had already built for
+automated coverage, and `create_boss_trace_battle` on the beta. Player-facing
+Quick Match stays System-only on both.
+
+```bash
+node tools/gen/boss_parity.mjs --seeds 0-59
+```
+
+**300/300 with no divergence**, ODANSHAY across all five HOSTs. The first
+comparison diverged on hash while matching on event count, turn count, winner,
+and even the exact Override cells chosen — the cause was field naming, since the
+beta writes snake_case and the alpha's camelCase wins at the trace boundary.
+
 ## Requirements
 
 - Godot **4.7.2** stable, standard (non-Mono) build
@@ -148,10 +159,11 @@ release builds carry different signatures and cannot install over one another.
 ## Commands
 
 ```bash
-godot --headless -s res://tools/run_tests.gd            # 2,906 logic tests, no GPU
+godot --headless -s res://tools/run_tests.gd            # 3,122 logic tests, no GPU
 godot --headless --import                               # refresh the class cache
 node tools/gen/parity.mjs                               # battle differential gate
 node tools/gen/run_parity.mjs --seeds 0-1999            # Run/session differential
+node tools/gen/boss_parity.mjs --seeds 0-59             # Boss differential
 godot --headless -s res://tools/run_trace.gd -- --seed 42 --full   # dump one Run walk
 
 godot --headless --export-debug "Android" build/1c38r34kr.apk
@@ -174,12 +186,12 @@ that are perfectly fine.
 data/       ten CSV datasets — the content source of truth
 scripts/    game logic (pure RefCounted, no scene-tree dependencies)
 scenes/     Godot scenes — render from state, send intents to it
-tests/      22 headless suites
+tests/      23 headless suites
 tools/      headless runners: tests, traces, both parity harnesses
 staging/    build authorizations, decisions log, port notes, design reference
 ```
 
-~19,300 lines of GDScript: 10,800 logic, 3,200 scenes, 4,400 tests, 900 tools.
+~20,600 lines of GDScript: 11,200 logic, 3,400 scenes, 5,100 tests, 900 tools.
 
 ## Architecture
 
@@ -259,6 +271,42 @@ The Run's `route_seed` doubles as its identity in the logs. A generated ID would
 have joined records and nothing else; the seed also *reproduces* the Run, so a
 line from a device log replays in the harness.
 
+### The Boss
+
+Battle 4 is ODANSHAY, and a Boss is a distinct identity layer rather than a
+System with a flag: the battle carries `opponent kind = BOS`, no `SYS_ID` is
+ever synthesized, and its ICE is the authored **250** with no step modifier
+applied. (The step-4 `+150` in the encounter table is dead data, carried
+deliberately — see port-notes P-017.)
+
+Everything ODANSHAY shares with a System runs through the ordinary enemy path:
+Program charge routing, the Function phase, countdowns, HOST effects, Hacker
+UPGRADE PASSIVEs, cascades, damage attribution. `scripts/logic/boss.gd` adds
+exactly three things, and `run_enemy_phase` gains exactly two guarded hooks.
+
+**The Override.** At the end of every non-terminal Boss turn ODANSHAY places
+exactly **three** Overrides — or **none**. A valid target is an axis-bearing
+Packet not already carrying a Boss-owned overlay; a *Hacker*-owned overlay is a
+valid target and is replaced. Placement preserves the Packet's colour and shape,
+so it deals no damage, grants no charge, and creates no Sync. Its only effect is
+to count.
+
+**The fallback.** With fewer than three targets it places nothing and casts
+DATABEND to make room, then re-checks. The bound is the shipped alpha's and the
+off-by-one matters: `attempt` runs `0..LIMIT` inclusive, which is **5 DATABEND
+activations across 6 capacity checks** — the final iteration abandons rather
+than casting. A loop written `for i in LIMIT` gets both numbers wrong.
+
+**The threshold.** At `override_count >= 15` — never `== 15`, since Overrides
+arrive in threes — CODESHATTER fires as ordinary Function damage, then REBOOT if
+the Hacker survived. REBOOT regenerates the board under the **prevent-matches**
+invariant, so the result contains no Sync at all; it does not generate freely
+and decline to resolve. That distinction is D-032, and it matters because the
+looser reading would leave a pre-made Sync for the *player* to collect.
+
+None of this is a phase transition. Overrides accumulate again and the threshold
+can fire on a later turn.
+
 ### Saves
 
 The battle record is no longer the top level. A Run is saveable with no battle
@@ -296,13 +344,16 @@ rejected rather than restored against different rules than it was made under.
 
 | File | What it is |
 | --- | --- |
-| `staging/1c38r34kr-beta-0.2.0-build-authorization-revised.md` | the scope and completion standard this build answers to |
+| `staging/1c38r34kr-beta-0.3.0-build-authorization.md` | the scope and completion standard this build answers to |
+| `staging/1c38r34kr-beta-0.3.0-authorization-review.md` | the pre-implementation review of it |
+| `staging/1c38r34kr-beta-0.2.0-build-authorization-revised.md` | the previous build's scope |
 | `staging/1c38r34kr-beta-0.2.0-authorization-review.md` | the pre-implementation review of it, and the seven items that needed resolving |
 | `staging/1c38r34kr-beta-0.1.0-build-authorization.md` | the previous build's scope, kept for reference |
-| `staging/decisions.md` | append-only decision log, D-001..D-031 |
-| `staging/port-notes.md` | every place the translation is non-literal, P-001..P-036 |
+| `staging/decisions.md` | append-only decision log, D-001..D-032 |
+| `staging/port-notes.md` | every place the translation is non-literal, P-001..P-045 |
 | `staging/architect-notes.md` | design items raised during the port that must **not** be built as part of it |
-| `staging/1c38r34kr-beta-0.2.0-port-handback.md` | **the close-out** — what shipped, what the verification caught, and the final diff review |
+| `staging/1c38r34kr-beta-0.3.0-port-handback.md` | **the close-out** — what shipped, what the verification caught, and the final diff review |
+| `staging/1c38r34kr-beta-0.2.0-port-handback.md` | the beta 0.2 close-out |
 | `staging/port-handback.md` | the beta 0.1 close-out |
 | `staging/lessons-learned.md` | what cost time and why, for the AAR |
 | `staging/design-reference/` | the alpha's screens, and the rules extracted from them |
