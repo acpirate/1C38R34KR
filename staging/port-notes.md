@@ -895,3 +895,41 @@ breached" over ODANSHAY for the same reason as P-042.
 Both now derive from data — the version from `Content.GAME_VERSION`, the
 headline from the opponent union. A literal that duplicates a value the build
 already knows is a small thing that is wrong on a predictable schedule.
+
+### P-044 · A debug readout must not be load-bearing for layout
+
+AN-006 in full: the battle screen overflowed a 1080 px viewport because the
+debug bar's seed Label shared a row with the controls, and a Label's minimum
+width is its text. F-002 changed the seed from a permanent `0` to a ten-digit
+random, so a row that had always been narrow became the widest thing in the
+scene — clipping the board, the opponent's Program column, and the bar's own
+last button.
+
+Three things about it are worth carrying forward.
+
+**It was invisible on the tablet.** 1200 px absorbed the growth; 1080 did not.
+That is twice now that the tablet structurally could not see a phone defect
+(P-031 was the other), and both times the mechanism was width, not touch.
+
+**It presented as a Boss bug and was not one.** The failing screenshot was a
+Boss battle and the passing one a Quick Match, which is a coincidence of seed
+digit count — 10 versus 7. Two device screenshots are a sample of two, and the
+difference between them is not necessarily the variable you changed.
+
+**The first fix was worse than the bug.** Clipping the label restored the layout
+and truncated the seed to `seed 205953`. The seed exists so a device
+observation can be replayed in the harness; a clipped one cannot. The rule the
+fix should follow is not "make it fit" but *a debug affordance must not
+participate in the game's layout at all* — hence its own row.
+
+### P-045 · `wm size` turns a phone-only defect into an ordinary iteration
+
+`adb shell wm size 1080x2340` on the tablet reproduced AN-006 exactly, which
+meant the fix was developed and verified without the phone attached.
+`wm size reset` restores the device.
+
+Worth reaching for before requesting a device window: the phone is the
+director's daily handset and tethering time is a real cost, while the tablet is
+always connected and may be configured freely. It restarts the app, so relaunch
+after setting it, and the screenshot comes back letterboxed to the emulated
+aspect (886x1920 for a 1080x2340 override) — measure ratios, not raw pixels.

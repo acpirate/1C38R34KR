@@ -324,29 +324,49 @@ func _apply_safe_area(root: Control) -> void:
 # Diagnostics (D-012) — debug builds only
 # ---------------------------------------------------------------------------
 
+## The debug affordances: a seed readout on its own line, then the controls.
+##
+## AN-006 — the seed sits on a SEPARATE ROW rather than beside the buttons.
+##
+## A Label's minimum width is its text, so a seed sharing the button row adds
+## its digits to that row's minimum. F-002 changed the seed from a permanent `0`
+## to a ten-digit random, which pushed the row past a 1080 px viewport and
+## clipped the board, the opponent's Program column, and the bar's own last
+## button — on the phone only, because the tablet has ~120 px more to absorb it.
+##
+## Clipping the label instead was tried and rejected: a seed you cannot read is
+## not a diagnostic. Its own row keeps it complete AND keeps it out of the
+## buttons' width, which is the property that actually matters — nothing in a
+## debug affordance should be load-bearing for the game's layout.
 func _build_debug_bar() -> Control:
-	var bar := HBoxContainer.new()
+	var box := VBoxContainer.new()
 	if not OS.is_debug_build():
-		bar.visible = false
-		return bar
+		box.visible = false
+		return box
+	box.add_theme_constant_override("separation", UiTheme.px(2))
+
+	# The highest-leverage diagnostic: it turns "something looked wrong on the
+	# phone" into a seed that replays in the headless harness with a full trace.
+	var seed_label := Label.new()
+	seed_label.text = "seed %d" % _battle_seed()
+	seed_label.add_theme_font_size_override("font_size", UiTheme.font_small())
+	seed_label.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
+	box.add_child(seed_label)
+
+	var bar := HBoxContainer.new()
+	box.add_child(bar)
 
 	_speed_button = Button.new()
 	_speed_button.pressed.connect(_cycle_speed)
 	bar.add_child(_speed_button)
 	_update_speed_button()
 
-	# The highest-leverage diagnostic: it turns "something looked wrong on the
-	# phone" into a seed that replays in the headless harness with a full trace.
-	var seed_label := Label.new()
-	seed_label.text = "  seed %d  " % _battle_seed()
-	bar.add_child(seed_label)
-
 	bar.add_child(_debug_button("charge", _grant_charge))
 	bar.add_child(_debug_button("win", func(): _force_outcome(Types.Side.ENEMY)))
 	bar.add_child(_debug_button("lose", func(): _force_outcome(Types.Side.PLAYER)))
 	bar.add_child(_debug_button("log", func():
 		_log_overlay.visible = not _log_overlay.visible))
-	return bar
+	return box
 
 
 func _debug_button(label: String, action: Callable) -> Button:

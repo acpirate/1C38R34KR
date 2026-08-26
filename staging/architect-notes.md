@@ -237,10 +237,36 @@ larger than its presentation suggests.
 
 ---
 
-## AN-006 — Battle screen overflows horizontally on the S25 (BLOCKS the Beta 0.3 phone gate)
+## AN-006 — Battle screen overflowed horizontally on the S25 — RESOLVED
 
-**Found during the Beta 0.3 §23.2 phone window, 2026-08-25. Reproducible. This
-item is why the phone gate is NOT signed off.**
+**Found during the Beta 0.3 §23.2 phone window, 2026-08-25. RESOLVED the same
+day — the hypothesis below was confirmed and fixed. Kept in full because the
+diagnosis is the useful part, and because it names a device-testing technique
+worth reusing.**
+
+### Resolution
+
+The seed label was the cause. It now sits on **its own row** above the debug
+controls, so its width cannot enter the button row's minimum.
+
+Clipping the label was tried first and **rejected**: it kept the layout correct
+but truncated the seed to `seed 205953`, and a seed you cannot read is not a
+diagnostic. Its own row keeps the value complete *and* keeps it out of the
+buttons' width.
+
+Verified at the phone viewport with a ten-digit seed — the exact case that
+failed — margins symmetric at 12 px left and right, every control present, and
+`seed 1943671255` fully legible.
+
+### The technique worth reusing
+
+The phone did not need to be tethered for the fix. `adb shell wm size 1080x2340`
+on the **tablet** reproduced the failure exactly, giving a full edit-build-verify
+loop on the always-connected device. `wm size reset` restores it.
+
+That converts "a defect only the phone can see" into an ordinary iteration, and
+it is worth reaching for before asking for a device window. It does restart the
+app, so relaunch after setting it.
 
 **Symptom.** On the Galaxy S25 (1080×2340), the battle screen renders wider than
 the viewport: the opponent ICE bar, the entire right-hand Program column, the
