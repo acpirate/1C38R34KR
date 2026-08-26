@@ -258,6 +258,11 @@ Verified at the phone viewport with a ten-digit seed — the exact case that
 failed — margins symmetric at 12 px left and right, every control present, and
 `seed 1943671255` fully legible.
 
+**Confirmed on the S25 itself afterwards**, closing the gap the emulated
+viewport could not cover: the layout is clean against the real display cutout,
+with no impingement, and the Override marker is legible on the physical panel.
+§23.2 is signed off on hardware.
+
 ### The technique worth reusing
 
 The phone did not need to be tethered for the fix. `adb shell wm size 1080x2340`

@@ -9,7 +9,7 @@
 
 ## 1. Verdict
 
-**Complete against §27.**
+**Complete against §27, both device gates signed off.**
 
 The full alpha gameplay loop now runs in Godot: New Run → Boss → Hacker → Deck →
 (Path → Build → Battle) ×3 → ODANSHAY → Run Complete. Played end to end on the
@@ -89,7 +89,7 @@ Two things worth keeping from it:
 | Battle parity, fast tier | 150/150, no divergence |
 | Battle parity, DEEPSCAN | **5,250/5,250**, all four variations, no divergence |
 | Tablet device gate | complete, clean log |
-| Phone layout | verified at 1080×2340 after AN-006 |
+| Phone device gate | complete on the S25 — layout, cutout, Override legibility |
 | Alpha suite (after the instrument change) | 272 passing |
 
 DEEPSCAN was run because the Boss work touches `run_enemy_phase`. §22 allows
@@ -136,17 +136,23 @@ on the first run, and the only thing wrong was the spelling of the record.
 - Run survived a full APK reinstall and resumed into the Boss battle ✅
 - clean Godot log ✅
 
-**Phone (Galaxy S25, 1080×2340)** — §23.2, partially:
+**Phone (Galaxy S25, 1080×2340)** — §23.2, complete:
 
 - Run flow, Path Choice, Build, and the Boss Build all fit and scroll ✅
 - battle screen overflow found → **AN-006**, fixed, re-verified at 1080×2340 ✅
+- no safe-area impingement against the real display cutout ✅
+- **Override markers legible on the physical panel** ✅
 
-**Stated plainly:** the post-fix battle-screen verification was done at an
-**emulated** 1080×2340 viewport on the tablet, not on the S25 itself. The
-geometry is identical and the overflow reproduced and cleared there, but the S25
-has a real display cutout the tablet does not. Two §23.2 items — the safe area
-over a genuine cutout, and Override marker legibility on the real panel — remain
-unconfirmed on hardware and want one short window.
+The AN-006 fix was first cleared at an *emulated* 1080×2340 viewport on the
+tablet, which reproduces the geometry but not the cutout. Confirmed afterwards on
+the S25 itself: layout clean, nothing clipped by the cutout, and the ringed `Ø`
+readable at the panel's real pixel density over a Packet that keeps its own
+colour and glyph. **§23.2 is signed off on hardware.**
+
+Worth keeping for the next device pass: the emulated viewport was right about
+everything it could see, and the two things it structurally could not see — the
+cutout and physical legibility — are exactly the two that needed the phone.
+That is a usable division of labour rather than an argument against either.
 
 **Performance (§24)** — no speculative optimization, and none needed. No
 repeated full-board rebuild on placement, no visible DATABEND stall, no scene

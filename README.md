@@ -31,7 +31,7 @@ and Run completion.
 | F — result and session integration | ✅ |
 | G — Boss telemetry | ✅ |
 | H — Boss differential, DEEPSCAN, regression | ✅ |
-| I — device verification | ✅ tablet complete; phone layout defect found and fixed |
+| I — device verification | ✅ both devices; one phone layout defect found and fixed |
 | J — README, closeout, diff review | ✅ see `staging/1c38r34kr-beta-0.3.0-port-handback.md` |
 
 | Gate | State |
@@ -42,7 +42,7 @@ and Run completion.
 | Battle parity (fast, 150 battles) | ✅ 150/150 |
 | Battle parity (full matrix, "DEEPSCAN") | ✅ **5,250/5,250** |
 | Tablet device gate | ✅ full Run to RUN COMPLETE, clean log |
-| Phone layout | ✅ verified at 1080×2340 after AN-006 |
+| Phone device gate | ✅ layout, cutout, and Override legibility on the S25 |
 
 Deliberately **not** in 0.3: additional Bosses, a Boss scripting layer, Boss
 Quick Match, permanent progression, a completion matrix, production art or
