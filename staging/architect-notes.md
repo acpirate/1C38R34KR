@@ -234,3 +234,78 @@ the one genuinely destructive control is consistent rather than novel.
 
 Related to AN-003 in spirit: both are about a control whose consequence is
 larger than its presentation suggests.
+
+---
+
+## AN-006 — Battle screen overflows horizontally on the S25 (BLOCKS the Beta 0.3 phone gate)
+
+**Found during the Beta 0.3 §23.2 phone window, 2026-08-25. Reproducible. This
+item is why the phone gate is NOT signed off.**
+
+**Symptom.** On the Galaxy S25 (1080×2340), the battle screen renders wider than
+the viewport: the opponent ICE bar, the entire right-hand Program column, the
+board's eighth column, and the debug bar's `log` button are all clipped at the
+right edge. Reproduced on a clean launch with the screen awake and unlocked, so
+it is not an artefact of the app starting behind the keyguard.
+
+**It is NOT Boss-specific.** An ordinary Random Quick Match on the same phone,
+same build, fits perfectly with a symmetric margin. That is what made it look
+like a Boss defect at first.
+
+### What was measured, so this is not re-derived
+
+| Check | Result |
+| --- | --- |
+| Safe-area insets, Boss vs ordinary battle | **identical** — `control=(1080,2340) screen=(1080,2340) safe=[(0,96)…(1080,2244)] insets=(0,96,0,0)` |
+| Content extent, ordinary QM | left 15, right **1064** — symmetric, correct |
+| Content extent, Boss battle | left 15, right **1079** — clipped at the screen edge |
+| `AvatarBox` / `UnitBox` minimum width | **none** — both are pure `_draw` with shrink-to-fit |
+| Battle root VBox child minimums (headless, 1080 wide) | header 119, grid 4, debug bar 282–364, all far below the ~1068 root width |
+
+**The safe area is ruled out** and **minimum sizes as measured headlessly are
+ruled out**, which is the useful half of this note.
+
+### The leading hypothesis, unconfirmed
+
+The failing screenshot's seed was `1278219584` (10 digits); the passing one's was
+`7898945` (7). The battle debug bar is an `HBoxContainer` containing a
+`seed %d` Label, and its minimum width **does** grow with digit count —
+measured 282 at `seed 1`, **364** at `seed 1278219584`.
+
+That correlates perfectly with the device evidence, and it has an obvious
+cause: **F-002 replaced the always-`0` gameplay seed with large randoms**, so
+this row got materially wider in this build and never did before.
+
+The gap in the theory: 364 is still well under the ~1068 px root width in a
+headless measurement, so minimum size alone should not overflow. Device font
+metrics may differ from headless, or the growth may interact with the
+`AspectRatioContainer` board sizing. **Not confirmed** — it needs one more phone
+window with instrumentation on the debug bar's resolved rect.
+
+### Why it did not appear before
+
+- Beta 0.2's phone gate ran Quick Match with the seed pinned at `0`, so the row
+  was at its narrowest.
+- The tablet is 1200 px wide and has ~120 px more room, so it absorbs the
+  growth. Every Boss battle played there fit.
+
+This is the second time the tablet has structurally been unable to see a phone
+problem (the first being the safe-area conversion itself, P-031).
+
+### Suggested fix direction
+
+Whatever the exact mechanism, the debug bar should not be able to drive the
+battle layout's width. Options, cheapest first:
+
+1. **Clip the seed label** — give it `clip_text = true` and a fixed width, or
+   show a shortened form. A diagnostic readout must never resize the game.
+2. **Move the seed out of the bar** — into the pause menu, where width is free.
+3. **Make the debug bar its own overlay** rather than a VBox row, so it cannot
+   participate in the battle layout's sizing at all.
+
+Option 1 is the smallest and is probably correct regardless of the root cause:
+nothing in a debug affordance should be load-bearing for player-facing layout.
+
+**Release builds are not affected** — the bar is `OS.is_debug_build()` only —
+but every device test runs on a debug build, so it degrades exactly the
+configuration used to evaluate the game.
