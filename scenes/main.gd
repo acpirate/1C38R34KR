@@ -1217,10 +1217,9 @@ func _show_run_result(winner: int) -> void:
 		_show_metrics(_finished_state)
 
 
-## Progress past a won battle. At the last step there is no next path — the Run
-## has already committed its Boss route and stops instead of advancing.
-## Progress past a won battle. At the last step there is no next route — beating
-## ODANSHAY ends the Run.
+## Progress past a won battle. At the last step there is no next route — the Run
+## has already committed its Boss package, and beating ODANSHAY ends the Run
+## rather than advancing it.
 func _advance_run() -> void:
 	if _run.advance_after_victory():
 		SessionLog.path_offered(_run)
