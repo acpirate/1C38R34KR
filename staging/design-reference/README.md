@@ -1,6 +1,7 @@
-# Alpha visual reference
+# Visual reference
 
-Captured 2026-08-23 from `breach` alpha-0.7.0 running in the browser at a
+The alpha reference the beta is matched against, and the beta's own
+screens as they stand. The alpha set was captured 2026-08-23 from `breach` alpha-0.7.0 running in the browser at a
 430×932 phone viewport (`http://localhost:5174/`). These are the **source of
 truth for the beta's initial look**, per the director's instruction to
 "replicate those using the currently implemented game systems and with the later
@@ -17,6 +18,8 @@ Two things this reference is NOT:
 
 ## The images
 
+### Alpha (`alpha-*.jpg`) — the reference being matched
+
 | File | Screen |
 | --- | --- |
 | `alpha-01-title.jpg` | Title |
@@ -24,6 +27,54 @@ Two things this reference is NOT:
 | `alpha-03-battle.jpg` | Battle, idle |
 | `alpha-04-battle-hint.jpg` | Battle with the status/hint line populated |
 | `alpha-05-pause.jpg` | Pause menu with ACTIVE BATTLE CONFIG |
+
+### Beta 0.1 (`beta-*.png`) — the first port, for comparison
+
+`beta-01-title`, `beta-02-system-select`, `beta-03-build`, `beta-04-battle`,
+`beta-05-pause`, `beta-06-result`. Quick Match only: no Run, no routes, no
+UPGRADEs, no Boss.
+
+### Beta 0.3 (`beta03-*.png`) — current, captured 2026-08-25
+
+Captured from `beta-0.3.0` on real hardware. Files with no suffix are the
+**Galaxy S25 (1080×2340)**, which is the phone-shaped case the alpha reference
+was captured at; `-tablet` files are the **Galaxy Tab A (1200×1920)**. Both are
+debug builds, so the seed row and the `1x / charge / win / lose / log` controls
+are visible and would not appear in a release build.
+
+| File | Screen | Device |
+| --- | --- | --- |
+| `beta03-01-title.png` / `-tablet` | Title, no save | both |
+| `beta03-02-path-choice.png` / `-tablet` | Path Choice, Battle 1 (fixed DOORMAN + THRESHOLD, two UPGRADEs) | both |
+| `beta03-03-build.png` / `-tablet` | Build with Run context | both |
+| `beta03-04-battle.png` / `-tablet` | Battle against a System | both |
+| `beta03-05-battle-victory.png` / `-tablet` | Battle won, mid-Run | both |
+| `beta03-06-run-defeat.png` | Battle lost — Retry / Abandon | S25 |
+| `beta03-07-boss-build-tablet.png` | Build for Battle 4, ODANSHAY at ICE 250 | Tab A |
+| `beta03-08-boss-battle-tablet.png` | **The ODANSHAY battle** | Tab A |
+| `beta03-09-run-complete-tablet.png` | **RUN COMPLETE** — the Boss is down | Tab A |
+
+**What changed since the 0.1 set, visually:**
+
+- Both sides' Programs are on screen at once — the single biggest gap the alpha
+  reference called out, now closed.
+- Packets are a coloured glyph on a dark cell, with neutrals as static.
+- Selection screens are select-then-confirm, per the reference's recommendation.
+- Every Run screen carries the Run context block (battle N of 4, opponent, ICE,
+  HOST, LINK, acquired UPGRADEs, Boss).
+- The Boss is an honest identity: the battle header reads **ODANSHAY**, never
+  "SYSTEM", and its ICE is the authored 250.
+- Overrides render as a ringed `Ø` badge on the Packet, which keeps its colour
+  and shape underneath. Not captured in a still here — placement happens at the
+  end of a Boss turn, so it needs a battle in progress to see.
+
+**Two layout facts these images encode**, both learned the hard way and worth
+keeping when the art pass lands:
+
+- The phone is the constraint, not the tablet. The tablet has ~120 px more width
+  and has twice hidden a phone-only defect (P-031, AN-006/P-044).
+- The debug rows are deliberately laid out so they cannot widen the battle
+  scene — the seed sits on its own line for exactly that reason.
 
 **No image for the VICTORY screen.** The browser screenshot tool stopped
 persisting captures to disk partway through the session, and chasing that was
