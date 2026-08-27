@@ -2,7 +2,7 @@
 
 **Gate A deliverable.** Authorization: `1c38r34kr-beta-0.3.1-graphics-asset-layer-authorization-revised.md` §6.4.
 Intent: `Graphics Asset Layer — Iteration 1 Intent.md`.
-**Date:** 2026-08-26. **Status:** awaiting director approval.
+**Date:** 2026-08-26. **Status:** Gate A approved (with inventory latitude — see §4.8). Pack generated; see the Gate B notes.
 
 Four design forks were resolved with the director before this document was
 written; they are recorded in §9 and carried through the inventory.
@@ -196,23 +196,26 @@ for that entry only. Startup validation reports all six together (§7).
 
 ## 4. Asset inventory
 
-**41 PNGs and one SVG.** Every entry is required by something the live game
-currently renders; nothing is speculative.
+**40 PNGs and one SVG.** Every entry is required by something the live game
+currently renders on a device this build targets; nothing is speculative.
+
+The director delegated add/merge/delete authority over this list on the grounds
+that the intent doc's version was inferred from screenshots. §4.8 records what I
+changed and why.
 
 Alpha = transparency. 9-slice = scalable chrome with fixed corners.
 
-### 4.1 Screen chrome — 15
+### 4.1 Screen chrome — 14
 
 | Semantic key | Source px | Alpha | 9-slice | Replaces |
 | --- | --- | --- | --- | --- |
 | `screen_bg` | 256×256 tileable | no | tile | `BOARD_BACKGROUND` ColorRect (both `main.gd` and `battle_screen.gd`) |
 | `panel` | 48×48 | no | 16 | `_panel` + pause panel `StyleBoxFlat` |
 | `button_normal` | 48×48 | no | 16 | `UiTheme._button_box(CONTROL, CONTROL_EDGE)` |
-| `button_hover` | 48×48 | no | 16 | `_button_box(CONTROL, ACCENT)` |
 | `button_pressed` | 48×48 | no | 16 | `_button_box(PANEL_DEEP, ACCENT)` |
+| `button_selected` | 48×48 | no | 16 | **new** — see §4.8 |
 | `button_disabled` | 48×48 | no | 16 | `_button_box(PANEL_DEEP, PANEL_EDGE)` |
-| `field` | 48×48 | no | 16 | `LineEdit` normal stylebox |
-| `divider` | 8×4 | no | stretch x | `_divider()` ColorRect, both copies |
+| `rule` | 64×8 | no | stretch x | `_divider()` ColorRect, both copies |
 | `scroll_track` | 32×32 | no | 12 | `VScrollBar` scroll stylebox |
 | `scroll_thumb` | 32×32 | no | 12 | grabber / highlight / pressed |
 | `bar_track` | 32×16 | no | 6 (x) | `CHARGE_TRACK` rect in both boxes |
@@ -302,7 +305,7 @@ answer to fork 3 said to leave text as it is. I read that as scoping out
 because the intent doc lists "battle menu icon", "up-arrow icon" and
 "down-arrow icon" as assets by name, and the chosen fork-3 option named the
 cancel mark explicitly. **If that reading is wrong, drop these four and the pack
-is 37 PNGs** — nothing else in the plan changes.
+is 36 PNGs** — nothing else in the plan changes.
 
 ### 4.6 Palette — 1
 
@@ -321,6 +324,79 @@ labelled, on one canvas, laid out to be pleasant to edit as a coordinated set.
 | Playback tints, damage flash, pause scrim | `modulate` and one translucent rect; not appearance an artist would replace with an image. |
 | Six dead registry members | §1.5 — nothing renders them. |
 
+### 4.8 Judgement calls on the inventory
+
+The intent doc's list was inferred from screenshots. Reading the source changes
+four of its entries and confirms the rest. The governing principle for the ones
+I kept apart: **merge on identity, not on current appearance.** Two assets that
+happen to look alike at v0 stay separate if an artist would plausibly want to
+differentiate them later, because merging them means that differentiation costs
+a code change — the exact retrofit the registry exists to prevent.
+
+**ADDED — `button_selected`.**
+
+The intent doc asks for a "selected button" and I could not find one, so I went
+looking for how selection is actually expressed. It is `modulate` and nothing
+else: an unchosen card is `TINT_INACTIVE`, the chosen one is `TINT_NONE`.
+
+That collides on the Build screen, where a swap button has three states at once
+— *chosen* (`TINT_NONE`), *available* (`TINT_INACTIVE`), and *already used in
+another slot* (`disabled`, which is also grey). **Two different meanings both
+render as "dimmer".** §16.2 requires selected and disabled be distinguishable,
+and right now they are separated only by how grey they are.
+
+One asset fixes it, and it is the highest-leverage entry in the pack: selection
+runs through `_show_chooser`, which serves Boss, Hacker, Deck, System and HOST
+selection **and** Path Choice — six screens — plus the Build swap grid.
+
+A screenshot cannot show this. Two greys look like a style; they were a
+multiply.
+
+**DELETED — `button_hover`.**
+
+Hover is unreachable on both devices this build targets (§13: phone and tablet
+portrait). The Theme's hover slot points at `button_normal`. If Windows becomes
+a target, it is one PNG and one line to restore — but authoring art now for a
+state no target device can display is scope §14 does not want.
+
+**DELETED — `field`.**
+
+The only `LineEdit` in the game is the debug seed entry at `main.gd:479`, inside
+`if OS.is_debug_build()`. It does not exist in a release build. It keeps its
+current `StyleBoxFlat`, whose colours still come from the registry, so the
+hex-literal ban still passes.
+
+This is AN-006's lesson applied one step further: a debug affordance must not be
+load-bearing for the game's layout, and it should not consume production art or
+a catalog slot either.
+
+**REWORKED — `divider` → `rule`, authored 64×8 and rendered at `px(2)`.**
+
+At `px(1)` a linearly-filtered texture is mush; there is no art you can put in
+one pixel. At two it can carry a gradient, a dashed trace, or a taper, which is
+the point of making it an asset at all. Straightforward to revert to a
+`ColorRect` if you would rather keep the hairline.
+
+**CONFIRMED ABSENT — three intent-list entries with no referent.**
+
+| Intent entry | Finding |
+| --- | --- |
+| emphasized / active panel | The game has exactly one panel style, used by both the screen panel and the pause panel. Nothing renders an emphasized variant. Not created. |
+| Datastream / board frame | There is no frame around the board. `AspectRatioContainer` holds the `Datastream`, which draws only its surround. "Board frame" maps to `board_surround`; it is not a second element. |
+| Build priority / accent treatment | Real, but not a separate asset — it is the amber left edge already baked into `build_slot`, deliberately mirroring the mark a charged Program carries in battle. |
+
+**One art-spec note the screenshots could not reveal.**
+
+`packet_glyph[]` is drawn at **two very different scales**. On the board it is
+≈118 px. In `UnitBox` it is also the *binding swatch* — `swatch := size.y * 0.30`
+on a `px(40)` box, so roughly **30 px**, about a quarter the size.
+
+The v0 glyphs must therefore stay legible at ~25% scale, which constrains the
+two-tone outline: an outline tuned to look right at 118 px will close up and
+muddy the silhouette at 30. v0 authors the outline as a proportion generous
+enough to survive the small case, and the S25 pass checks the swatch
+specifically.
+
 ---
 
 ## 5. Folders and naming
@@ -331,7 +407,7 @@ assets/
     v0/
       pack.tres
       packet_palette.svg
-      chrome/    screen_bg, panel, button_*, field, divider, scroll_*, bar_*
+      chrome/    screen_bg, panel, button_*, rule, scroll_*, bar_*
       battle/    avatar_box, program_box_*, board_surround, packet_cell, build_slot
       packet/    glyph_*, ring_selected, ring_targeting
       overlay/   badge_*, ring_*
@@ -350,22 +426,35 @@ A future pack is a sibling directory plus one `.tres`. No path outside
 
 ## 6. Import settings
 
-Uniform across the pack, set via `.import` files committed with the assets:
+**Corrected after generating the pack.** The proposal originally listed five
+settings to configure and named texture filtering as one of them. Reading
+Godot 4.7's actual importer output, four of the five are already its defaults
+for a 2D texture, and filtering is not an import setting at all:
 
-- `compress/mode = 0` (**Lossless**) — §2.2 and §12 forbid destructive artefacts.
-- `compress/normal_map = 0`, `detect_3d/compress_to = 0` — Godot silently
-  re-imports to VRAM compression when it believes a texture is used in 3D. Off.
-- `mipmaps/generate = false` — 2D UI at fixed scale; mipmaps cost memory and
-  soften.
-- `process/fix_alpha_border = true` on every alpha asset — prevents the dark
-  halo when a transparent edge is filtered.
-- **Filter on (linear)**, `repeat` off, except `screen_bg` and `board_surround`,
-  which enable repeat for tiling.
+| Setting | State |
+| --- | --- |
+| `compress/mode=0` (Lossless) | already the default |
+| `mipmaps/generate=false` | already the default |
+| `process/fix_alpha_border=true` | already the default |
+| `compress/normal_map=0` | already the default |
+| `detect_3d/compress_to` | **defaults to 1 — patched to 0 across all 40** |
 
-Filtering is deliberately linear, not nearest. §12 says not to make a final
-pixel-art decision this pass, and linear is the reversible choice: it scales
-smoothly across the phone's 1080 and the tablet's 1200 without committing the
-project to a retro pipeline. One import preset switches it later.
+`detect_3d/compress_to=1` tells Godot to silently re-import the texture as VRAM
+compressed if it ever sees it used in 3D. Nothing here is used in 3D, but the
+setting is a trapdoor: it converts a lossless asset to a lossy one without
+anyone editing anything, which is precisely what §2.2 forbids. It is the only
+one that needed changing, and it needed changing everywhere.
+
+**Filtering is a project setting, not an import setting.** In Godot 4 it is
+`rendering/textures/canvas_textures/default_texture_filter`, or a per-CanvasItem
+override. The project does not set it, so it is at Godot's default of **Linear**
+— which is what §6 wanted anyway. No change, and no pixel-art commitment made.
+
+**The palette SVG is imported with `importer="keep"`.** Godot's texture importer
+would otherwise convert it to a `CompressedTexture2D`, and D-033 needs the file
+readable as *text* at runtime. `export_presets.cfg` now carries
+`include_filter="*.csv,*.svg"` so the raw file ships — the same mechanism the
+project already uses to ship its content CSVs past the importer.
 
 Source sizes survive both targets without per-resolution duplication: 9-slice
 chrome is resolution-independent by construction, and the 128 px glyph never
@@ -439,7 +528,7 @@ caught by eyes on a device rather than by tests. So:
 
 **Phase B — Asset Pack v0, then Gate B.**
 
-The 41 PNGs are **generated by a committed headless tool**
+The 40 PNGs are **generated by a committed headless tool**
 (`tools/gen_assets.gd`) that draws into `Image`s and saves them, rather than
 hand-authored. Three reasons: it can port the exact current `_draw` code, which
 is the most reliable way to "approximately reproduce the current presentation";

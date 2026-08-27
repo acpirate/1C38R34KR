@@ -1,0 +1,367 @@
+{
+  "assets": [
+    {
+      "alpha": false,
+      "h": 256,
+      "key": "screen_bg",
+      "path": "chrome/screen_bg.png",
+      "slice": 0,
+      "stretch": "tile",
+      "w": 256
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "panel",
+      "path": "chrome/panel.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "button_normal",
+      "path": "chrome/button_normal.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "button_pressed",
+      "path": "chrome/button_pressed.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "button_disabled",
+      "path": "chrome/button_disabled.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "button_selected",
+      "path": "chrome/button_selected.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 8,
+      "key": "rule",
+      "path": "chrome/rule.png",
+      "slice": 0,
+      "stretch": "stretch-x",
+      "w": 64
+    },
+    {
+      "alpha": false,
+      "h": 32,
+      "key": "scroll_track",
+      "path": "chrome/scroll_track.png",
+      "slice": 12,
+      "stretch": "",
+      "w": 32
+    },
+    {
+      "alpha": true,
+      "h": 32,
+      "key": "scroll_thumb",
+      "path": "chrome/scroll_thumb.png",
+      "slice": 12,
+      "stretch": "",
+      "w": 32
+    },
+    {
+      "alpha": false,
+      "h": 16,
+      "key": "bar_track",
+      "path": "chrome/bar_track.png",
+      "slice": 6,
+      "stretch": "",
+      "w": 32
+    },
+    {
+      "alpha": false,
+      "h": 16,
+      "key": "bar_fill_link",
+      "path": "chrome/bar_fill_link.png",
+      "slice": 6,
+      "stretch": "",
+      "w": 32
+    },
+    {
+      "alpha": false,
+      "h": 16,
+      "key": "bar_fill_ice",
+      "path": "chrome/bar_fill_ice.png",
+      "slice": 6,
+      "stretch": "",
+      "w": 32
+    },
+    {
+      "alpha": false,
+      "h": 16,
+      "key": "bar_fill_charge",
+      "path": "chrome/bar_fill_charge.png",
+      "slice": 6,
+      "stretch": "",
+      "w": 32
+    },
+    {
+      "alpha": false,
+      "h": 16,
+      "key": "bar_fill_charge_ready",
+      "path": "chrome/bar_fill_charge_ready.png",
+      "slice": 6,
+      "stretch": "",
+      "w": 32
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "avatar_box",
+      "path": "battle/avatar_box.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "program_box_idle",
+      "path": "battle/program_box_idle.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "program_box_charged",
+      "path": "battle/program_box_charged.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "program_box_ready",
+      "path": "battle/program_box_ready.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "program_box_armed",
+      "path": "battle/program_box_armed.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": false,
+      "h": 64,
+      "key": "board_surround",
+      "path": "battle/board_surround.png",
+      "slice": 0,
+      "stretch": "tile",
+      "w": 64
+    },
+    {
+      "alpha": false,
+      "h": 64,
+      "key": "packet_cell",
+      "path": "battle/packet_cell.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": false,
+      "h": 48,
+      "key": "build_slot",
+      "path": "battle/build_slot.png",
+      "slice": 16,
+      "stretch": "",
+      "w": 48
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "glyph_circle",
+      "path": "packet/glyph_circle.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "glyph_square",
+      "path": "packet/glyph_square.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "glyph_triangle",
+      "path": "packet/glyph_triangle.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "glyph_diamond",
+      "path": "packet/glyph_diamond.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "glyph_star",
+      "path": "packet/glyph_star.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "glyph_cross",
+      "path": "packet/glyph_cross.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "ring_selected",
+      "path": "packet/ring_selected.png",
+      "slice": 12,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "ring_targeting",
+      "path": "packet/ring_targeting.png",
+      "slice": 12,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "badge_player",
+      "path": "overlay/badge_player.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "badge_enemy",
+      "path": "overlay/badge_enemy.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "ring_bomb",
+      "path": "overlay/ring_bomb.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "ring_buff",
+      "path": "overlay/ring_buff.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "ring_shield",
+      "path": "overlay/ring_shield.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 128,
+      "key": "ring_override",
+      "path": "overlay/ring_override.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 128
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "menu",
+      "path": "icon/menu.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "arrow_up",
+      "path": "icon/arrow_up.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "arrow_down",
+      "path": "icon/arrow_down.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "cancel",
+      "path": "icon/cancel.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    }
+  ],
+  "build": "beta-0.3.0",
+  "count": 40,
+  "pack": "v0"
+}
