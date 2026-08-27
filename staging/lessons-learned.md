@@ -521,3 +521,42 @@ gets caught by nobody.
 The Beta 0.3 handback's "3,122 tests passing" should be read with this in mind.
 The figure was honestly reported and the build was sound; eight of the
 assertions behind it were not doing their job.
+
+## `draw_texture_rect` stretches; only `draw_style_box` nine-patches
+
+**Beta 0.3.1 Phase D, 2026-08-26. Caught on the tablet, one screenshot after
+the code was written.**
+
+The whole conversion rests on 9-slicing: chrome is authored at 48×48 with a
+16 px margin so a 1 px border stays 1 px at any control size. That works
+perfectly through `Theme`, because a `StyleBoxTexture` knows its margins.
+
+It does not work at all through `CanvasItem.draw_texture_rect`, which stretches
+the entire image into the rect. The four `_draw`-based components had been
+converted with `draw_texture_rect`, so every authored border scaled with the
+control: a 2 px edge in a 48 px source became roughly **24 px** on a 590 px-wide
+Program box. The Deck Function's white "ready" frame turned into a slab that
+swallowed its own charge readout.
+
+The fix is `draw_style_box(stylebox, rect)` — the same nine-patch path the Theme
+uses, reachable from `_draw`. Flat fills (bar track, bar fill, packet cell) can
+keep `draw_texture_rect`, because stretching a field of one colour is
+indistinguishable from tiling it and costs less.
+
+**Two things worth keeping:**
+
+- **The failure scales with the control.** It was nearly invisible on the small
+  Program boxes and obvious on the wide one, which is the worst possible
+  distribution: a quick glance at the board says "fine", and the one control
+  that shows it is at the bottom of the screen. A defect that is subtle
+  everywhere except one place will be dismissed as a quirk of that place.
+- **Nothing but eyes could find it.** The suite passed at 3,164 before and
+  after. Every asset resolved, every semantic key was present, the pack
+  validated — the catalog tests answer "is the asset there", and this was a
+  question about how it got drawn. That boundary is worth remembering when
+  reading a green run during presentation work: asset-completeness tests say
+  nothing about rendering.
+
+Cached the boxes while fixing it. The board redraws constantly across sixty-four
+Packets, and building a `StyleBoxTexture` per draw call would allocate thousands
+a second to say the same thing each time.

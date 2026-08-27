@@ -36,7 +36,11 @@ func _ready() -> void:
 ## The surround shows through the gaps between cells, so it is what draws the
 ## grid — the cells themselves carry no border.
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), PacketStyle.BOARD_SURROUND)
+	# Tiled, not stretched: the surround shows through the 6% gaps between cells
+	# and IS the grid, so its texel scale has to stay constant as the board
+	# resizes. Stretching one image across the board would make the grid's own
+	# texture change size with the phone.
+	draw_texture_rect(Graphics.pack().board_surround, Rect2(Vector2.ZERO, size), true)
 
 
 func cell_size() -> float:

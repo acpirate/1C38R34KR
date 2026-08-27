@@ -98,20 +98,12 @@ func _draw() -> void:
 	else:
 		modulate = PacketStyle.TINT_NONE
 
-	draw_rect(rect, PacketStyle.BOX, true)
-
-	# Border state carries the whole readiness story: idle, charged, and
-	# charged-and-yours are three different edges rather than three shades of
-	# the same one.
-	var edge: Color = PacketStyle.BOX_EDGE
-	var width := 1.0
-	if charged:
-		edge = PacketStyle.READY if actionable else PacketStyle.ACCENT
-		width = 2.0
-	if armed:
-		edge = PacketStyle.ACCENT_HOT
-		width = 3.0
-	draw_rect(rect.grow(-width * 0.5), edge, false, width)
+	# Background and frame are ONE texture per state rather than a box plus four
+	# overlays. Border state carries the whole readiness story — idle, charged,
+	# and charged-and-yours are three different edges rather than three shades of
+	# the same one — and the widths differ too (1, 2, 3), which is why each is a
+	# distinct image instead of one box recoloured.
+	draw_style_box(Graphics.box(_frame(), 16), rect)
 
 	# Three rows in a fixed height: name, charge, bar. Proportions rather than
 	# constants, so the box reads the same at any scale.
@@ -120,11 +112,16 @@ func _draw() -> void:
 	var text_x := pad + swatch + pad
 	var bar_h := size.y * 0.11
 
+	# The binding swatch is the SAME glyph texture the board draws, at about a
+	# quarter the size. That is the constraint the pack's outline weight was
+	# tuned for: an outline that looks right at 118 px closes up at 30.
 	if binding_color >= 0 and binding_shape >= 0:
-		PacketStyle.draw_shape(
-			self, binding_shape,
-			Vector2(pad + swatch * 0.5, pad + swatch * 0.5), swatch * 0.5,
-			PacketStyle.COLOR_FILL[binding_color], PacketStyle.COLOR_BORDER[binding_color],
+		var c := Vector2(pad + swatch * 0.5, pad + swatch * 0.5)
+		var r := swatch * 0.5
+		draw_texture_rect(
+			Graphics.glyph(binding_shape),
+			Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), false,
+			Graphics.palette(binding_color),
 		)
 
 	var font := ThemeDB.fallback_font
@@ -148,11 +145,16 @@ func _draw() -> void:
 		PacketStyle.CHARGE_TEXT_READY if charged else PacketStyle.TEXT_DIM,
 	)
 
+	# Track and fill are textures; the fill's WIDTH stays code. Nothing that
+	# encodes a live value becomes a bitmap.
 	var bar := Rect2(pad, size.y - bar_h - pad * 0.5, size.x - pad * 2.0, bar_h)
-	draw_rect(bar, PacketStyle.CHARGE_TRACK, true)
+	draw_texture_rect(Graphics.pack().bar_track, bar, false)
 	var filled := bar
 	filled.size.x = bar.size.x * minf(1.0, float(charge) / float(cost))
-	draw_rect(filled, PacketStyle.CHARGE_FILL_READY if charged else PacketStyle.CHARGE_FILL, true)
+	draw_texture_rect(
+		Graphics.pack().bar_fill_charge_ready if charged else Graphics.pack().bar_fill_charge,
+		filled, false,
+	)
 
 	if armed:
 		_draw_cancel(rect)
@@ -164,9 +166,19 @@ func _draw() -> void:
 func _draw_cancel(rect: Rect2) -> void:
 	var m := rect.size.y * 0.18
 	var c := Vector2(rect.size.x - m - rect.size.y * 0.15, rect.size.y * 0.5)
-	var w := maxf(2.0, rect.size.y * 0.06)
-	draw_line(c + Vector2(-m, -m), c + Vector2(m, m), PacketStyle.DAMAGE, w, true)
-	draw_line(c + Vector2(m, -m), c + Vector2(-m, m), PacketStyle.DAMAGE, w, true)
+	draw_texture_rect(
+		Graphics.pack().icon_cancel,
+		Rect2(c - Vector2(m, m), Vector2(m, m) * 2.0), false,
+	)
+
+
+## The frame for this control's current state.
+func _frame() -> Texture2D:
+	if armed:
+		return Graphics.pack().program_box_armed
+	if charge >= cost:
+		return Graphics.pack().program_box_ready if actionable else Graphics.pack().program_box_charged
+	return Graphics.pack().program_box_idle
 
 
 ## Press/release pairing, not release alone.

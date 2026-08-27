@@ -98,11 +98,15 @@ func _build_ui() -> void:
 	_hacker_box = AvatarBox.new()
 	_hacker_box.title = "HACKER"
 	_hacker_box.stat = "LINK"
-	_hacker_box.bar_color = PacketStyle.LINK_BAR
+	_hacker_box.bar_fill = Graphics.pack().bar_fill_link
 	header.add_child(_hacker_box)
 
+	# The pause control. An icon rather than the "≡" character it used to be:
+	# the mark is art now, and a Button's `icon` centres it without the font
+	# metrics that made the character sit slightly high.
 	var menu := Button.new()
-	menu.text = "≡"
+	menu.icon = Graphics.pack().icon_menu
+	menu.expand_icon = true
 	menu.custom_minimum_size = Vector2(UiTheme.px(44), AvatarBox.height())
 	menu.pressed.connect(_toggle_pause)
 	header.add_child(menu)
@@ -114,7 +118,7 @@ func _build_ui() -> void:
 	# wrong is worse than no placeholder, because it looks like an answer.
 	_system_box.title = _opponent_name()
 	_system_box.stat = "ICE"
-	_system_box.bar_color = PacketStyle.ICE_BAR
+	_system_box.bar_fill = Graphics.pack().bar_fill_ice
 	header.add_child(_system_box)
 
 	# --- Program grid: the Hacker's build on the left, the System's on the

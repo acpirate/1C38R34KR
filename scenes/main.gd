@@ -451,8 +451,8 @@ func _show_build() -> void:
 		# which Program you pick.
 		var moves := VBoxContainer.new()
 		moves.add_theme_constant_override("separation", UiTheme.px(2))
-		moves.add_child(_move_button("▲", slot, -1))
-		moves.add_child(_move_button("▼", slot, 1))
+		moves.add_child(_move_button(Graphics.pack().icon_arrow_up, slot, -1))
+		moves.add_child(_move_button(Graphics.pack().icon_arrow_down, slot, 1))
 		row.add_child(moves)
 		list.add_child(row)
 
@@ -570,9 +570,10 @@ func _slot_box() -> StyleBoxTexture:
 	return UiTheme.slot_box()
 
 
-func _move_button(glyph: String, slot: int, delta: int) -> Button:
+func _move_button(icon: Texture2D, slot: int, delta: int) -> Button:
 	var b := Button.new()
-	b.text = glyph
+	b.icon = icon
+	b.expand_icon = true
 	b.custom_minimum_size = Vector2(UiTheme.px(44), UiTheme.px(22))
 	var dest := slot + delta
 	b.disabled = dest < 0 or dest >= _active_build().size()

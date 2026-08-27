@@ -19,6 +19,9 @@ static var _palette: Array[Color] = []
 static var _missing: Texture2D = null
 static var _problems := PackedStringArray()
 
+## Memoised 9-slice boxes, keyed on [texture, margin]. Cleared with the pack.
+static var _boxes := {}
+
 
 ## Loads and validates a pack. Returns every problem found, empty on success.
 ##
@@ -29,6 +32,7 @@ static func load_pack(path := DEFAULT_PACK) -> PackedStringArray:
 	_problems = PackedStringArray()
 	_pack = null
 	_palette = []
+	_boxes.clear()
 
 	if not ResourceLoader.exists(path):
 		_problems.append("graphics: no pack at '%s'" % path)
@@ -131,6 +135,32 @@ static func missing() -> Texture2D:
 			img.set_pixel(x, y, PacketStyle.MISSING_A if odd else PacketStyle.MISSING_B)
 	_missing = ImageTexture.create_from_image(img)
 	return _missing
+
+
+## A cached 9-sliced StyleBox for `tex`.
+##
+## For `_draw` code that needs nine-patch behaviour. `draw_texture_rect`
+## STRETCHES the whole image, which is fine for a flat fill and wrong for
+## anything with a border: a 2 px edge in a 48 px source becomes a 24 px slab on
+## a 590 px-wide control, and the wider the control the worse it gets. That is
+## visible on a device and invisible in a unit test.
+##
+## Cached because the board redraws constantly and there are sixty-four Packets:
+## building a StyleBox per draw call would allocate thousands of them a second
+## for no reason. Keyed on the texture and margin, so a pack swap yields new
+## boxes rather than stale ones.
+static func box(tex: Texture2D, margin: int) -> StyleBoxTexture:
+	var key := [tex, margin]
+	if _boxes.has(key):
+		return _boxes[key]
+
+	var b := StyleBoxTexture.new()
+	b.texture = tex if tex != null else missing()
+	b.set_texture_margin_all(margin)
+	b.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	b.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	_boxes[key] = b
+	return b
 
 
 static func _at(arr: Array[Texture2D], i: int) -> Texture2D:

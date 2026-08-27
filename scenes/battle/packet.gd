@@ -83,9 +83,9 @@ func _draw() -> void:
 		_draw_overlay(rect, view["special"])
 
 	if targeting:
-		draw_texture_rect(Graphics.pack().ring_targeting, rect.grow(-1.0), false)
+		draw_style_box(Graphics.box(Graphics.pack().ring_targeting, 12), rect.grow(-1.0))
 	elif selected:
-		draw_texture_rect(Graphics.pack().ring_selected, rect.grow(-1.0), false)
+		draw_style_box(Graphics.box(Graphics.pack().ring_selected, 12), rect.grow(-1.0))
 
 
 ## Deterministic per-cell noise, seeded from the cell coordinate.

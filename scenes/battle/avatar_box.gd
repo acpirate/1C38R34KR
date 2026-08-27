@@ -17,7 +17,10 @@ var title := ""
 var stat := ""
 var value := 0
 var maximum := 1
-var bar_color: Color = PacketStyle.LINK_BAR
+## Which meter this is. LINK and ICE are separate authored textures rather than
+## one white bar tinted, because §11 restricts runtime colour configuration to
+## the six Packet colours — every other colour is painted into its own PNG.
+var bar_fill: Texture2D = null
 
 ## Shield and Buff totals, shown compactly and hidden at zero. Zero is the
 ## normal case, and a row of zeroes is noise that trains the eye to skip the
@@ -46,8 +49,7 @@ func set_totals(shield_value: int, buff_value: int) -> void:
 
 func _draw() -> void:
 	var rect := Rect2(Vector2.ZERO, size)
-	draw_rect(rect, PacketStyle.BOX, true)
-	draw_rect(rect.grow(-0.5), PacketStyle.CONTROL_EDGE, false, 1.0)
+	draw_style_box(Graphics.box(Graphics.pack().avatar_box, 16), rect)
 
 	var font := ThemeDB.fallback_font
 	var pad := size.y * 0.09
@@ -72,13 +74,14 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_RIGHT, title_room, int(size.y * 0.24), PacketStyle.CHARGE_TEXT_READY,
 		)
 
+	# Track and fill are textures; the fill's WIDTH is computed, because it is
+	# the one thing here that encodes a live value.
 	var bar_h := size.y * 0.42
 	var bar := Rect2(pad, size.y - bar_h - pad, size.x - pad * 2.0, bar_h)
-	draw_rect(bar, PacketStyle.CHARGE_TRACK, true)
+	draw_texture_rect(Graphics.pack().bar_track, bar, false)
 	var filled := bar
 	filled.size.x = bar.size.x * clampf(float(value) / float(maximum), 0.0, 1.0)
-	draw_rect(filled, bar_color, true)
-	draw_rect(bar.grow(-0.5), PacketStyle.CONTROL_EDGE, false, 1.0)
+	draw_texture_rect(bar_fill if bar_fill != null else Graphics.missing(), filled, false)
 
 	# Shrink-to-fit rather than truncate: "ICE 250/250" is longer than the two-
 	# digit values this was first laid out against, and a clipped LINK total is
