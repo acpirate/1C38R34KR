@@ -122,6 +122,14 @@ const OVERLAY_TINT: Array[Color] = [
 	Color("b04aff"),  ## OVERRIDE
 ]
 
+## The diagnostic checker a missing graphics asset resolves to (beta 0.3.1).
+##
+## Deliberately hideous. §9.4 requires an element that lost its asset to LOOK
+## broken — a tasteful fallback is indistinguishable from success, and would
+## hide exactly the failure it exists to surface.
+const MISSING_A := Color("ff00ff")
+const MISSING_B := Color("000000")
+
 const SELECTION := Color("ffffff")
 const TARGETING := Color("ffe14a")
 

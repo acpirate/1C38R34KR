@@ -1,0 +1,173 @@
+class_name Graphics
+extends RefCounted
+
+## The one way the game reaches the graphics pack.
+##
+## Screens ask for semantics — `Graphics.pack().button_normal`,
+## `Graphics.glyph(shape)` — and never for a path. Centralising it here is what
+## makes replacing the whole look a single `.tres` swap, and what stops asset
+## filenames from scattering back through the scene layer (authorization §9.3).
+##
+## Static because there is exactly one pack for the life of the process and no
+## screen should be able to hold a different one. `load()` is called once at
+## startup, before any screen is built.
+
+const DEFAULT_PACK := "res://assets/packs/v0/pack.tres"
+
+static var _pack: GraphicsPack = null
+static var _palette: Array[Color] = []
+static var _missing: Texture2D = null
+static var _problems := PackedStringArray()
+
+
+## Loads and validates a pack. Returns every problem found, empty on success.
+##
+## Reports ALL failures together rather than stopping at the first: a pack that
+## is short six assets should say so once, not six launches in a row. Same
+## reasoning the content loader already uses.
+static func load_pack(path := DEFAULT_PACK) -> PackedStringArray:
+	_problems = PackedStringArray()
+	_pack = null
+	_palette = []
+
+	if not ResourceLoader.exists(path):
+		_problems.append("graphics: no pack at '%s'" % path)
+		_use_fallback_palette()
+		return _problems
+
+	var res := ResourceLoader.load(path)
+	if res is not GraphicsPack:
+		_problems.append("graphics: '%s' is not a GraphicsPack" % path)
+		_use_fallback_palette()
+		return _problems
+
+	_pack = res
+	for key in _pack.validate():
+		_problems.append("graphics: missing required asset '%s'" % key)
+
+	_load_palette()
+	return _problems
+
+
+## Problems from the last `load_pack`, for a caller that wants them later.
+static func problems() -> PackedStringArray:
+	return _problems
+
+
+static func is_loaded() -> bool:
+	return _pack != null
+
+
+## The pack. Never null once `load_pack` has run — an unloaded pack returns an
+## empty one so a caller reading a field gets `null` and therefore the MISSING
+## texture, rather than a crash on a nil dereference.
+static func pack() -> GraphicsPack:
+	if _pack == null:
+		_pack = GraphicsPack.new()
+	return _pack
+
+
+## One Packet glyph, keyed by `Types.PacketShape`.
+##
+## A function rather than raw array access so an out-of-range key degrades to
+## MISSING instead of throwing. The renderer indexes this from game state, and
+## game state is the one thing that must never be able to crash the view.
+static func glyph(shape_index: int) -> Texture2D:
+	return _at(pack().packet_glyph, shape_index)
+
+
+## The centre mark of an overlay badge, keyed by `Tile.Special.Type`. Since
+## D-037 this carries the whole type signal.
+static func mark(type_index: int) -> Texture2D:
+	return _at(pack().overlay_mark, type_index)
+
+
+## The suspended type ring, keyed by `Tile.Special.Type` (D-037).
+##
+## Nothing calls this today. It exists so that restoring the ring is a renderer
+## change and not a contract change.
+static func ring(type_index: int) -> Texture2D:
+	return _at(pack().overlay_ring, type_index)
+
+
+## The ownership badge. Ownership is the badge's FILL — light for the Hacker,
+## dark for the System — which is the convention that carries ownership for
+## every overlay type without a legend.
+static func badge(is_player: bool) -> Texture2D:
+	var t: Texture2D = pack().badge_player if is_player else pack().badge_enemy
+	return t if t != null else missing()
+
+
+## One Packet colour, keyed by `Types.PacketColor`.
+##
+## Comes from the palette SVG when it could be read and from `PacketStyle` when
+## it could not, so the board is always drawable.
+static func palette(color_index: int) -> Color:
+	if _palette.is_empty():
+		_use_fallback_palette()
+	if color_index < 0 or color_index >= _palette.size():
+		return PacketStyle.COLOR_FILL[0]
+	return _palette[color_index]
+
+
+## The diagnostic texture a missing asset resolves to.
+##
+## Deliberately hideous, and deliberately NOT the procedural whitebox it
+## replaced. §9.4 — an element that lost its asset has to LOOK broken, because
+## a tasteful fallback is indistinguishable from success and would hide exactly
+## the failure this exists to surface.
+##
+## Generated rather than shipped: an asset pack cannot be trusted to contain the
+## texture that reports the asset pack is broken.
+static func missing() -> Texture2D:
+	if _missing != null:
+		return _missing
+
+	var n := 32
+	var img := Image.create_empty(n, n, false, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var odd := ((x / 8) + (y / 8)) % 2 == 1
+			img.set_pixel(x, y, PacketStyle.MISSING_A if odd else PacketStyle.MISSING_B)
+	_missing = ImageTexture.create_from_image(img)
+	return _missing
+
+
+static func _at(arr: Array[Texture2D], i: int) -> Texture2D:
+	if i < 0 or i >= arr.size() or arr[i] == null:
+		return missing()
+	return arr[i]
+
+
+static func _load_palette() -> void:
+	var path := str(pack().palette_svg)
+	if path.is_empty():
+		_problems.append("graphics: the pack names no palette SVG")
+		_use_fallback_palette()
+		return
+
+	if not FileAccess.file_exists(path):
+		_problems.append("graphics: no palette SVG at '%s'" % path)
+		_use_fallback_palette()
+		return
+
+	var result := PacketPalette.parse(
+		FileAccess.get_file_as_string(path), _fallback_colors()
+	)
+	_palette = result.colors
+	for p in result.problems:
+		_problems.append("graphics: %s" % p)
+
+
+static func _use_fallback_palette() -> void:
+	_palette = _fallback_colors()
+
+
+## The registry's own values, which are the alpha's. Using these when the SVG
+## cannot be read means a broken palette file costs the CONFIGURABILITY of the
+## colours, never the playability of the board.
+static func _fallback_colors() -> Array[Color]:
+	var out: Array[Color] = []
+	for c in PacketStyle.COLOR_FILL:
+		out.append(c)
+	return out

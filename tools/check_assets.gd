@@ -112,6 +112,10 @@ func _load(key: String) -> Image:
 ## rests on the file still being readable as text after import — a texture
 ## importer would convert it and this would fail — so it is worth confirming
 ## here rather than discovering it on a device at Phase E.
+##
+## Uses `PacketPalette`, the SAME parser the game uses, rather than a second
+## copy of the grammar. Two implementations is how a checker ends up certifying
+## a file the game cannot actually read.
 func _check_palette() -> Array[String]:
 	var out: Array[String] = []
 	var path := "%s/packet_palette.svg" % OUT
@@ -119,52 +123,25 @@ func _check_palette() -> Array[String]:
 		return ["packet_palette.svg missing"]
 
 	var text := FileAccess.get_file_as_string(path)
-	if text.is_empty():
+	if text.strip_edges().is_empty():
 		return ["packet_palette.svg is not readable as text — the importer converted it"]
 
-	# Enum ORDER, not alphabetical. A System's weak set is the enum-order
-	# complement of its strong set, so index is identity.
-	var ids := ["red", "yellow", "magenta", "green", "cyan", "blue"]
-	var seen := {}
-	for i in ids.size():
-		var id := "packet_%s" % ids[i]
-		var colour := _swatch(text, id)
-		if colour == "":
-			out.append("palette: no fill found for id '%s'" % id)
-			continue
-		if not colour.is_valid_html_color():
-			out.append("palette: '%s' is not a valid colour (%s)" % [id, colour])
-			continue
-		if seen.has(colour):
-			out.append("palette: '%s' duplicates '%s' (%s)" % [id, seen[colour], colour])
-		seen[colour] = id
+	var fallback: Array[Color] = []
+	for c in PacketStyle.COLOR_FILL:
+		fallback.append(c)
 
-		# The parsed value must equal what the live renderer currently draws,
-		# or v0 is not reproducing the whitebox it claims to reproduce.
-		var expected: Color = PacketStyle.COLOR_FILL[i]
-		if not Color(colour).is_equal_approx(expected):
-			out.append("palette: '%s' is %s, registry has %s" % [
-				id, colour, expected.to_html(false)
+	var parsed := PacketPalette.parse(text, fallback)
+	for p in parsed.problems:
+		out.append(p)
+
+	# The parsed values must equal what the live renderer draws, or v0 is not
+	# reproducing the whitebox it claims to reproduce.
+	for i in parsed.colors.size():
+		if not parsed.colors[i].is_equal_approx(PacketStyle.COLOR_FILL[i]):
+			out.append("palette: entry %d is %s, registry has %s" % [
+				i, parsed.colors[i].to_html(false), PacketStyle.COLOR_FILL[i].to_html(false)
 			])
 	return out
-
-
-## Reads one swatch's fill, accepting either the `fill` attribute or a `style`
-## declaration — Inkscape writes whichever the object was created with, and a
-## parser that only handles one of them breaks the first time the file is saved
-## from the editor it exists for.
-func _swatch(text: String, id: String) -> String:
-	var at := text.find('id="%s"' % id)
-	if at < 0:
-		return ""
-	var tag_end := text.find(">", at)
-	if tag_end < 0:
-		return ""
-	var tag := text.substr(at, tag_end - at)
-
-	var attr := RegEx.create_from_string(r'fill\s*[=:]\s*"?\s*(#[0-9a-fA-F]{6})')
-	var m := attr.search(tag)
-	return m.get_string(1) if m != null else ""
 
 
 ## The four overlay marks (D-038).

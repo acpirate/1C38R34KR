@@ -92,6 +92,22 @@ func _ready() -> void:
 
 	Content.set_active(result["content"])
 	Passives.clear_cache()
+
+	# The graphics pack loads AFTER content and, unlike content, does not block
+	# startup (authorization §10).
+	#
+	# The asymmetry is deliberate. There is no fallback content and no default
+	# System, so a content error leaves nothing to show. A graphics error has a
+	# fallback by design — every missing asset resolves to the MISSING checker —
+	# so refusing to launch would turn a cosmetic fault into an unplayable game.
+	#
+	# "Visibly and gracefully" is therefore split between two places: every
+	# problem is reported here, all of them at once rather than the first, and
+	# the checker makes the failure impossible to miss on the screen that lost
+	# the asset.
+	for problem in Graphics.load_pack():
+		push_error(problem)
+
 	_show_title(result["fingerprint"])
 
 
