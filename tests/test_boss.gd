@@ -269,7 +269,7 @@ func _test_threshold_sequence(t: TestCase) -> void:
 	t.check("CODESHATTER fires before REBOOT", i_shatter >= 0 and i_shatter < i_reboot)
 
 	# §21.34 — the authored raw damage, with no modifier in play.
-	var raw := int(Content.function(Content.FN_CODESHATTER)["damage"])
+	var raw := _authored_damage(t, Content.FN_CODESHATTER)
 	t.eq("the authored damage is 70", raw, 70)
 	t.eq("CODESHATTER dealt it", link_before - s.hp[Types.Side.PLAYER], raw)
 
@@ -674,3 +674,31 @@ func _of_kind(events: Array, kind: String) -> Array:
 		if e["t"] == Types.EVT.BOSS_MECHANIC and str(e["kind"]) == kind:
 			out.append(e)
 	return out
+
+
+## The damage a Function is AUTHORED to deal, read from its effect plan.
+##
+## Not `row["damage"]`. A Function row carries id, name, cost, composite, plan,
+## notes and start_charged — the numbers live inside the plan's step params,
+## because a Function is a sequence of effects and only some of them deal
+## damage at all.
+##
+## This existed as `row["damage"]` until 0.3.1 and cost more than a wrong
+## number: indexing a Dictionary with a missing key ABORTS the calling
+## function in GDScript, so every assertion after it in this test silently
+## stopped running while the suite still reported them as part of its passing
+## total. The shape is asserted here rather than assumed so the same failure
+## cannot come back quietly if the plan format moves.
+func _authored_damage(t: TestCase, fn_id: String) -> int:
+	var row: Dictionary = Content.function(fn_id)
+	t.check("%s has an effect plan" % fn_id, row.has("plan"))
+	if not row.has("plan"):
+		return -1
+
+	for step in (row["plan"] as Array):
+		var params: Dictionary = step.get("params", {})
+		if params.has("damage"):
+			return int(params["damage"])
+
+	t.check("%s's plan deals damage" % fn_id, false)
+	return -1

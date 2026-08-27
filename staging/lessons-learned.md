@@ -472,3 +472,52 @@ Two supporting notes:
   1080x2340` reproduces the phone's geometry on the tablet and turns a
   device-window-gated defect into ordinary iteration — reach for it before
   asking for hardware.
+
+## A test suite can report assertions that never ran
+
+**Beta 0.3.1, 2026-08-26. Found by chasing a log line, not by a failure.**
+
+The headless suite printed one `SCRIPT ERROR: Invalid access to property or key
+'damage' on a base object of type 'Dictionary'` and then reported **3,122
+passed, 0 failed**. It had been doing so since Beta 0.3 shipped.
+
+`tests/test_boss.gd` read `Content.function(FN_CODESHATTER)["damage"]`. A
+Function row has no `damage` — it carries `plan`, and the numbers live inside
+the plan's step params, because a Function is a sequence of effects and only
+some of them deal damage. In GDScript, indexing a Dictionary with a missing key
+**aborts the calling function**. So every assertion after that line stopped
+running:
+
+- §21.34 — CODESHATTER deals its authored 70
+- §21.36 — an ordinary damage-reducing UPGRADE modifies it
+- §21.45 — the threshold is not a phase transition and can fire again
+- §21.39 — a lethal CODESHATTER stops the sequence before REBOOT
+
+Eight assertions, covering four numbered requirements, silently absent — while
+the suite counted the ones that *did* run and reported success. Fixing the
+lookup took the suite from 3,164 assertions to... 3,164 *executed* ones, eight
+of which had never executed before.
+
+**They all pass.** The gameplay was correct the whole time. What was wrong was
+the claim that it had been verified, which is the more dangerous of the two:
+a wrong number gets caught by the next person who reads it, and a coverage gap
+gets caught by nobody.
+
+**Three things worth keeping:**
+
+- **A passing suite that prints errors is not a passing suite.** The count was
+  green, so nobody looked at the one red line above it. Treat any error output
+  from a green run as a failure until it is explained — the harness cannot tell
+  you about assertions it never reached.
+- **"N tests pass" counts what executed, not what exists.** Every suite that
+  counts assertions at runtime has this property. Where a number is quoted as
+  evidence — a handback, a gate, a completion standard — it is worth
+  remembering that it is a floor on coverage and not a measure of it.
+- **Read data through its real shape, and assert the shape.** The replacement
+  walks the plan for a step carrying `damage` and fails loudly if there isn't
+  one, rather than indexing a key that happened to be plausible. The original
+  was not a typo — it was a guess about a schema, and it looked right.
+
+The Beta 0.3 handback's "3,122 tests passing" should be read with this in mind.
+The figure was honestly reported and the build was sound; eight of the
+assertions behind it were not doing their job.
