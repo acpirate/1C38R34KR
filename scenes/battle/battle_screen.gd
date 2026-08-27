@@ -75,11 +75,7 @@ func _ready() -> void:
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	var bg := ColorRect.new()
-	bg.color = PacketStyle.BOARD_BACKGROUND
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	add_child(UiTheme.background())
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -222,12 +218,7 @@ func _build_pause_panel() -> void:
 	_pause_panel = PanelContainer.new()
 	_pause_panel.custom_minimum_size.x = UiTheme.px(250)
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = PacketStyle.PANEL
-	style.border_color = PacketStyle.PANEL_EDGE
-	style.set_border_width_all(1)
-	style.set_content_margin_all(UiTheme.px(16))
-	_pause_panel.add_theme_stylebox_override("panel", style)
+	_pause_panel.add_theme_stylebox_override("panel", UiTheme.panel_box(16))
 	centre.add_child(_pause_panel)
 
 	var box := VBoxContainer.new()
@@ -274,10 +265,7 @@ func _build_pause_panel() -> void:
 
 
 func _divider(box: Control) -> void:
-	var line := ColorRect.new()
-	line.color = PacketStyle.PANEL_EDGE
-	line.custom_minimum_size.y = maxi(1, UiTheme.px(1))
-	box.add_child(line)
+	box.add_child(UiTheme.rule())
 
 
 ## Pausing is refused mid-playback for the same reason saving is: the board on

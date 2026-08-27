@@ -117,7 +117,7 @@ static func build() -> Theme:
 ## A null texture yields the MISSING checker rather than a flat colour, so a
 ## pack that lost this asset looks broken instead of looking fine (§9.4).
 static func _button_box(tex: Texture2D) -> StyleBoxTexture:
-	var box := _sliced(tex, 16)
+	var box := sliced(tex, 16)
 	box.content_margin_left = px(10)
 	box.content_margin_right = px(10)
 	box.content_margin_top = px(8)
@@ -129,24 +129,92 @@ static func _button_box(tex: Texture2D) -> StyleBoxTexture:
 ## width — the same `px(7)` the flat boxes used, so the thumb stays a thumb-
 ## sized target.
 static func _bar(tex: Texture2D, margin: int) -> StyleBoxTexture:
-	var box := _sliced(tex, margin)
+	var box := sliced(tex, margin)
 	box.content_margin_left = px(7)
 	box.content_margin_right = px(7)
 	return box
 
 
-## The shared 9-slice setup.
+## The shared 9-slice setup, public because the screens need it too.
 ##
 ## `axis_stretch_*` is STRETCH rather than TILE: these are flat fields with a
 ## border at the edge, and tiling a flat field is indistinguishable from
 ## stretching it while costing more draw calls. A textured fill would want TILE.
-static func _sliced(tex: Texture2D, margin: int) -> StyleBoxTexture:
+static func sliced(tex: Texture2D, margin: int) -> StyleBoxTexture:
 	var box := StyleBoxTexture.new()
 	box.texture = tex if tex != null else Graphics.missing()
 	box.set_texture_margin_all(margin)
 	box.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	box.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	return box
+
+
+# ---------------------------------------------------------------------------
+# Screen chrome
+# ---------------------------------------------------------------------------
+#
+# Built here rather than at each call site for the same reason the Theme is: a
+# panel assembled in two places becomes two slightly different panels. These are
+# the pieces `Theme` cannot carry, because they are nodes and styleboxes for
+# specific containers rather than defaults for a control class.
+
+
+## The panel every menu screen and the pause menu are built into.
+##
+## The padding is a parameter because the two callers genuinely differ — menus
+## use 14 and the pause panel 16 — and quietly unifying them during a skin pass
+## would be a layout change smuggled in as an art change. Same texture, same
+## 9-slice, different breathing room.
+static func panel_box(pad := 14) -> StyleBoxTexture:
+	var box := sliced(Graphics.pack().panel, 16)
+	box.set_content_margin_all(px(pad))
+	return box
+
+
+## A Build slot. The amber left edge is baked into the texture, and the 9-slice
+## margin is what holds it at a fixed width while the row stretches — the same
+## job the asymmetric `border_width_left` did on the flat box it replaces.
+static func slot_box() -> StyleBoxTexture:
+	var box := sliced(Graphics.pack().build_slot, 16)
+	box.content_margin_left = px(10)
+	box.content_margin_right = px(10)
+	box.content_margin_top = px(8)
+	box.content_margin_bottom = px(8)
+	return box
+
+
+## The full-screen ground.
+##
+## TILED rather than stretched: the phone is 1080×2340 and the tablet 1200×1920,
+## and one stretched image cannot serve both aspects without distorting. Tiling
+## is aspect-independent by construction, which is why the source is authored
+## seamless.
+static func background() -> TextureRect:
+	var bg := TextureRect.new()
+	bg.texture = Graphics.pack().screen_bg
+	if bg.texture == null:
+		bg.texture = Graphics.missing()
+	bg.stretch_mode = TextureRect.STRETCH_TILE
+	bg.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return bg
+
+
+## The horizontal rule under a heading or above a footnote.
+##
+## Drawn at `px(2)` rather than the `px(1)` the ColorRect used: a one-pixel line
+## from a filtered texture is mush, and there is no art anyone can put in one
+## pixel. Two is the smallest height that can carry a gradient or a taper later.
+static func rule() -> TextureRect:
+	var line := TextureRect.new()
+	line.texture = Graphics.pack().rule
+	if line.texture == null:
+		line.texture = Graphics.missing()
+	line.stretch_mode = TextureRect.STRETCH_SCALE
+	line.custom_minimum_size.y = maxi(2, px(2))
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return line
 
 
 # ---------------------------------------------------------------------------

@@ -379,3 +379,38 @@ turn "someone remembers" into something repeatable. That is not a pixel
 differential — the beta is deliberately not pixel-identical — but a human
 comparing two screenshots deliberately is a far better instrument than a human
 looking at one and trying to recall the other.
+
+---
+
+## AN-008 — The pause menu calls every battle a "Quick Match"
+
+**Found during Beta 0.3.1 Phase D, 2026-08-26, while photographing the
+converted pause panel over a Boss battle. NOT fixed — see below.**
+
+`battle_screen.gd:236` sets the pause panel's mode line to the literal
+`"Quick Match"`. The label is a local, is never stored, and is never updated.
+So it reads "Quick Match" over a Run battle, and over the ODANSHAY battle at the
+end of a Run.
+
+It was true when written. Beta 0.1 had no Run, so every battle genuinely was a
+Quick Match; the line became wrong the moment Beta 0.2 landed the Run loop, and
+nothing pointed at it because nothing reads a label.
+
+**This is the P-043 shape for the third time** — a literal that outlived the
+build it was true in. The first was the title screen reading "beta 0.2"
+throughout 0.3 development; the second was `run.gd` describing its own stop
+point in the past tense. The recurring cause is the same: a string that encodes
+a fact about the build, written where the fact happens to be true, with nothing
+downstream that would notice when it stops being.
+
+**Why it is not fixed here.** §13 says a pre-existing defect exposed by the
+graphics pass gets reported rather than folded in, and a mode label is not
+chrome. The fix is genuinely three lines — hold the Label, and set it from the
+session's mode when the panel is shown — and it is available on request rather
+than being taken unilaterally.
+
+**Worth considering with it:** the pause panel already has the room to say
+something more useful. Over a Run battle the honest line is the one the Build
+screen already computes — `Battle 3 of 4 · vs MIDNIGHT` — and that is
+information a paused player actually wants. That is a design call, not a bug
+fix, which is the other reason to leave it here rather than decide it mid-pass.

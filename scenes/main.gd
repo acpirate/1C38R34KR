@@ -97,11 +97,7 @@ func _ready() -> void:
 	# charge route, so it is an explicit diagnostic opt-in.
 	BattleLog.set_level(BattleLog.default_level(OS.is_debug_build()))
 
-	var bg := ColorRect.new()
-	bg.color = PacketStyle.BOARD_BACKGROUND
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	add_child(UiTheme.background())
 
 	# Content validation runs before anything is shown. Any error blocks
 	# startup with a readable report rather than a half-built screen — there is
@@ -173,12 +169,7 @@ func _fresh_screen(compact := false) -> VBoxContainer:
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size.x = UiTheme.px(250)
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = PacketStyle.PANEL
-	style.border_color = PacketStyle.PANEL_EDGE
-	style.set_border_width_all(1)
-	style.set_content_margin_all(UiTheme.px(14))
-	_panel.add_theme_stylebox_override("panel", style)
+	_panel.add_theme_stylebox_override("panel", UiTheme.panel_box())
 	host.add_child(_panel)
 
 	_root = VBoxContainer.new()
@@ -219,9 +210,7 @@ func _button(text: String, action: Callable) -> Button:
 
 
 func _divider() -> void:
-	var line := ColorRect.new()
-	line.color = PacketStyle.PANEL_EDGE
-	line.custom_minimum_size.y = maxi(1, UiTheme.px(1))
+	var line := UiTheme.rule()
 	_root.add_child(line)
 
 
@@ -570,20 +559,15 @@ func _binding_text(prog: Dictionary) -> String:
 	return " + ".join(parts) if parts.size() > 0 else "unbound"
 
 
-func _slot_box() -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = PacketStyle.BOX
-	# StyleBoxFlat paints one border colour, so the accent has to be the whole
-	# border. At 1px on three sides and 4px on the left it still reads as an
-	# edge bar rather than a highlighted box.
-	box.border_color = PacketStyle.ACCENT
-	box.set_border_width_all(1)
-	box.border_width_left = maxi(2, UiTheme.px(4))
-	box.content_margin_left = UiTheme.px(10)
-	box.content_margin_right = UiTheme.px(10)
-	box.content_margin_top = UiTheme.px(8)
-	box.content_margin_bottom = UiTheme.px(8)
-	return box
+## The active Build slot's box.
+##
+## The amber left edge is now painted into the texture rather than faked with an
+## asymmetric border. A `StyleBoxFlat` paints ONE border colour, so the accent
+## had to be the whole frame at 1px with a 4px left; the texture can simply have
+## an accent bar down its left and an ordinary edge elsewhere, which is what it
+## always meant.
+func _slot_box() -> StyleBoxTexture:
+	return UiTheme.slot_box()
 
 
 func _move_button(glyph: String, slot: int, delta: int) -> Button:
