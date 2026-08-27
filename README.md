@@ -24,7 +24,7 @@ through the scene layer.
 | B — Asset Pack v0 and the palette SVG | ✅ Gate B approved |
 | C — the graphics catalog, no renderer changes | ✅ |
 | D — renderer conversion, five commits | ✅ tablet-checked between each |
-| E — cleanup, before/after captures, device passes | ✅ phone geometry emulated; see below |
+| E — cleanup, before/after captures, device passes | ✅ tablet and S25 both signed off |
 | F — closeout | ✅ see `staging/1c38r34kr-beta-0.3.1-graphics-handback.md` |
 
 | Gate | State |
@@ -34,7 +34,7 @@ through the scene layer.
 | Battle parity (fast, 150 battles) | ✅ 150/150 — nothing leaked into logic |
 | Tablet device pass | ✅ every screen, clean log |
 | Phone layout | ✅ verified at an emulated 1080×2340 |
-| Physical S25 | ⚠️ one short window still wanted — cutout and mark legibility |
+| Physical S25 | ✅ cutout safe area, mark legibility, clean log |
 
 Deliberately **not** in 0.3.1: the graphics jig, hot reload, animation,
 particles, shaders, audio, HOST or Boss visual variation, landscape, final art

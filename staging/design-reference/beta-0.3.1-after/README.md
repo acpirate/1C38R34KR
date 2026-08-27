@@ -62,8 +62,8 @@ worth further device time to reproduce a redundant frame.
 
 ## Not covered here
 
-These are tablet captures. The phone geometry was verified separately by
-emulating 1080×2340 on this tablet (P-045): title, Path Choice, Build and the
-battle screen all fit with symmetric margins and no clipping. Two things only
-the physical S25 can confirm — the safe area over its real display cutout, and
-overlay-mark legibility on that panel — remain open and want one short window.
+These are tablet captures. The phone was verified separately: geometry by
+emulating 1080×2340 on this tablet (P-045), then the rest on the physical S25 —
+safe area over the real cutout, no clipping, all four overlay marks legible and
+mutually distinguishable at panel density in both ownership polarities, charged
+and ready frames distinct, clean log. Both device gates are signed off.

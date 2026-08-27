@@ -4,15 +4,13 @@
 **Authorization:** `1c38r34kr-beta-0.3.1-graphics-asset-layer-authorization-revised.md`.
 **Gate A proposal:** `1c38r34kr-beta-0.3.1-graphics-asset-proposal.md`.
 **Gate B notes:** `1c38r34kr-beta-0.3.1-gate-b-notes.md`.
-**Date:** 2026-08-27. **Status:** complete, with one device window outstanding.
+**Date:** 2026-08-27. **Status:** complete. Both device gates signed off.
 
 ---
 
 ## 1. Verdict
 
-**Complete against §18**, with item 14 (tablet) fully met, item 13 (phone) met at
-an emulated viewport, and one short physical-S25 window still wanted for two
-things emulation cannot cover.
+**Complete against §18**, items 1–21, both device gates signed off on hardware.
 
 The renderer draws from Asset Pack v0 end to end. Replacing the game's look is
 now one `.tres` path and no gameplay change, which is the whole point of doing
@@ -63,6 +61,7 @@ contain the texture that reports the pack is broken.
 | Pack regeneration after pruning | **byte-identical** |
 | Tablet | every screen, clean log, before/after captured |
 | Phone geometry | verified at an emulated 1080×2340 (P-045) |
+| **Physical S25** | **✅ complete** — see §8 |
 
 **No DEEPSCAN.** §15.1 requires it only if shared gameplay code changes. None
 did — `git diff` confirms the rules engine is untouched — and fast parity is the
@@ -180,19 +179,31 @@ assertions behind it were not doing their job.
 
 ---
 
-## 8. Outstanding
+## 8. The S25 pass
 
-**One short S25 window.** Phone *geometry* is verified — title, Path Choice,
-Build and battle all fit at an emulated 1080×2340 with symmetric margins and no
-clipping. Two things the emulation cannot cover:
+**Signed off on hardware, 2026-08-27.** The emulated viewport had already
+cleared the geometry; this window covered the two things it structurally could
+not.
 
-1. the safe area over the S25's real display cutout;
-2. overlay-mark legibility on that panel — which matters more than it used to,
-   because with the type ring suspended the mark carries the whole type signal.
+- **Safe area over the real cutout** ✅ — the battle header sits below the notch
+  with a visible top inset, applied from `DisplayServer.get_display_safe_area()`
+  at runtime rather than from any constant. Nothing is under the cutout.
+- **Overlay-mark legibility on the panel** ✅ — and this was the one that
+  mattered, because with the type ring suspended the mark carries the whole type
+  signal. All four are crisp and mutually distinguishable at panel density, in
+  both ownership polarities, alongside both armed countdown states.
+- No horizontal clipping; all eight board columns and all six debug controls
+  present with symmetric margins.
+- **Charged vs ready are distinct on the panel** — MUSCLE at 7/7 wears the amber
+  frame, AGIMA at 3/3 the white one. That is §16.2's requirement that interaction
+  states not go ambiguous under asset scaling, and it is the check most at risk
+  when a 2 px drawn border becomes a scaled texture.
+- Clean log: engine banner and GPU line, nothing else.
 
-Everything else in §16.2 is covered.
-
----
+**Worth recording:** the emulated pass was right about everything it could see,
+and the two things it could not see were exactly the two that needed the phone.
+That is the same division of labour 0.3 found, and it holds — reach for
+`wm size` first, and spend the device window on the cutout and the panel.
 
 ## 9. For the next iteration
 
