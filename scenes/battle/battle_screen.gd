@@ -362,6 +362,7 @@ func _build_debug_bar() -> Control:
 	_update_speed_button()
 
 	bar.add_child(_debug_button("charge", _grant_charge))
+	bar.add_child(_debug_button("ovl", _debug_seed_overlays))
 	bar.add_child(_debug_button("win", func(): _force_outcome(Types.Side.ENEMY)))
 	bar.add_child(_debug_button("lose", func(): _force_outcome(Types.Side.PLAYER)))
 	bar.add_child(_debug_button("log", func():
@@ -399,6 +400,69 @@ func _update_speed_button() -> void:
 ## Fills every Program pool. Function activation, targeting, cancel-without-
 ## spend, composites, and fizzles are the densest cluster of rules in the game
 ## and are otherwise unreachable until charge accumulates.
+## Debug only: put one of EVERY overlay on the board at once.
+##
+## Reaching this state by playing is impractical — a Boss Override, a Hacker
+## Shield, an armed Bomb and a pending Buff owned by both sides do not co-occur
+## in any battle you could set up on purpose — so the overlay vocabulary could
+## never be seen, compared, or photographed as a whole. That matters now because
+## the type ring is suspended (D-037) and the badge's centre mark is the entire
+## type signal: whether four marks are distinguishable is a question about the
+## four of them TOGETHER.
+##
+## Writes real `Tile.Special` objects into the live board and refreshes through
+## the ordinary path, so what appears is what a battle would draw. A faked view
+## dictionary would be easier and would prove nothing.
+##
+## It does change the battle. That is acceptable for a debug affordance whose
+## purpose is inspection, and it is why this is gated with the rest of the bar.
+func _debug_seed_overlays() -> void:
+	if _playing or state.has_winner():
+		return
+
+	var seq := 0
+	# Rows 0 and 1: every type, live, once per owner. Live rather than armed
+	# because an ARMED overlay shows its countdown whatever it will deliver —
+	# so an armed row would show four identical digits and no marks at all.
+	for row in 2:
+		var side: Types.Side = Types.Side.PLAYER if row == 0 else Types.Side.ENEMY
+		var x := 0
+		for type_index in Tile.Special.Type.size():
+			x = _stamp_overlay(row, x, side, type_index, -1, seq)
+			seq += 1
+
+	# Row 2: the armed state in both polarities, so the countdown digit is in
+	# frame beside the marks it replaces.
+	var ax := _stamp_overlay(2, 0, Types.Side.PLAYER, Tile.Special.Type.BOMB, 3, seq)
+	_stamp_overlay(2, ax, Types.Side.ENEMY, Tile.Special.Type.BUFF, 2, seq + 1)
+
+	_refresh_board()
+
+
+## Places one overlay on the first eligible Packet at or after `from_x` in row
+## `y`, and returns the column after it.
+##
+## Skips neutrals rather than overwriting them: a neutral has no axes and can
+## never carry an overlay, and a debug view that broke that rule would be
+## showing a board the game cannot produce — which is worse than showing
+## nothing, because it would be believed.
+func _stamp_overlay(y: int, from_x: int, owner: Types.Side, type_index: int, countdown: int, seq: int) -> int:
+	for x in range(from_x, Constants.BOARD_WIDTH):
+		var t: Tile = state.board[y][x]
+		if t == null or t.is_neutral():
+			continue
+		var sp := Tile.Special.new()
+		sp.type = type_index
+		sp.owner = owner
+		# Below zero means LIVE: the view omits the property entirely rather
+		# than emitting a sentinel, matching the alpha.
+		sp.countdown = countdown
+		sp.seq = seq
+		t.special = sp
+		return x + 1
+	return from_x
+
+
 func _grant_charge() -> void:
 	for u in (state.units[Types.Side.PLAYER] as Array):
 		u.charge = int(Content.program(u.program_id)["charge_cap"])

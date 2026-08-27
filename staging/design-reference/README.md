@@ -34,7 +34,22 @@ Two things this reference is NOT:
 `beta-05-pause`, `beta-06-result`. Quick Match only: no Run, no routes, no
 UPGRADEs, no Boss.
 
-### Beta 0.3 (`beta03-*.png`) — current, captured 2026-08-25
+### Versioned sets (`beta-<version>-<phase>/`) — the scheme from 0.3.1 on
+
+From beta 0.3.1 each capture session gets its own directory with its own
+README, because the graphics work is a before/after comparison and a flat
+namespace cannot express that.
+
+| Directory | What it is |
+| --- | --- |
+| `beta-0.3.1-before/` | The procedural whitebox at the end of Phase C — Asset Pack v0 complete and validated, nothing drawing from it yet. The baseline the conversion is measured against. |
+
+Two shots in that set are new in kind: `05-battle-all-overlays.png` and
+`09-boss-battle-all-overlays.png` put **every overlay type, in both ownership
+polarities, plus the armed countdown state, on one board**. That state cannot be
+reached by playing, so a debug affordance stamps it. See that directory's README.
+
+### Beta 0.3 (`beta03-*.png`) — captured 2026-08-25
 
 Captured from `beta-0.3.0` on real hardware. Files with no suffix are the
 **Galaxy S25 (1080×2340)**, which is the phone-shaped case the alpha reference
@@ -67,6 +82,11 @@ are visible and would not appear in a release build.
 - Overrides render as a ringed `Ø` badge on the Packet, which keeps its colour
   and shape underneath. Not captured in a still here — placement happens at the
   end of a Boss turn, so it needs a battle in progress to see.
+
+**Superseded on one point.** The coloured ring around every badge in this set is
+the *type ring*, which the alpha never had. It was suspended in 0.3.1 (D-037,
+AN-007). Compare `beta03-08-boss-battle-tablet.png` against
+`beta-0.3.1-before/08-boss-battle.png` to see the difference it made.
 
 **Two layout facts these images encode**, both learned the hard way and worth
 keeping when the art pass lands:
