@@ -183,6 +183,19 @@ static func slot_box() -> StyleBoxTexture:
 	return box
 
 
+## A compact icon-only control, like the Build screen's reorder arrows.
+##
+## The ordinary button box pads by `px(10)`/`px(8)`, which is right for a label
+## and wrong for a 55 px-tall icon button: the padding leaves about fifteen
+## pixels for the glyph, and `expand_icon` dutifully shrinks it to fit. The
+## whitebox got away with it because a Label ignores content margins and
+## overflowed happily; a texture cannot.
+static func icon_button_box(tex: Texture2D) -> StyleBoxTexture:
+	var box := sliced(tex, 16)
+	box.set_content_margin_all(px(2))
+	return box
+
+
 ## The full-screen ground.
 ##
 ## TILED rather than stretched: the phone is 1080×2340 and the tablet 1200×1920,

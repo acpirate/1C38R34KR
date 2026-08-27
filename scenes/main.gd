@@ -574,6 +574,10 @@ func _move_button(icon: Texture2D, slot: int, delta: int) -> Button:
 	var b := Button.new()
 	b.icon = icon
 	b.expand_icon = true
+	# Tight padding, or the ordinary button chrome leaves no room for the mark.
+	b.add_theme_stylebox_override("normal", UiTheme.icon_button_box(Graphics.pack().button_normal))
+	b.add_theme_stylebox_override("pressed", UiTheme.icon_button_box(Graphics.pack().button_pressed))
+	b.add_theme_stylebox_override("disabled", UiTheme.icon_button_box(Graphics.pack().button_disabled))
 	b.custom_minimum_size = Vector2(UiTheme.px(44), UiTheme.px(22))
 	var dest := slot + delta
 	b.disabled = dest < 0 or dest >= _active_build().size()

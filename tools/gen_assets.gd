@@ -125,7 +125,12 @@ func _battle() -> void:
 ## row stretches.
 func _slot(n: int) -> Image:
 	var img := _box(n, PacketStyle.BOX, 1, PacketStyle.ACCENT)
-	img.fill_rect(Rect2i(0, 0, 4, n), PacketStyle.ACCENT)
+	# 10 px, not 4. A 9-slice preserves the corner region 1:1, so the bar's
+	# source width IS its screen width — where the StyleBoxFlat it replaces
+	# computed `px(4)` ≈ 10. Authoring 4 here made the bar two and a half times
+	# thinner than the whitebox, which is the kind of drift a skin pass is
+	# supposed to avoid.
+	img.fill_rect(Rect2i(0, 0, 10, n), PacketStyle.ACCENT)
 	return img
 
 

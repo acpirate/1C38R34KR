@@ -31,7 +31,6 @@ func run(t: TestCase) -> void:
 func _test_registry_shape(t: TestCase) -> void:
 	t.group("presentation / registry")
 	t.eq("a fill per colour", PacketStyle.COLOR_FILL.size(), EXPECTED_ENTRIES)
-	t.eq("a border per colour", PacketStyle.COLOR_BORDER.size(), EXPECTED_ENTRIES)
 	t.eq("fills cover the Color enum", PacketStyle.COLOR_FILL.size(), Types.PacketColor.size())
 	t.eq("an overlay tint per type", PacketStyle.OVERLAY_TINT.size(), Tile.Special.Type.size())
 

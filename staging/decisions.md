@@ -967,3 +967,67 @@ design change, not a rendering change, and the designer should confirm it.
 **Explicitly deferred to the text pass:** the countdown DIGIT stays a font
 glyph. Whether it becomes 0–9 sprites, stays text, or is replaced by something
 more iconic is a decision for that pass, not this one.
+
+---
+
+## D-039 — The registry's chrome colours become pack SOURCE, not runtime values
+
+**Beta 0.3.1 Phase E, 2026-08-27.**
+
+After the conversion, `PacketStyle`'s role split in two, and the split is worth
+naming because the file now looks like it does more than it does.
+
+**Still read at runtime:** the Packet palette (as the fallback when the palette
+SVG cannot be parsed), text colours, playback tints, the pause scrim, the
+neutral static, badge polarity, and the MISSING checker.
+
+**Read only by `tools/gen_assets.gd`:** every chrome colour — panel, box,
+control, bars, edges. The game no longer touches them. The PNGs carry those
+values now.
+
+**They stay in the registry rather than moving into the tool.** Generating the
+pack from the same constants the renderer used is exactly what makes v0
+*provably* reproduce the whitebox rather than approximating it by eye — and the
+proof is mechanical: after this pruning the pack regenerated **byte-identical**,
+with only the manifest's version string changing.
+
+The alternative — moving the colours into the generator — would have made the
+registry smaller and the guarantee weaker. When the art pass replaces these
+PNGs, the constants become vestigial and can go with them; until then they are
+the record of what the whitebox looked like.
+
+**Deleted here as genuinely dead** (§1.5, §9.4): `SYSTEM_TURN_FRAME`,
+`NEUTRAL_FILL`, `NEUTRAL_BORDER`, `GLYPH`, `fill_for()`, `border_for()`, and
+`draw_shape()`. The first six were beta 0.1 fossils that nothing had rendered
+for two builds; `draw_shape` went when the renderer started drawing textures.
+`shape_points()` stays — the generator rasterises the glyphs from it, so it
+remains the authoritative silhouette and a regenerated pack cannot drift.
+
+`COLOR_BORDER` went too, under D-036: the outline is now a second tone inside
+the glyph texture, produced by the same modulate that produces the fill.
+
+---
+
+## D-040 — Authored width replaces computed width, and that is a real hazard
+
+**Beta 0.3.1 Phase D/E, 2026-08-27.**
+
+Twice during the conversion a measurement that had been CODE became a property
+of an image, and both times the first attempt shipped the wrong number.
+
+- The Build slot's accent bar was `border_width_left = maxi(2, px(4))` ≈ 10 px.
+  Authored into the texture as 4 px it rendered 4 px, because a 9-slice
+  preserves the corner region 1:1. Two and a half times too thin.
+- The reorder arrows were text, and a Label happily overflows its container's
+  content margins. A texture does not: `expand_icon` shrank the mark to the
+  ~15 px the button's padding left it.
+
+**The general shape:** `px()` scaling, content margins, and text overflow are
+all things the whitebox got for free from the layout engine. An image gets none
+of them — its dimensions are just its dimensions. So every measurement crossing
+from code into art has to be *converted*, and the conversion is easy to skip
+because the code still compiles and the screen still looks broadly right.
+
+Both were caught by comparing against the pre-conversion captures rather than by
+looking at the new screen and asking whether it seemed fine. That is the
+argument for taking a before set at all.

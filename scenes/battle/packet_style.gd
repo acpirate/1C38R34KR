@@ -19,10 +19,27 @@ extends RefCounted
 ## `test_presentation.gd` enforces that by banning hex literals elsewhere under
 ## `scenes/`, because the rule is only useful if it cannot quietly erode.
 ##
-## The values below are the alpha's, carried over because copying twelve
-## constants costs nothing and gives a legible board to play on. They are
-## PLACEHOLDERS, not a target to reproduce faithfully — the shape glyphs in
-## particular are expected to be replaced.
+## ## What changed in beta 0.3.1
+##
+## The graphics pack now owns appearance, and this file's role split in two.
+##
+## **Still read at runtime:** the Packet palette (as the fallback when the
+## palette SVG cannot be parsed), text colours, playback tints, the pause scrim,
+## the neutral static, the badge polarity, and the MISSING checker.
+##
+## **Now read only by `tools/gen_assets.gd`:** every chrome colour below — panel,
+## box, control, bars, edges. The game does not read them any more; the PNGs
+## carry those values, and these constants are the SOURCE the pack is generated
+## from. That is why they stay rather than moving into the tool: regenerating
+## the pack from the same registry the renderer used is what makes v0 provably
+## reproduce the whitebox instead of approximating it.
+##
+## Six members were deleted here in 0.3.1 — `SYSTEM_TURN_FRAME`, `NEUTRAL_FILL`,
+## `NEUTRAL_BORDER`, `GLYPH`, `fill_for()` and `border_for()` — survivors of the
+## beta 0.1 representation, when a Packet was a coloured square with a white
+## glyph on it. Nothing had rendered them for two builds. `COLOR_BORDER` went
+## with them under D-036: the outline is now a second tone inside the glyph
+## texture, produced by the same modulate that produces the fill.
 
 
 ## Fill colour, indexed by `Types.PacketColor`.
@@ -35,19 +52,6 @@ const COLOR_FILL: Array[Color] = [
 	Color("4a72e8"),  ## BLUE
 ]
 
-## Border and glyph outline, indexed by `Types.PacketColor`.
-const COLOR_BORDER: Array[Color] = [
-	Color("79201f"),  ## RED
-	Color("776e1a"),  ## YELLOW
-	Color("6f2570"),  ## MAGENTA
-	Color("1f5f28"),  ## GREEN
-	Color("1c6666"),  ## CYAN
-	Color("22397e"),  ## BLUE
-]
-
-const NEUTRAL_FILL := Color("4a4a52")
-const NEUTRAL_BORDER := Color("2a2a30")
-const GLYPH := Color("ffffff")
 const BOARD_BACKGROUND := Color("1b1b22")
 
 ## The cell a Packet sits ON, and the surround the grid sits on.
@@ -112,7 +116,6 @@ const CHARGE_FILL_READY := Color("f0c040")
 const CHARGE_TEXT_READY := Color("ffe080")
 
 const DAMAGE := Color("ff5a5a")
-const SYSTEM_TURN_FRAME := Color("e03030")
 
 ## Overlay tints, indexed by `Tile.Special.Type`.
 const OVERLAY_TINT: Array[Color] = [
@@ -144,19 +147,11 @@ const TINT_BLAST := Color(1.8, 1.2, 0.8)
 const TINT_INACTIVE := Color(0.65, 0.65, 0.65)
 
 
-static func fill_for(is_neutral: bool, color_index: int) -> Color:
-	return NEUTRAL_FILL if is_neutral else COLOR_FILL[color_index]
-
-
-static func border_for(is_neutral: bool, color_index: int) -> Color:
-	return NEUTRAL_BORDER if is_neutral else COLOR_BORDER[color_index]
-
-
 ## The glyph outline for one shape, as unit-square points in `[-1, 1]`.
 ##
-## Returned as points rather than drawn here so the caller controls scale,
-## centring, and whether it fills or strokes — and so a future sprite-based
-## registry can replace this without every call site changing.
+## **No longer drawn by the game.** The renderer draws glyph TEXTURES now; this
+## geometry is what `tools/gen_assets.gd` rasterises them from, so it remains the
+## authoritative silhouette and a regenerated pack cannot drift from it.
 ##
 ## A circle has no polygon, so it is signalled by an empty array and drawn by
 ## `draw_shape` below. That is the one special case, and it is contained here.
@@ -197,25 +192,3 @@ static func _star_points() -> PackedVector2Array:
 		var angle := -PI / 2.0 + i * PI / 5.0
 		pts.append(Vector2(cos(angle), sin(angle)) * radius)
 	return pts
-
-
-## Draws one Packet's glyph, centred on `centre` at `radius`.
-##
-## The whole shape vocabulary is drawn through this one function, so a change of
-## representation — filled to stroked, polygon to sprite — happens once.
-static func draw_shape(canvas: CanvasItem, shape_index: int, centre: Vector2, radius: float, fill: Color, outline: Color) -> void:
-	if shape_index == Types.PacketShape.CIRCLE:
-		canvas.draw_circle(centre, radius * 0.86, fill)
-		canvas.draw_arc(centre, radius * 0.86, 0, TAU, 24, outline, radius * 0.12, true)
-		return
-
-	var unit := shape_points(shape_index)
-	var pts := PackedVector2Array()
-	for p in unit:
-		pts.append(centre + p * radius)
-	canvas.draw_colored_polygon(pts, fill)
-
-	# Closed outline: repeat the first point so the final edge is stroked.
-	var loop := pts.duplicate()
-	loop.append(pts[0])
-	canvas.draw_polyline(loop, outline, radius * 0.11, true)

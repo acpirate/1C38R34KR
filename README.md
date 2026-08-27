@@ -10,44 +10,35 @@ intended — see [The differential gate](#the-differential-gate).
 
 ## Status
 
-**`beta-0.3.0` — the complete Alpha gameplay loop, playable on hardware.**
+**`beta-0.3.1` — the gameplay loop, drawn from a replaceable asset pack.**
 
-A full Run now runs end to end, Boss included:
-
-```
-New Run → Boss → Hacker → Deck → (Path → Build → Battle) ×3 → ODANSHAY → Run Complete
-```
-
-With Beta 0.3 the Godot line contains the whole alpha feature skeleton: the
-battle engine, Constructed and Random Quick Match, Run setup and progression,
-the route/HOST/UPGRADE layer, Boss selection, Battle 4, the ODANSHAY mechanic,
-and Run completion.
+Beta 0.3.0 finished the reference port: the whole alpha loop, Boss included,
+running in Godot. Beta 0.3.1 does not add gameplay. It replaces the procedural
+whitebox with a **graphics asset layer** — one `.tres` owning every semantic
+visual, so replacing the game's entire look is a pack swap rather than a hunt
+through the scene layer.
 
 | Phase | State |
 | --- | --- |
-| A — preflight fixes (board jump, fresh gameplay seeds) | ✅ |
-| B — Boss identity, battle construction, Run Complete | ✅ |
-| C–E — Override overlay, Boss turn hook, mechanic payloads | ✅ |
-| F — result and session integration | ✅ |
-| G — Boss telemetry | ✅ |
-| H — Boss differential, DEEPSCAN, regression | ✅ |
-| I — device verification | ✅ both devices; one phone layout defect found and fixed |
-| J — README, closeout, diff review | ✅ see `staging/1c38r34kr-beta-0.3.0-port-handback.md` |
+| A — renderer inspection, asset contract proposal | ✅ Gate A approved |
+| B — Asset Pack v0 and the palette SVG | ✅ Gate B approved |
+| C — the graphics catalog, no renderer changes | ✅ |
+| D — renderer conversion, five commits | ✅ tablet-checked between each |
+| E — cleanup, before/after captures, device passes | ✅ phone geometry emulated; see below |
+| F — closeout | ✅ see `staging/1c38r34kr-beta-0.3.1-graphics-handback.md` |
 
 | Gate | State |
 | --- | --- |
-| Headless logic tests | ✅ 3,122 passing across 23 suites |
-| **Boss differential vs the alpha** | ✅ **300/300** — ODANSHAY on every HOST |
-| Run/session differential | ✅ 1,000/1,000 walks |
-| Battle parity (fast, 150 battles) | ✅ 150/150 |
-| Battle parity (full matrix, "DEEPSCAN") | ✅ **5,250/5,250** |
-| Tablet device gate | ✅ full Run to RUN COMPLETE, clean log |
-| Phone device gate | ✅ layout, cutout, and Override legibility on the S25 |
+| Headless logic tests | ✅ 3,163 passing across 23 suites |
+| Asset pack structural checks | ✅ glyph tones, ring hollowness, badge polarity, palette parse |
+| Battle parity (fast, 150 battles) | ✅ 150/150 — nothing leaked into logic |
+| Tablet device pass | ✅ every screen, clean log |
+| Phone layout | ✅ verified at an emulated 1080×2340 |
+| Physical S25 | ⚠️ one short window still wanted — cutout and mark legibility |
 
-Deliberately **not** in 0.3: additional Bosses, a Boss scripting layer, Boss
-Quick Match, permanent progression, a completion matrix, production art or
-audio, broad balance work, Windows/browser/iOS deployment, and package-ID
-finalization.
+Deliberately **not** in 0.3.1: the graphics jig, hot reload, animation,
+particles, shaders, audio, HOST or Boss visual variation, landscape, final art
+direction, a theme/recolour system, content, and any gameplay change.
 
 ### Devices
 
@@ -159,11 +150,13 @@ release builds carry different signatures and cannot install over one another.
 ## Commands
 
 ```bash
-godot --headless -s res://tools/run_tests.gd            # 3,122 logic tests, no GPU
+godot --headless -s res://tools/run_tests.gd            # 3,163 logic tests, no GPU
 godot --headless --import                               # refresh the class cache
 node tools/gen/parity.mjs                               # battle differential gate
 node tools/gen/run_parity.mjs --seeds 0-1999            # Run/session differential
 node tools/gen/boss_parity.mjs --seeds 0-59             # Boss differential
+godot --headless -s res://tools/gen_assets.gd           # regenerate Asset Pack v0
+godot --headless -s res://tools/check_assets.gd         # pack structural checks
 godot --headless -s res://tools/run_trace.gd -- --seed 42 --full   # dump one Run walk
 
 godot --headless --export-debug "Android" build/1c38r34kr.apk
@@ -307,6 +300,46 @@ looser reading would leave a pre-made Sync for the *player* to collect.
 None of this is a phase transition. Overrides accumulate again and the threshold
 can fire on a later turn.
 
+### Graphics
+
+Every visual the game can ask for lives in one `GraphicsPack` resource at
+`assets/packs/v0/pack.tres`. Screens request semantics — `Graphics.pack().panel`,
+`Graphics.glyph(shape)` — and never a path, so swapping the entire look is one
+`.tres` and no gameplay change.
+
+**The exported fields ARE the contract.** A missing asset is a null field, which
+makes completeness mechanically checkable rather than something you notice on a
+device. `validate()` walks the property list rather than a maintained list, and
+array sizes come from the enums — so adding a Packet shape fails the pack instead
+of quietly rendering the new one as MISSING.
+
+**Missing assets fail visibly.** Every null resolves to a magenta/black checker,
+generated at runtime rather than shipped, because a pack cannot be trusted to
+contain the texture that reports the pack is broken. Startup logs every problem
+at once but does **not** block: content has no fallback and must stop launch,
+graphics has the checker by design, and refusing to launch would turn a cosmetic
+fault into an unplayable game.
+
+**Six Packet colours, one editable source.** `packet_palette.svg` opens in
+Inkscape, carries six labelled swatches with stable XML ids, and is parsed once
+at startup — shipped past the importer by `include_filter`, the same mechanism
+the content CSVs use. Everything else is painted into its PNG.
+
+**One glyph, two tones.** Each Packet shape is a single monochrome texture
+carrying a white core and a grey outline, so one `modulate` by one palette entry
+produces the fill *and* a proportionally darker edge. Six textures and six
+colours cover thirty-six Packets, and shape stays independent of colour.
+
+**What stays procedural**, deliberately: the neutral static (its noise is seeded
+per cell, and a sprite cannot vary per cell), the pause scrim, playback tints,
+bar fill *widths*, and all text. Nothing that encodes a live value became a
+bitmap.
+
+The pack is **generated**, not drawn — `tools/gen_assets.gd` reads the same
+`PacketStyle` constants the whitebox drew from, which is what makes v0 provably
+reproduce it rather than approximate it. Rejecting an asset costs a code edit and
+a re-run, not a redrawn PNG.
+
 ### Saves
 
 The battle record is no longer the top level. A Run is saveable with no battle
@@ -349,7 +382,7 @@ rejected rather than restored against different rules than it was made under.
 | `staging/1c38r34kr-beta-0.2.0-build-authorization-revised.md` | the previous build's scope |
 | `staging/1c38r34kr-beta-0.2.0-authorization-review.md` | the pre-implementation review of it, and the seven items that needed resolving |
 | `staging/1c38r34kr-beta-0.1.0-build-authorization.md` | the previous build's scope, kept for reference |
-| `staging/decisions.md` | append-only decision log, D-001..D-032 |
+| `staging/decisions.md` | append-only decision log, D-001..D-040 |
 | `staging/port-notes.md` | every place the translation is non-literal, P-001..P-045 |
 | `staging/architect-notes.md` | design items raised during the port that must **not** be built as part of it |
 | `staging/1c38r34kr-beta-0.3.0-port-handback.md` | **the close-out** — what shipped, what the verification caught, and the final diff review |
