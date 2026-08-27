@@ -11,6 +11,19 @@ extends Control
 ## All appearance comes from `PacketStyle`. This file contains no colour value
 ## and no shape path (D-014).
 
+## Overlay type names, in `Tile.Special.Type` order — the order the pack's mark
+## and ring arrays are built in, so an index here is an index there.
+const TYPE_NAMES := ["bomb", "buff", "shield", "override"]
+
+## The overlay's authored coordinate space, as a multiple of the badge radius.
+## Mirrors `tools/gen_assets.gd`: badge and mark are separate textures drawn into
+## one rect, so both sides have to agree on what that rect is.
+const OVERLAY_SPAN := 1.38
+
+## The live mark's size inside the badge face, as a multiple of the badge
+## radius. Matches the optical size of the text it replaces.
+const MARK_SCALE := 0.72
+
 ## Which cell this view occupies. Presentation-only: it seeds the neutral static
 ## so a given cell's noise is stable across redraws, and nothing else reads it.
 var cell := Vector2i.ZERO
@@ -37,7 +50,7 @@ func _draw() -> void:
 
 	# The cell is drawn whether or not it holds a Packet, so the grid stays
 	# continuous through a destroy or a fall instead of punching holes in itself.
-	draw_rect(cell, PacketStyle.CELL_BACKGROUND, true)
+	draw_texture_rect(Graphics.pack().packet_cell, cell, false)
 
 	if view.is_empty():
 		return
@@ -46,29 +59,33 @@ func _draw() -> void:
 
 	if is_neutral:
 		# A neutral has no colour and no shape, so it gets neither — it is
-		# static. That is also why it can never hold an overlay.
+		# static. Still drawn procedurally (D-034): the noise is seeded per cell
+		# so no two neutrals match, and a sprite cannot vary per cell.
 		_draw_static(cell)
 	else:
-		# The Packet IS the coloured glyph: no tile field behind it, filled in
-		# its colour and outlined in that colour's dark shade, sized so the
+		# The Packet IS the coloured glyph: no tile field behind it, sized so the
 		# silhouette reaches near the cell edge. A white glyph on a coloured
 		# square reads as a gem; this reads as a signal on a wire, and it leaves
 		# the glyph's centre free for the ownership badge.
-		var color_index := int(view.get("color", 0))
-		PacketStyle.draw_shape(
-			self, int(view.get("shape", 0)),
-			rect.get_center(), size.x * 0.46,
-			PacketStyle.COLOR_FILL[color_index],
-			PacketStyle.COLOR_BORDER[color_index],
+		#
+		# ONE texture carries both tones — a white core and a grey outline — so
+		# this single modulate produces the fill AND a proportionally darker edge
+		# from one palette entry (D-036). Colour and shape stay independent, and
+		# six glyphs cover thirty-six Packets.
+		var radius := size.x * 0.46
+		var glyph := Rect2(rect.get_center() - Vector2(radius, radius), Vector2(radius, radius) * 2.0)
+		draw_texture_rect(
+			Graphics.glyph(int(view.get("shape", 0))), glyph, false,
+			Graphics.palette(int(view.get("color", 0))),
 		)
 
 	if view.has("special"):
 		_draw_overlay(rect, view["special"])
 
 	if targeting:
-		draw_rect(rect.grow(-1.0), PacketStyle.TARGETING, false, maxf(2.0, size.x * 0.07))
+		draw_texture_rect(Graphics.pack().ring_targeting, rect.grow(-1.0), false)
 	elif selected:
-		draw_rect(rect.grow(-1.0), PacketStyle.SELECTION, false, maxf(2.0, size.x * 0.07))
+		draw_texture_rect(Graphics.pack().ring_selected, rect.grow(-1.0), false)
 
 
 ## Deterministic per-cell noise, seeded from the cell coordinate.
@@ -102,63 +119,83 @@ func _draw_static(area: Rect2) -> void:
 ## deliver. That distinction is load-bearing: a pending Buff contributes nothing
 ## until it delivers, and the board must not imply otherwise.
 func _draw_overlay(rect: Rect2, special: Dictionary) -> void:
-	# D-037 — the type ring is SUSPENDED. Left commented rather than deleted
-	# because the decision is "not now", not "never"; see the block below.
-	# var type_index := ["bomb", "buff", "shield", "override"].find(str(special.get("type", "bomb")))
-	# if type_index < 0:
-	# 	type_index = 0
+	var type_index := TYPE_NAMES.find(str(special.get("type", "bomb")))
+	if type_index < 0:
+		type_index = 0
 
 	var player := str(special.get("owner", "player")) == "player"
-	var face: Color = PacketStyle.BADGE_PLAYER if player else PacketStyle.BADGE_ENEMY
-	var mark: Color = PacketStyle.BADGE_ENEMY if player else PacketStyle.BADGE_PLAYER
 
+	# The overlay is authored in one coordinate space spanning the type ring's
+	# full extent — 1.38 × the badge radius — so the badge and its mark stay
+	# concentric without either knowing the other's size. `gen_assets.gd` holds
+	# the same constant.
 	var badge_r := size.x * 0.22
+	var span := badge_r * OVERLAY_SPAN
 	var centre := rect.get_center()
-	draw_circle(centre, badge_r, face)
-	draw_arc(centre, badge_r, 0, TAU, 24, mark, badge_r * 0.16, true)
+	var area := Rect2(centre - Vector2(span, span), Vector2(span, span) * 2.0)
+
+	# Ownership is the badge's FILL — light for the Hacker, dark for the System,
+	# each ringed in the other. One convention carries ownership for every
+	# overlay type without a legend, which is why the badge is centred rather
+	# than tucked in a corner where it competes with nothing.
+	draw_texture_rect(Graphics.badge(player), area, false)
 
 	# D-037 — TYPE RING SUSPENDED.
 	#
-	# This was a beta-era addition that the alpha never had: `view.ts` carries
-	# type on the badge's centre mark ALONE, and nothing else. It was never
-	# recorded as a decision, and the differential could not catch it because
-	# the scene layer has no automated coverage.
+	# A beta-era addition the alpha never had: `view.ts` carries type on the
+	# badge's centre mark ALONE. It was never recorded as a decision, and the
+	# differential could not catch it because the scene layer has no automated
+	# coverage.
 	#
-	# It also cost more than it looked like. The ring pushed the overlay from
-	# the alpha's 0.45 × cell out to 0.61 — about 35% wider — which is most of
-	# why a compact glyph (a diamond, a circle) all but disappears under an
-	# overlay. Removing it restores alpha parity AND gives the Packet's shape
-	# back, which is the same move twice.
+	# It cost more than it looked like. The ring pushed the overlay from the
+	# alpha's 0.45 × cell to 0.61 — about 35% wider — which is most of why a
+	# compact glyph all but disappeared underneath one. Removing it restores
+	# alpha parity AND gives the Packet's shape back, in the same move.
 	#
-	# Suspended rather than deleted: the director is taking the question of how
-	# to distinguish overlays to the designer, so this may return in some form.
-	# `OVERLAY_TINT` and the four ring PNGs are retained for that reason.
+	# Suspended, not deleted: the question of how to distinguish overlays is with
+	# the designer. `Graphics.ring()` and the four PNGs are retained so restoring
+	# it is one line here and no change to the contract.
 	#
-	# draw_arc(centre, badge_r * 1.28, 0, TAU, 24, PacketStyle.OVERLAY_TINT[type_index], badge_r * 0.2, true)
+	# draw_texture_rect(Graphics.ring(type_index), area, false)
 
+	var mark: Color = PacketStyle.BADGE_ENEMY if player else PacketStyle.BADGE_PLAYER
 	var countdown := int(special.get("countdown", 0))
-	var armed := special.has("countdown") and countdown > 0
-	var text := str(countdown) if armed else _live_glyph(str(special.get("type", "bomb")))
-	if text == "":
+
+	# An ARMED overlay shows its remaining countdown whatever it will eventually
+	# deliver. That distinction is load-bearing: a pending Buff contributes
+	# nothing until it delivers, and the board must not imply otherwise.
+	if special.has("countdown") and countdown > 0:
+		_draw_countdown(centre, badge_r, countdown, mark)
 		return
 
+	# D-038 — a LIVE overlay's type is art, not a font character.
+	#
+	# These were "S", "Ø", "?" and "+" from `ThemeDB.fallback_font`. `Ø` in
+	# particular is not guaranteed to exist in whatever face a device falls back
+	# to, and a missing glyph renders as a box — on the Boss mechanic's only
+	# board-level signal. With the ring suspended this mark is the WHOLE type
+	# signal, so it is authored as a silhouette rather than a letter.
+	#
+	# Tinted with the badge's opposite colour, so ownership keeps working exactly
+	# as before.
+	var m := badge_r * MARK_SCALE
+	draw_texture_rect(
+		Graphics.mark(type_index),
+		Rect2(centre - Vector2(m, m), Vector2(m, m) * 2.0), false, mark,
+	)
+
+
+## The remaining turns on an armed overlay.
+##
+## Still drawn text, and deliberately: a countdown is a live VALUE, and the
+## choice between 0-9 sprites, text, or something more iconic belongs to the
+## text pass rather than to this one.
+func _draw_countdown(centre: Vector2, badge_r: float, countdown: int, colour: Color) -> void:
+	var text := str(countdown)
 	var font := ThemeDB.fallback_font
 	var fs := int(badge_r * 1.5)
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	draw_string(
 		font, centre + Vector2(-w * 0.5, badge_r * 0.52), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, mark,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, colour,
 	)
-
-
-## What a LIVE overlay reads as, once it is no longer counting down.
-func _live_glyph(type_name: String) -> String:
-	match type_name:
-		"shield":
-			return "S"
-		"override":
-			return "Ø"
-		"bomb":
-			return "?"
-		_:
-			return "+"

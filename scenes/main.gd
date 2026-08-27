@@ -632,7 +632,8 @@ func _start_battle() -> void:
 ## drift from what was actually played.
 func _replay_battle() -> void:
 	_enter_battle(
-		Session.create_quick_match(_system_id, _host_id, _gameplay_seed, _qm_build, {}, true)
+		Session.create_quick_match(_system_id, _host_id, _gameplay_seed, _qm_build, {}, true),
+		"Quick Match",
 	)
 
 
@@ -641,10 +642,17 @@ func _replay_battle() -> void:
 ## — half a battle's figures presented as a whole battle's would be worse than
 ## none at all.
 func _resume(state: GameState) -> void:
-	_enter_battle(state)
+	_enter_battle(state, "Quick Match")
 
 
-func _enter_battle(state: GameState) -> void:
+## `context` is what the pause menu will call this battle.
+##
+## Passed in by each entry point rather than inferred from `_run`, because
+## inference is how AN-008 happened in the first place: a value that was correct
+## when it was written, with nothing downstream that would notice when it
+## stopped being. Four callers, four explicit answers, and a new fifth caller
+## cannot forget — the parameter has no default.
+func _enter_battle(state: GameState, context: String) -> void:
 	if _shell != null:
 		_shell.queue_free()
 		_shell = null
@@ -654,6 +662,7 @@ func _enter_battle(state: GameState) -> void:
 	_finished_state = state
 
 	var screen := BattleScreen.new()
+	screen.context_line = context
 	screen.setup(state)
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	screen.battle_finished.connect(_on_battle_finished)
@@ -875,7 +884,7 @@ func _resume_session(saved: Dictionary) -> void:
 			_setup = null
 			_run = saved["run"]
 			if saved["state"] != null:
-				_enter_battle(saved["state"])
+				_enter_battle(saved["state"], _run_battle_context())
 			else:
 				_resume_run_screen()
 		_:
@@ -1109,7 +1118,25 @@ func _start_run_battle() -> void:
 	SessionLog.battle_started(_run, state.battle_id)
 	_run.phase = Types.SessionPhase.ACTIVE_BATTLE
 	SessionSave.write(SessionSave.run_to_dict(_run, state))
-	_enter_battle(state)
+	_enter_battle(state, _run_battle_context())
+
+
+## What a Run battle is, in one line, for the pause menu.
+##
+## Names the step and the opponent rather than the mode. "Run" would be accurate
+## and useless; a paused player already knows they are in a Run and wants to
+## know WHICH battle and against WHAT — the same two facts the Build screen
+## leads with.
+func _run_battle_context() -> String:
+	if _run == null:
+		return "Quick Match"
+	var enemy := Content.opponent_of_identity({
+		"opponent_kind": _run.opponent_kind, "opponent_id": _run.opponent_id,
+	})
+	var name := str(enemy.get("name", "?"))
+	if _run.opponent_kind == Types.OpponentKind.BOS:
+		return "Battle %d of %d · %s" % [_run.step, Run.RUN_LENGTH, name]
+	return "Battle %d of %d · vs %s" % [_run.step, Run.RUN_LENGTH, name]
 
 
 ## §15.1 — the Run is over: ODANSHAY's ICE reached zero.

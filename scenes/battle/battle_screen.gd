@@ -20,6 +20,13 @@ const PLAYBACK_SPEEDS := [1.0, 2.0, 4.0, 0.25]
 var state: GameState
 var game: Game
 
+## What the pause menu calls this battle — "Quick Match", or a Run battle's
+## step and opponent. Set by whoever opens the screen, because only they know.
+##
+## AN-008: this was the literal "Quick Match" for every battle, and had been
+## wrong for every Run battle since Beta 0.2 landed the Run loop.
+var context_line := "Quick Match"
+
 var _stream: Datastream
 var _hacker_box: AvatarBox
 var _system_box: AvatarBox
@@ -101,7 +108,11 @@ func _build_ui() -> void:
 	header.add_child(menu)
 
 	_system_box = AvatarBox.new()
-	_system_box.title = "SYSTEM"
+	# Named from the identity at CONSTRUCTION, not left as a placeholder for the
+	# first refresh to correct. "SYSTEM" sitting here is what the player saw for
+	# a whole build when the refresh aborted early (P-042); a placeholder that is
+	# wrong is worse than no placeholder, because it looks like an answer.
+	_system_box.title = _opponent_name()
 	_system_box.stat = "ICE"
 	_system_box.bar_color = PacketStyle.ICE_BAR
 	header.add_child(_system_box)
@@ -233,7 +244,7 @@ func _build_pause_panel() -> void:
 	box.add_child(head)
 
 	var mode := Label.new()
-	mode.text = "Quick Match"
+	mode.text = context_line
 	mode.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mode.add_theme_font_size_override("font_size", UiTheme.font_subheading())
 	mode.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
@@ -625,13 +636,29 @@ func _play_one(ev: Dictionary) -> void:
 			await _pause(0.45 / speed)
 		Types.EVT.OVER:
 			_refresh_all()
-			_log("Hacker wins" if ev["winner"] == Types.Side.PLAYER else "System wins")
+			_log("%s wins" % _who(ev["winner"]))
 		_:
 			pass
 
 
+## Who a message is about.
+##
+## The enemy is NAMED rather than called "System". Over a Boss battle,
+## "System fires CODESHATTER" is simply false — and it is the same error P-042
+## fixed in the battle header and §16 fixed on the result screen, surviving here
+## because a log line is prose and nothing asserts prose.
+##
+## Resolved through the opponent union, never `Content.system`: a Boss id is not
+## in the systems registry, and the failed lookup is what aborted the header
+## refresh in 0.3.
 func _who(side) -> String:
-	return "Hacker" if int(side) == Types.Side.PLAYER else "System"
+	if int(side) == Types.Side.PLAYER:
+		return "Hacker"
+	return _opponent_name()
+
+
+func _opponent_name() -> String:
+	return str(Content.opponent_of_identity(state.identity).get("name", "System"))
 
 
 ## Pulses the control that just fired.
