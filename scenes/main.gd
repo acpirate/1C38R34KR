@@ -66,6 +66,28 @@ var _build_origin: Types.BuildOrigin = Types.BuildOrigin.DEFAULT
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	# GRAPHICS FIRST — before the Theme, and before content.
+	#
+	# `UiTheme.build()` now bakes pack textures into its styleboxes, so it has
+	# to run after the pack is available or every button on every screen would
+	# be built against a null texture and render as the MISSING checker. The
+	# Theme is built once and inherited, so there is no second chance.
+	#
+	# Ahead of content too, because the content-failure screen is itself a
+	# themed screen: if content is broken, the report saying so should still be
+	# readable. Graphics has no dependency on content, so the order costs
+	# nothing.
+	#
+	# Unlike content, this does NOT block (authorization §10). There is no
+	# fallback content and no default System, so a content error leaves nothing
+	# to show; a graphics error has the MISSING checker by design, and refusing
+	# to launch would turn a cosmetic fault into an unplayable game. Every
+	# problem is reported at once, and the checker makes the failure impossible
+	# to miss on the screen that lost the asset.
+	for problem in Graphics.load_pack():
+		push_error(problem)
+
 	# Set once on the root: every screen and the battle scene inherit it, so
 	# there is exactly one place a control's appearance is decided.
 	theme = UiTheme.build()
@@ -92,22 +114,6 @@ func _ready() -> void:
 
 	Content.set_active(result["content"])
 	Passives.clear_cache()
-
-	# The graphics pack loads AFTER content and, unlike content, does not block
-	# startup (authorization §10).
-	#
-	# The asymmetry is deliberate. There is no fallback content and no default
-	# System, so a content error leaves nothing to show. A graphics error has a
-	# fallback by design — every missing asset resolves to the MISSING checker —
-	# so refusing to launch would turn a cosmetic fault into an unplayable game.
-	#
-	# "Visibly and gracefully" is therefore split between two places: every
-	# problem is reported here, all of them at once rather than the first, and
-	# the checker makes the failure impossible to miss on the screen that lost
-	# the asset.
-	for problem in Graphics.load_pack():
-		push_error(problem)
-
 	_show_title(result["fingerprint"])
 
 

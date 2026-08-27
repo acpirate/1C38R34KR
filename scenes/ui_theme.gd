@@ -54,15 +54,28 @@ static func control_height() -> int: return px(46)
 static func build() -> Theme:
 	var theme := Theme.new()
 
-	theme.set_stylebox("normal", "Button", _button_box(PacketStyle.CONTROL, PacketStyle.CONTROL_EDGE))
-	theme.set_stylebox("hover", "Button", _button_box(PacketStyle.CONTROL, PacketStyle.ACCENT))
-	theme.set_stylebox("pressed", "Button", _button_box(PacketStyle.PANEL_DEEP, PacketStyle.ACCENT))
+	# Beta 0.3.1 — every stylebox below is now a `StyleBoxTexture` over an
+	# asset-pack PNG rather than a flat colour. The MEASUREMENTS are unchanged:
+	# content margins still come from `px()`, so nothing moves on screen and the
+	# conversion is a change of skin, not of layout.
+	#
+	# 9-slicing is what makes that true. The source PNGs are 48×48 with a 16 px
+	# margin, so corners never stretch and a 1 px border authored at the edge
+	# stays 1 px at any control size — exactly what the `StyleBoxFlat` borders
+	# they replace did.
+	theme.set_stylebox("normal", "Button", _button_box(Graphics.pack().button_normal))
+	theme.set_stylebox("pressed", "Button", _button_box(Graphics.pack().button_pressed))
 	theme.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+
+	# Hover is unreachable on both target devices, so the pack authors no art
+	# for it (§4.8) and it borrows `normal`. If Windows becomes a target this is
+	# where the distinct state goes back.
+	theme.set_stylebox("hover", "Button", _button_box(Graphics.pack().button_normal))
 
 	# A disabled control keeps its shape and loses its contrast. Hiding it would
 	# make the screen change size as state changes, which on a phone moves the
 	# thing you were about to tap.
-	theme.set_stylebox("disabled", "Button", _button_box(PacketStyle.PANEL_DEEP, PacketStyle.PANEL_EDGE))
+	theme.set_stylebox("disabled", "Button", _button_box(Graphics.pack().button_disabled))
 
 	theme.set_color("font_color", "Button", PacketStyle.TEXT)
 	theme.set_color("font_hover_color", "Button", PacketStyle.TEXT_HEADING)
@@ -78,16 +91,15 @@ static func build() -> Theme:
 	# two-finger gesture is the primary way to scroll; this is the visible
 	# affordance that says the region scrolls at all, and the fallback for
 	# anyone who reaches for the bar.
-	var track := StyleBoxFlat.new()
-	track.bg_color = PacketStyle.CHARGE_TRACK
-	track.content_margin_left = px(7)
-	track.content_margin_right = px(7)
-	theme.set_stylebox("scroll", "VScrollBar", track)
+	theme.set_stylebox("scroll", "VScrollBar", _bar(Graphics.pack().scroll_track, 12))
 
-	theme.set_stylebox("grabber", "VScrollBar", _grabber(PacketStyle.CONTROL_EDGE))
-	theme.set_stylebox("grabber_highlight", "VScrollBar", _grabber(PacketStyle.ACCENT))
-	theme.set_stylebox("grabber_pressed", "VScrollBar", _grabber(PacketStyle.ACCENT))
+	theme.set_stylebox("grabber", "VScrollBar", _bar(Graphics.pack().scroll_thumb, 12))
+	theme.set_stylebox("grabber_highlight", "VScrollBar", _bar(Graphics.pack().scroll_thumb, 12))
+	theme.set_stylebox("grabber_pressed", "VScrollBar", _bar(Graphics.pack().scroll_thumb, 12))
 
+	# The seed entry is debug-only — the sole `LineEdit` in the game lives
+	# behind `OS.is_debug_build()` — so the pack authors no art for it and it
+	# keeps a flat box (§4.8). Its colours still come from the registry.
 	var field := StyleBoxFlat.new()
 	field.bg_color = PacketStyle.CHARGE_TRACK
 	field.border_color = PacketStyle.CONTROL_EDGE
@@ -100,24 +112,40 @@ static func build() -> Theme:
 	return theme
 
 
-static func _grabber(colour: Color) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = colour
-	box.content_margin_left = px(7)
-	box.content_margin_right = px(7)
-	box.set_corner_radius_all(px(3))
-	return box
-
-
-static func _button_box(bg: Color, edge: Color) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = bg
-	box.border_color = edge
-	box.set_border_width_all(1)
+## A 9-sliced chrome box carrying the button's content margins.
+##
+## A null texture yields the MISSING checker rather than a flat colour, so a
+## pack that lost this asset looks broken instead of looking fine (§9.4).
+static func _button_box(tex: Texture2D) -> StyleBoxTexture:
+	var box := _sliced(tex, 16)
 	box.content_margin_left = px(10)
 	box.content_margin_right = px(10)
 	box.content_margin_top = px(8)
 	box.content_margin_bottom = px(8)
+	return box
+
+
+## Scrollbar chrome. The horizontal content margins are what give the bar its
+## width — the same `px(7)` the flat boxes used, so the thumb stays a thumb-
+## sized target.
+static func _bar(tex: Texture2D, margin: int) -> StyleBoxTexture:
+	var box := _sliced(tex, margin)
+	box.content_margin_left = px(7)
+	box.content_margin_right = px(7)
+	return box
+
+
+## The shared 9-slice setup.
+##
+## `axis_stretch_*` is STRETCH rather than TILE: these are flat fields with a
+## border at the edge, and tiling a flat field is indistinguishable from
+## stretching it while costing more draw calls. A textured fill would want TILE.
+static func _sliced(tex: Texture2D, margin: int) -> StyleBoxTexture:
+	var box := StyleBoxTexture.new()
+	box.texture = tex if tex != null else Graphics.missing()
+	box.set_texture_margin_all(margin)
+	box.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	box.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	return box
 
 
