@@ -340,3 +340,42 @@ nothing in a debug affordance should be load-bearing for player-facing layout.
 **Release builds are not affected** — the bar is `OS.is_debug_build()` only —
 but every device test runs on a debug build, so it degrades exactly the
 configuration used to evaluate the game.
+
+---
+
+## AN-007 — The overlay type ring diverged from the alpha, undocumented
+
+**Found during Beta 0.3.1 Gate B, 2026-08-26, by the director's recollection
+rather than by any instrument. Suspended the same day — see D-037.**
+
+The beta drew a coloured ring outside the ownership badge to carry an overlay's
+type. The alpha never had one: type rides the badge's centre character alone.
+
+**The interesting part is not the ring. It is that nothing could see it.**
+
+- The differential compares the event stream, and presentation is not in it.
+- 3,122 headless tests do not touch the scene layer by design — layer purity is
+  what makes the logic provable and is the same boundary that leaves the
+  renderer unproven.
+- `test_presentation.gd` enforces that appearance decisions live in the
+  registry. It cannot ask whether an appearance decision was CORRECT.
+- Every device pass looked at it. A ring around a badge looks deliberate,
+  because it was — just not by the alpha.
+
+It survived beta 0.1, 0.2 and 0.3, four device gates, and a full Boss battle
+played to RUN COMPLETE. It was caught by a person remembering what the alpha
+looked like.
+
+**The generalizable point.** The port has a rigorous instrument for behaviour
+and none at all for appearance, and the project has been treating "the
+differential is green" as though it covered the whole build. It covers the half
+that can be compared. For the other half the only instrument is someone who
+knows the reference — and that instrument has now found three of this project's
+defects (P-042, AN-006, this one).
+
+**Worth considering for a future pass**, without widening 0.3.1: the alpha can
+still render every screen, and a side-by-side capture at matched state would
+turn "someone remembers" into something repeatable. That is not a pixel
+differential — the beta is deliberately not pixel-identical — but a human
+comparing two screenshots deliberately is a far better instrument than a human
+looking at one and trying to recall the other.

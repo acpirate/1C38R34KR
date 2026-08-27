@@ -894,3 +894,76 @@ Hacker overlay is itself regenerated.
 ask whether X is *prevented* or merely *unobserved*. Those are different
 mechanisms behind the same prohibition, and only an assertion about resulting
 state tells them apart.
+
+---
+
+## D-037 — The overlay type ring is suspended, restoring alpha parity
+
+**Beta 0.3.1, director call, 2026-08-26.**
+
+The beta drew a coloured ring outside the ownership badge to carry an overlay's
+TYPE. **The alpha has no such ring.** `src/render/view.ts` draws exactly two
+things for an overlay — a filled circle at `c * 0.22`, and a character in its
+centre — and type is carried by that character alone.
+
+The ring was a beta-era addition. It was never recorded as a decision, and the
+differential could not have caught it: the scene layer has no automated
+coverage, which is the same blind spot that produced P-042 and AN-006.
+
+**It cost more than it appeared to.** The ring pushed the overlay's footprint
+from the alpha's 0.45 × cell to 0.61 — about 35% wider — which is most of the
+reason a compact glyph (a diamond, a circle) all but vanishes under an overlay.
+The Gate-B sheet showed a cyan diamond reduced to four points poking out from
+behind a badge.
+
+So removing it does two things at once: it restores parity with the alpha, and
+it gives the Packet's shape back to the player who still has to match it.
+
+**Suspended, not deleted.** The director is taking the question of how to
+distinguish overlays to the designer, so this may return in some form.
+`PacketStyle.OVERLAY_TINT`, the four `ring_*` PNGs, and the commented-out
+`draw_arc` in `packet.gd` are all retained deliberately. Restoring it is
+uncommenting three lines.
+
+**Correcting the record:** the Gate-B notes originally described the badge's
+coverage of the glyph as "faithful, not a defect I introduced". That was true of
+the beta renderer but implied the alpha, and it does not trace there. The
+occlusion was substantially caused by the ring itself.
+
+---
+
+## D-038 — The four overlay marks become art, not font characters
+
+**Beta 0.3.1, director call, 2026-08-26.** Amends **D-035**, which scoped text
+rendering out of this pass entirely.
+
+The badge's centre mark was `draw_string` against `ThemeDB.fallback_font`: `S`
+for a shield, `Ø` for an Override, `+` for a live Buff, `?` for a bomb with no
+countdown. These become PNGs in the pack, authored white with alpha and tinted
+at runtime with the badge's opposite colour, so ownership keeps working exactly
+as it does now.
+
+Two reasons, and the first is a real robustness problem rather than an
+aesthetic one:
+
+- **A font is a dependency nobody chose.** `Ø` is not guaranteed to exist in
+  whatever face a device falls back to, and a missing glyph renders as a box —
+  on the Boss mechanic's only board-level signal. Nothing in the project pins a
+  font; `UiTheme` sets sizes and never a family.
+- **A letterform cannot be art-directed.** Every other mark on the board would
+  become replaceable while the four carrying the most specific information
+  stayed hostage to a system font.
+
+The suspension of the type ring (D-037) sharpens this: the mark is now the
+**sole** type signal, as it is in the alpha. So each is authored as a silhouette
+rather than a letter — a shield shape instead of `S`, a slashed ring instead of
+`Ø`.
+
+**One mark's meaning changed, and it is flagged rather than buried.** The bomb's
+`?` was a fallback for "armed bomb with no countdown to show", saying *unknown*
+where the type is actually known. It is now a charge with a fuse. That is a
+design change, not a rendering change, and the designer should confirm it.
+
+**Explicitly deferred to the text pass:** the countdown DIGIT stays a font
+glyph. Whether it becomes 0–9 sprites, stays text, or is replaced by something
+more iconic is a decision for that pass, not this one.

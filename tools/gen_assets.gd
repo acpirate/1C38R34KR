@@ -196,6 +196,28 @@ func _overlays() -> void:
 	for t in Tile.Special.Type.size():
 		_save("overlay/ring_%s" % names[t], _type_ring(PacketStyle.OVERLAY_TINT[t]), 0)
 
+	# The badge's centre MARK, as art rather than as a character (D-038).
+	#
+	# These were `draw_string` glyphs — "S", "Ø", "?", "+" — pulled from
+	# `ThemeDB.fallback_font`. Two problems with that. A font is a dependency
+	# nobody chose: `Ø` in particular is not guaranteed to exist in whatever
+	# face a device falls back to, and a missing glyph renders as a box on the
+	# one mark that has to be unambiguous. And a letterform cannot be
+	# art-directed — the art pass could restyle everything on screen EXCEPT the
+	# four marks carrying the most specific information on the board.
+	#
+	# Authored white with alpha and tinted at runtime, so ownership keeps
+	# working exactly as it does now: the mark takes the badge's opposite
+	# colour, dark on a Hacker badge and light on a System one.
+	#
+	# With the type ring suspended (D-037), these become the SOLE type signal,
+	# which is how the alpha has always done it. That raises the bar on their
+	# legibility, so each is a silhouette rather than a letter.
+	_save("overlay/mark_bomb", _mark_bomb(), 0)
+	_save("overlay/mark_buff", _mark_buff(), 0)
+	_save("overlay/mark_shield", _mark_shield(), 0)
+	_save("overlay/mark_override", _mark_override(), 0)
+
 
 ## The ownership badge: a filled disc with a ring straddling its edge.
 func _badge(face: Color, mark: Color) -> Image:
@@ -228,6 +250,84 @@ func _type_ring(tint: Color) -> Image:
 
 	_annulus(img, centre, badge_r * 1.28, badge_r * 0.2, tint)
 	img.resize(n, n, Image.INTERPOLATE_LANCZOS)
+	return img
+
+
+## A blank mark canvas plus the geometry helpers' shared setup. Every mark is
+## authored in the same square so they read at one weight beside each other.
+func _mark() -> Image:
+	var img := Image.create_empty(64 * SS, 64 * SS, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 1, 1, 0))
+	return img
+
+
+## BOMB — a charge with a fuse.
+##
+## Reached only when a bomb has no countdown to show, which is the degenerate
+## case: an armed bomb displays its remaining turns instead. The whitebox drew
+## "?" here, which said "unknown" rather than "bomb". This is the one mark whose
+## MEANING changed rather than just its rendering — flagged for the designer.
+func _mark_bomb() -> Image:
+	var img := _mark()
+	var n := float(64 * SS)
+	var centre := Vector2(n * 0.46, n * 0.58)
+	_disc(img, centre, n * 0.30, Color.WHITE)
+	_thick_line(img, centre + Vector2(n * 0.18, -n * 0.22),
+		centre + Vector2(n * 0.34, -n * 0.42), n * 0.09, Color.WHITE)
+	img.resize(64, 64, Image.INTERPOLATE_LANCZOS)
+	return img
+
+
+## BUFF — a plus. The one mark carried over unchanged, because a plus is
+## already a silhouette rather than a letterform.
+func _mark_buff() -> Image:
+	var img := _mark()
+	var n := 64 * SS
+	var arm := int(n * 0.17)
+	var span := int(n * 0.72)
+	var off := (n - span) / 2
+	img.fill_rect(Rect2i((n - arm) / 2, off, arm, span), Color.WHITE)
+	img.fill_rect(Rect2i(off, (n - arm) / 2, span, arm), Color.WHITE)
+	img.resize(64, 64, Image.INTERPOLATE_LANCZOS)
+	return img
+
+
+## SHIELD — a silhouette, replacing the letter "S".
+##
+## A shield is recognisable at badge size in a way a single letter is not, and
+## it stops depending on a font having a legible capital S at ~40 px.
+func _mark_shield() -> Image:
+	var img := _mark()
+	var n := float(64 * SS)
+	var c := Vector2(n, n) * 0.5
+	var r := n * 0.40
+	_polygon(img, PackedVector2Array([
+		c + Vector2(-0.95, -0.92) * r,
+		c + Vector2(0.95, -0.92) * r,
+		c + Vector2(0.95, 0.14) * r,
+		c + Vector2(0.55, 0.66) * r,
+		c + Vector2(0.0, 1.05) * r,
+		c + Vector2(-0.55, 0.66) * r,
+		c + Vector2(-0.95, 0.14) * r,
+	]), Color.WHITE)
+	img.resize(64, 64, Image.INTERPOLATE_LANCZOS)
+	return img
+
+
+## OVERRIDE — a slashed ring, which is what "Ø" was drawing anyway.
+##
+## The mark most worth taking off the font: `Ø` is the least likely of the four
+## to exist in an arbitrary fallback face, and a missing glyph renders as a
+## box on the Boss mechanic's only board-level signal.
+func _mark_override() -> Image:
+	var img := _mark()
+	var n := float(64 * SS)
+	var c := Vector2(n, n) * 0.5
+	var r := n * 0.34
+	_annulus(img, c, r, n * 0.115, Color.WHITE)
+	_thick_line(img, c + Vector2(0.86, -0.86) * r, c + Vector2(-0.86, 0.86) * r,
+		n * 0.115, Color.WHITE)
+	img.resize(64, 64, Image.INTERPOLATE_LANCZOS)
 	return img
 
 

@@ -327,6 +327,42 @@
     {
       "alpha": true,
       "h": 64,
+      "key": "mark_bomb",
+      "path": "overlay/mark_bomb.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "mark_buff",
+      "path": "overlay/mark_buff.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "mark_shield",
+      "path": "overlay/mark_shield.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
+      "key": "mark_override",
+      "path": "overlay/mark_override.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 64,
       "key": "menu",
       "path": "icon/menu.png",
       "slice": 0,
@@ -362,6 +398,6 @@
     }
   ],
   "build": "beta-0.3.0",
-  "count": 40,
+  "count": 44,
   "pack": "v0"
 }

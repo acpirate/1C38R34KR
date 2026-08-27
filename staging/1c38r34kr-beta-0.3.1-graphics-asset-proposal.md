@@ -196,7 +196,7 @@ for that entry only. Startup validation reports all six together (§7).
 
 ## 4. Asset inventory
 
-**40 PNGs and one SVG.** Every entry is required by something the live game
+**44 PNGs and one SVG.** Every entry is required by something the live game
 currently renders on a device this build targets; nothing is speculative.
 
 The director delegated add/merge/delete authority over this list on the grounds
@@ -273,7 +273,7 @@ them exactly, which §2.5 permits.
 Colour and shape stay strictly independent, and there are six glyphs rather than
 thirty-six.
 
-### 4.4 Overlays — 6
+### 4.4 Overlays — 10
 
 | Semantic key | Source px | Alpha | Notes |
 | --- | --- | --- | --- |
@@ -283,12 +283,31 @@ thirty-six.
 | `overlay_ring[BUFF]` | 128×128 | yes | |
 | `overlay_ring[SHIELD]` | 128×128 | yes | |
 | `overlay_ring[OVERRIDE]` | 128×128 | yes | |
+| `overlay_mark[BOMB]` | 64×64 | yes | **new** — a charge with a fuse |
+| `overlay_mark[BUFF]` | 64×64 | yes | **new** — a plus |
+| `overlay_mark[SHIELD]` | 64×64 | yes | **new** — a shield silhouette |
+| `overlay_mark[OVERRIDE]` | 64×64 | yes | **new** — a slashed ring |
 
-Composition is preserved exactly: glyph underneath, ownership badge centred,
-type ring outside it. Every currently reachable special state is covered — the
-enum is `{BOMB, BUFF, SHIELD, OVERRIDE}`, and `test_presentation.gd` already
-asserts the tint array covers it, so the same assertion extends to the texture
-array.
+**The type ring is suspended (D-037).** The alpha never had one; type rides the
+badge's centre mark alone, and the ring was an undocumented beta addition that
+widened the overlay from 0.45 × cell to 0.61. The four `ring_*` PNGs and
+`OVERLAY_TINT` are **retained but not displayed**, because the director is
+taking the question to the designer and "not now" is not "never". Filed as
+AN-007.
+
+**The four marks are art, not font characters (D-038).** They were `S`, `Ø`,
+`+`, `?` drawn from `ThemeDB.fallback_font`. `Ø` in particular is not guaranteed
+to exist in an arbitrary fallback face, and a missing glyph renders as a box on
+the Boss mechanic's only board-level signal. They are authored white with alpha
+and tinted with the badge's opposite colour, so ownership is unchanged.
+
+With the ring suspended these carry the whole type signal, as in the alpha — so
+each is a silhouette rather than a letterform.
+
+Composition: glyph underneath, ownership badge centred, mark inside the badge.
+Every currently reachable special state is covered — the enum is
+`{BOMB, BUFF, SHIELD, OVERRIDE}`, and `test_presentation.gd` already asserts the
+tint array covers it, so the same assertion extends to the texture arrays.
 
 ### 4.5 Icons — 4
 
@@ -319,7 +338,7 @@ labelled, on one canvas, laid out to be pleasant to edit as a coordinated set.
 | --- | --- |
 | **Neutral static** | Director decision (fork 4): stays procedural. Per-cell deterministic noise is what stops a field of neutrals reading as a repeating pattern, and a sprite cannot vary per cell. **D-034 — an explicit, named exception to the asset contract.** |
 | **All text** | Director decision (fork 3): text rendering is untouched. `draw_string`, `ThemeDB.fallback_font`, and the shrink-to-fit loops stay exactly as they are. **D-035.** |
-| Countdown digits and live-state characters (`S`, `Ø`, `?`, `+`) | Text, per the above. Both are drawn by the same call in the badge centre; splitting them would create two code paths for one mark. |
+| Countdown digits | Still text, and now the only text in the badge. A countdown is a live value, and the choice between 0–9 sprites, text, or something more iconic is **deferred to the text pass** by the director. The four type marks that used to share this code path are now assets — D-038. |
 | Bar fill *widths*, charge numbers, LINK/ICE values, Program names | These encode live values. Nothing that encodes a value becomes a bitmap. |
 | Playback tints, damage flash, pause scrim | `modulate` and one translucent rect; not appearance an artist would replace with an image. |
 | Six dead registry members | §1.5 — nothing renders them. |
@@ -519,7 +538,9 @@ caught by eyes on a device rather than by tests. So:
 | --- | --- |
 | **D-033** | `packet_palette.svg` is a lossless director→agent handoff channel, not a live production pipeline. Overrides authorization §11 and reinterprets §18.10. Implementation: ship the SVG in the pack, parse once at startup, fall back loudly to constants. |
 | **D-034** | Neutral static stays procedural — a named exception to the asset contract, because per-cell variation cannot come from a sprite. |
-| **D-035** | Text rendering is untouched in 0.3.1. No font slot, no `Label` conversion, no typography decisions. |
+| **D-035** | Text rendering is untouched in 0.3.1. No font slot, no `Label` conversion, no typography decisions. **Amended by D-038** — the four overlay type marks become art. The countdown digit stays a font glyph, explicitly deferred to the text pass. |
+| **D-037** | The overlay type ring is suspended, restoring alpha parity. Retained, not deleted. |
+| **D-038** | The four overlay marks become PNGs rather than font characters. Amends D-035. |
 | **D-036** | Packet glyphs carry fill and outline as two tones in one monochrome PNG, tinted by one palette entry. `COLOR_BORDER` is retired; the palette stays at six entries. |
 
 ---

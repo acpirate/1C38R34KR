@@ -102,9 +102,11 @@ func _draw_static(area: Rect2) -> void:
 ## deliver. That distinction is load-bearing: a pending Buff contributes nothing
 ## until it delivers, and the board must not imply otherwise.
 func _draw_overlay(rect: Rect2, special: Dictionary) -> void:
-	var type_index := ["bomb", "buff", "shield", "override"].find(str(special.get("type", "bomb")))
-	if type_index < 0:
-		type_index = 0
+	# D-037 — the type ring is SUSPENDED. Left commented rather than deleted
+	# because the decision is "not now", not "never"; see the block below.
+	# var type_index := ["bomb", "buff", "shield", "override"].find(str(special.get("type", "bomb")))
+	# if type_index < 0:
+	# 	type_index = 0
 
 	var player := str(special.get("owner", "player")) == "player"
 	var face: Color = PacketStyle.BADGE_PLAYER if player else PacketStyle.BADGE_ENEMY
@@ -115,9 +117,24 @@ func _draw_overlay(rect: Rect2, special: Dictionary) -> void:
 	draw_circle(centre, badge_r, face)
 	draw_arc(centre, badge_r, 0, TAU, 24, mark, badge_r * 0.16, true)
 
-	# The type still has to be distinguishable at a glance, and the badge face
-	# is spoken for by ownership — so type rides a thin outer ring instead.
-	draw_arc(centre, badge_r * 1.28, 0, TAU, 24, PacketStyle.OVERLAY_TINT[type_index], badge_r * 0.2, true)
+	# D-037 — TYPE RING SUSPENDED.
+	#
+	# This was a beta-era addition that the alpha never had: `view.ts` carries
+	# type on the badge's centre mark ALONE, and nothing else. It was never
+	# recorded as a decision, and the differential could not catch it because
+	# the scene layer has no automated coverage.
+	#
+	# It also cost more than it looked like. The ring pushed the overlay from
+	# the alpha's 0.45 × cell out to 0.61 — about 35% wider — which is most of
+	# why a compact glyph (a diamond, a circle) all but disappears under an
+	# overlay. Removing it restores alpha parity AND gives the Packet's shape
+	# back, which is the same move twice.
+	#
+	# Suspended rather than deleted: the director is taking the question of how
+	# to distinguish overlays to the designer, so this may return in some form.
+	# `OVERLAY_TINT` and the four ring PNGs are retained for that reason.
+	#
+	# draw_arc(centre, badge_r * 1.28, 0, TAU, 24, PacketStyle.OVERLAY_TINT[type_index], badge_r * 0.2, true)
 
 	var countdown := int(special.get("countdown", 0))
 	var armed := special.has("countdown") and countdown > 0

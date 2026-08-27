@@ -22,15 +22,15 @@ GROUPS = [
     ("chrome", "Screen chrome", "Panels, buttons, bars and scrollbars. Converting these five primitives converts all fifteen menu screens at once."),
     ("battle", "Battle chrome", "The Program and status boxes, the board surround, the cell a Packet sits on, and the Build slot."),
     ("packet", "Packet", "Six glyphs and two selection rings. Every glyph is monochrome and tinted at runtime — colour and shape stay independent."),
-    ("overlay", "Overlays", "Ownership badges and special-type rings. These compose over a Packet rather than replacing it."),
+    ("overlay", "Overlays", "Ownership badges and the four type marks, which compose over a Packet rather than replacing it. The four ring_* textures are retained but NOT displayed — the type ring is suspended pending a designer decision, and &quot;not now&quot; is not &quot;never&quot;."),
     ("icon", "Icons", "Four marks that were characters in the whitebox."),
 ]
 
 SHEET_NOTES = [
     ("sheet_packet_matrix.png", "The tint mechanism",
      "Six glyph textures × six palette entries = thirty-six Packets. If this needed thirty-six PNGs the architecture would be wrong. Each glyph carries a white core and a grey outline in one image, so a single multiply produces the fill and a proportionally darker edge."),
-    ("sheet_overlay_composition.png", "Concentricity",
-     "Badge and type ring are separate textures drawn into one rect, so their coordinate spaces have to agree. Left column is Hacker-owned, right is System-owned; rows are BOMB, BUFF, SHIELD, OVERRIDE. Faithful to the shipped renderer — including how much of the Packet the badge covers."),
+    ("sheet_overlay_composition.png", "Type, carried by the mark alone",
+     "The type ring is suspended (D-037) — the alpha never had one, and it was widening the overlay by about a third, which is why a diamond used to disappear underneath it. Type now rides the centre mark, as in the alpha, and those four marks are art rather than font characters (D-038). Left column is Hacker-owned, right is System-owned; rows are BOMB, BUFF, SHIELD, OVERRIDE."),
     ("sheet_scale_check.png", "Two scales, one texture",
      "A glyph draws at ~118 px on the board and ~30 px as the binding swatch in a Program box. Top row is the board case, bottom is the swatch. Shape and colour survive the small case; the outline averages away."),
 ]
@@ -284,6 +284,7 @@ footer strong {{ color: var(--accent); font-weight: 600; }}
       <span class="fact">build <b>{build}</b></span>
       <span class="fact">lossless · linear filter</span>
       <span class="fact">Gate <b>B</b></span>
+      <span class="fact">4 rings <b>suspended</b></span>
     </div>
   </header>
 

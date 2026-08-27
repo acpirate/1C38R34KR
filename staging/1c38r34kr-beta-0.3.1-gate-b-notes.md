@@ -12,7 +12,7 @@ Contact sheet: **https://claude.ai/code/artifact/22229bfa-b32f-4334-afac-a736480
 
 | Item | Where |
 | --- | --- |
-| 40 PNGs + `manifest.json` | `assets/packs/v0/{chrome,battle,packet,overlay,icon}/` |
+| 44 PNGs + `manifest.json` | `assets/packs/v0/{chrome,battle,packet,overlay,icon}/` |
 | Editable palette | `assets/packs/v0/packet_palette.svg` |
 | Composition sheets | `staging/gate-b/sheet_*.png` |
 | Contact sheet | the artifact above — every asset, three backdrops, 9-slice guides |
@@ -53,26 +53,31 @@ project directory; nothing in the game loads an image that way.
 
 ---
 
-## 3. Three things to look at, and what I think of them
+## 3. Four things to look at, and what I think of them
 
-### 3.1 The badge covers most of the Packet
+### 3.1 The badge covered most of the Packet — resolved, and I had this wrong
 
-Visible in `sheet_overlay_composition.png`: with an overlay present, a diamond
-is reduced to four points poking out around the badge.
+**Superseded by D-037.** The first version of this note said the badge's
+coverage was "faithful, not a defect I introduced". That was true of the beta
+renderer, but it implied the alpha and it does not trace there.
 
-**This is faithful, not a defect I introduced.** The live renderer uses
-`badge_r = size.x * 0.22` and a type ring at `1.28 × badge_r`, so the overlay
-spans 61% of the cell. v0 reproduces that exactly.
+The director recalled that the alpha had no type ring, and checking
+`src/render/view.ts` confirmed it: an overlay is a filled circle at `c * 0.22`
+plus a character in its centre, and nothing else. The ring was an undocumented
+beta addition that widened the overlay from **0.45 × cell to 0.61** — about a
+third — and that width is most of why a diamond vanished underneath it.
 
-But it does mean the design's stated intent — *"the Packet's own colour and
-shape stay legible around it, because the player still has to match it"* — is
-only weakly achieved for compact shapes. Colour survives everywhere. Shape
-survives well for the star and cross, poorly for the diamond and circle.
+The ring is now suspended. Removing it restored alpha parity and gave the
+Packet's shape back in the same move. `OVERLAY_TINT`, the four `ring_*` PNGs,
+and the `draw_arc` call are all retained, commented, because the director is
+taking the question to the designer.
 
-Per §13 I am reporting it rather than fixing it: shrinking the badge is an art
-and design decision, not asset plumbing, and it would put v0 out of step with
-the build it is supposed to reproduce. **Flagging it as the first thing the real
-art pass should reconsider.**
+Filed as **AN-007**, and the note there is about the instrument rather than the
+ring: this survived beta 0.1, 0.2 and 0.3, four device gates, and a full Boss
+battle played to completion. Nothing could see it. The differential compares
+behaviour, the tests do not touch the scene layer, and `test_presentation.gd`
+can enforce that appearance decisions live in the registry but not that they are
+*correct*. It was caught by a person who remembered the reference.
 
 ### 3.2 The outline does not survive the small scale
 
@@ -89,11 +94,35 @@ The outline was already authored generously (14% of the radius) for exactly this
 reason. Pushing it further would thicken it noticeably on the board to buy
 something at 30 px that carries no meaning.
 
-### 3.3 Godot's defaults were already right
+### 3.3 The four type marks are now art (D-038)
+
+The badge's centre mark was `draw_string` against `ThemeDB.fallback_font` — `S`,
+`Ø`, `+`, `?`. These are now PNGs, authored white with alpha and tinted with the
+badge's opposite colour, so ownership behaves exactly as before.
+
+The robustness argument matters more than the aesthetic one: **`Ø` is not
+guaranteed to exist in whatever face a device falls back to**, and a missing
+glyph renders as a box — on the Boss mechanic's only board-level signal. Nothing
+in this project pins a font; `UiTheme` sets sizes and never a family.
+
+With the ring suspended these carry the whole type signal, so each is authored
+as a silhouette rather than a letter: a shield shape, a slashed ring, a plus.
+
+**One mark's meaning changed and should be confirmed by the designer.** The
+bomb's `?` was a fallback for "armed bomb with no countdown to show" — it said
+*unknown* where the type is actually known. It is now a charge with a fuse.
+That is a design change rather than a rendering change, and it is the one place
+here I made a call the director did not explicitly authorise.
+
+**Deferred by the director:** the countdown DIGIT stays a font glyph. Whether it
+becomes 0–9 sprites, stays text, or turns into something more iconic belongs to
+the text pass.
+
+### 3.4 Godot's defaults were already right
 
 Four of the five import settings §6 called for are Godot 4.7's defaults for a 2D
 texture. Only `detect_3d/compress_to` needed changing, and it needed changing on
-all 40 — left at its default it silently re-imports a lossless asset as VRAM
+all 44 — left at its default it silently re-imports a lossless asset as VRAM
 compressed the moment the texture is seen in 3D. Nothing here is 3D, but a
 setting that converts lossless to lossy with nobody editing anything is exactly
 what §2.2 forbids.
@@ -127,3 +156,7 @@ converts. Phase D then converts in five commits with a tablet check between
 each, per proposal §10.
 
 Rejection at this gate costs a `gen_assets.gd` edit and a re-run.
+
+**For the 0.3.1 handback**, as instructed: D-037 (ring suspended, alpha parity
+restored), D-038 (marks are art, amending D-035), AN-007 (the divergence and
+what failed to catch it), and the deferred countdown-digit decision.

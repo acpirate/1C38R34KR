@@ -15,6 +15,11 @@ extends SceneTree
 const PACK := "res://assets/packs/v0"
 const OUT := "res://staging/gate-b"
 
+## Mirrors `gen_assets.gd`. The badge and its marks are separate textures drawn
+## into one rect, so this sheet has to use the same span the pack was authored
+## in or the composition it shows is not the one the renderer will produce.
+const OVERLAY_SPAN := 1.38
+
 
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
@@ -64,9 +69,11 @@ func _packet_matrix() -> void:
 
 ## Sheet 2 — overlay composition.
 ##
-## The thing being checked is CONCENTRICITY. The badge and the type ring are
-## separate PNGs drawn into one rect; if their coordinate spaces disagree the
-## ring will sit off-centre, and that is invisible in a directory listing.
+## Two things are being checked. CONCENTRICITY: badge and mark are separate
+## PNGs drawn into one rect, and if their coordinate spaces disagree the mark
+## sits off-centre — invisible in a directory listing. And DISTINCTNESS: with
+## the type ring suspended (D-037) these four marks carry the whole type
+## signal on their own, so they have to be told apart at badge size.
 func _overlay_composition() -> void:
 	var cell := 128
 	var pad := 10
@@ -86,7 +93,7 @@ func _overlay_composition() -> void:
 
 	# The badge spans 0.22 of the Packet as a radius, in the overlay space that
 	# is 1.38× that radius across — see `gen_assets.gd`.
-	var badge_px := int(cell * 0.22 * 2.0 * 1.38)
+	var badge_px := int(cell * 0.22 * 2.0 * OVERLAY_SPAN)
 
 	for t in types:
 		for owner in 2:
@@ -99,12 +106,25 @@ func _overlay_composition() -> void:
 
 			var badge := _load("overlay/badge_%s" % ("player" if owner == 0 else "enemy"))
 			badge.resize(badge_px, badge_px, Image.INTERPOLATE_LANCZOS)
-			var ring := _load("overlay/ring_%s" % _special_name(t))
-			ring.resize(badge_px, badge_px, Image.INTERPOLATE_LANCZOS)
-
 			var at := Vector2i(x + (cell - badge_px) / 2, y + (cell - badge_px) / 2)
 			sheet.blend_rect(badge, Rect2i(0, 0, badge_px, badge_px), at)
-			sheet.blend_rect(ring, Rect2i(0, 0, badge_px, badge_px), at)
+
+			# D-037 — the type ring is suspended, so the MARK is the whole type
+			# signal, which is how the alpha has always carried it. D-038 makes
+			# it art rather than a font character.
+			#
+			# The mark takes the badge's opposite colour, which is what keeps
+			# ownership readable: dark on a Hacker badge, light on a System one.
+			var mark_col: Color = PacketStyle.BADGE_ENEMY if owner == 0 else PacketStyle.BADGE_PLAYER
+			var mark := _tinted(_load("overlay/mark_%s" % _special_name(t)), mark_col)
+			# The badge face is 1/1.38 of the overlay span; the mark sits inside
+			# it at roughly 70%, matching the old text's optical size.
+			var mark_px := int(badge_px / OVERLAY_SPAN * 0.72)
+			mark.resize(mark_px, mark_px, Image.INTERPOLATE_LANCZOS)
+			sheet.blend_rect(
+				mark, Rect2i(0, 0, mark_px, mark_px),
+				Vector2i(x + (cell - mark_px) / 2, y + (cell - mark_px) / 2),
+			)
 
 	sheet.save_png("%s/sheet_overlay_composition.png" % OUT)
 

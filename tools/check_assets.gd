@@ -21,6 +21,7 @@ func _initialize() -> void:
 	problems.append_array(_check_ring("packet/ring_selected"))
 	problems.append_array(_check_badge("overlay/badge_player", true))
 	problems.append_array(_check_badge("overlay/badge_enemy", false))
+	problems.append_array(_check_marks())
 	problems.append_array(_check_palette())
 
 	if problems.is_empty():
@@ -164,3 +165,56 @@ func _swatch(text: String, id: String) -> String:
 	var attr := RegEx.create_from_string(r'fill\s*[=:]\s*"?\s*(#[0-9a-fA-F]{6})')
 	var m := attr.search(tag)
 	return m.get_string(1) if m != null else ""
+
+
+## The four overlay marks (D-038).
+##
+## With the type ring suspended these carry the WHOLE type signal, so the
+## failure that matters is two of them being hard to tell apart — and the
+## degenerate version of that, two of them being identical, is something a
+## generator can produce silently by a copy-paste in one helper.
+##
+## They must also be white where opaque: the renderer tints them with the
+## badge's opposite colour, and a mark authored in any other tone would come
+## out wrong on one of the two owners.
+func _check_marks() -> Array[String]:
+	var out: Array[String] = []
+	var names := ["bomb", "buff", "shield", "override"]
+	var coverage := {}
+
+	for name in names:
+		var img := _load("overlay/mark_%s" % name)
+		if img == null:
+			out.append("mark_%s missing" % name)
+			continue
+
+		var opaque := 0
+		var off_white := 0
+		for y in img.get_height():
+			for x in img.get_width():
+				var c := img.get_pixel(x, y)
+				if c.a < 0.9:
+					continue
+				opaque += 1
+				if c.r < 0.95 or c.g < 0.95 or c.b < 0.95:
+					off_white += 1
+
+		var total := img.get_width() * img.get_height()
+		if opaque < total / 40:
+			out.append("mark_%s: almost nothing is drawn (%d px)" % [name, opaque])
+		if opaque > total * 0.8:
+			out.append("mark_%s: fills the canvas; it will not read inside a badge" % name)
+		if off_white > opaque / 20:
+			out.append("mark_%s: %d opaque px are not white, so tinting will be wrong" % [name, off_white])
+		coverage[name] = opaque
+
+	# Distinctness, cheaply: identical silhouettes give identical pixel counts.
+	# This will not catch two marks that merely LOOK alike — that is the human's
+	# job at Gate B — but it does catch the generator emitting one twice.
+	for i in names.size():
+		for j in range(i + 1, names.size()):
+			var a: String = names[i]
+			var b: String = names[j]
+			if coverage.has(a) and coverage.has(b) and coverage[a] == coverage[b]:
+				out.append("mark_%s and mark_%s have identical coverage" % [a, b])
+	return out
