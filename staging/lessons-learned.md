@@ -689,3 +689,48 @@ than by running the suite (after the three export failures in Phase D). The
 pattern holds: **the further a defect sits from the logic layer, the more likely
 only a device will find it** — and each time, a cheap mechanical check turns out
 to exist that would have caught it earlier.
+
+## Defects live at the boundaries between environments
+
+**Beta 0.3.2 closeout, 2026-08-28. The through-line of two builds.**
+
+Beta 0.3.2 shipped seven defects into a build that was passing every gate.
+**None of the seven was caught by the test suite**, which by then carried 3,340
+assertions. Beta 0.3.1 shipped three, likewise uncaught by a differential with
+5,250 battles behind it.
+
+Listed by where they lived:
+
+| Boundary | Defects | Found by |
+| --- | --- | --- |
+| Source tree → exported APK | 4 | installing the artefact |
+| Logic layer → scene layer | 2 | opening the screen |
+| Workbook → CSV | 2 | diffing the round trip |
+| Beta → alpha reference | 1 | a person who remembered |
+
+**Every instrument this project has measures WITHIN one environment.** The
+differential compares two engines running the same rules. The suite instantiates
+logic classes in the project directory. The asset checker reads files from disk.
+All three are excellent, and all three stop exactly where their environment
+does.
+
+The defects were in the *seams*: what an importer does to a CSV, what a
+spreadsheet does to a leading space, whether a `.ttf` path exists after export,
+whether a renamed function left a caller behind in a file nothing loads.
+
+**The pattern is not "test more".** More assertions inside an environment do not
+reach across a seam. It is: **enumerate the boundaries, and give each one a
+cheap mechanical check.**
+
+Each one turned out to cost almost nothing once identified:
+
+- source → export: *ask the resource system, never the filesystem* — a rule, not
+  a test
+- logic → scene: four lines that load every scene script and assert it compiles
+- workbook → CSV: `export_workbook.py --check`, written in ten minutes, which
+  then caught two more things nobody was looking for
+- beta → alpha: the before/after capture pair from 0.3.1
+
+**The uncomfortable part is that each check was obvious in hindsight and none was
+obvious in advance.** The way to find the next one is to ask where an artefact
+changes hands — not to look harder at the code.

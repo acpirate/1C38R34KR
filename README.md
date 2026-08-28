@@ -10,35 +10,39 @@ intended — see [The differential gate](#the-differential-gate).
 
 ## Status
 
-**`beta-0.3.1` — the gameplay loop, drawn from a replaceable asset pack.**
+**`beta-0.3.2` — the gameplay loop, drawn from a replaceable asset pack and
+spoken through an external text framework.**
 
-Beta 0.3.0 finished the reference port: the whole alpha loop, Boss included,
-running in Godot. Beta 0.3.1 does not add gameplay. It replaces the procedural
-whitebox with a **graphics asset layer** — one `.tres` owning every semantic
-visual, so replacing the game's entire look is a pack swap rather than a hunt
-through the scene layer.
+0.3.0 finished the reference port. 0.3.1 replaced the procedural whitebox with a
+graphics asset layer. 0.3.2 does the same for words: what the game says now
+lives in `text_content.csv`, how it behaves inside a rectangle lives in
+`text_style.csv`, and which bundled typeface a role uses lives in
+`font_refs.csv`.
 
 | Phase | State |
 | --- | --- |
-| A — renderer inspection, asset contract proposal | ✅ Gate A approved |
-| B — Asset Pack v0 and the palette SVG | ✅ Gate B approved |
-| C — the graphics catalog, no renderer changes | ✅ |
-| D — renderer conversion, five commits | ✅ tablet-checked between each |
-| E — cleanup, before/after captures, device passes | ✅ tablet and S25 both signed off |
-| F — closeout | ✅ see `staging/1c38r34kr-beta-0.3.1-graphics-handback.md` |
+| A — inspection, contract proposal | ✅ Gate A approved |
+| B — v0 CSVs, bundled fonts, title logo, countdown digits | ✅ Gate B approved |
+| C — runtime registries, no migration | ✅ |
+| D — carry-forward assets into the renderer | ✅ |
+| E — literal migration and styles | ✅ |
+| F — obsolete column removal | ✅ landed early, with the data |
+| G — tablet and S25 | ✅ both signed off |
+| H — closeout | ✅ see `staging/1c38r34kr-beta-0.3.2-text-handback.md` |
 
 | Gate | State |
 | --- | --- |
-| Headless logic tests | ✅ 3,163 passing across 23 suites |
-| Asset pack structural checks | ✅ glyph tones, ring hollowness, badge polarity, palette parse |
-| Battle parity (fast, 150 battles) | ✅ 150/150 — nothing leaked into logic |
+| Headless logic tests | ✅ 3,340 passing across 24 suites |
+| Font coverage | ✅ 98-character corpus, all three faces |
+| Asset pack structural checks | ✅ including 10 countdown digits |
+| Battle report fidelity | ✅ **44 lines byte-identical** before and after migration |
+| Battle parity (fast, 150 battles) | ✅ 150/150 — no gameplay code changed |
 | Tablet device pass | ✅ every screen, clean log |
-| Phone layout | ✅ verified at an emulated 1080×2340 |
-| Physical S25 | ✅ cutout safe area, mark legibility, clean log |
+| S25 device pass | ✅ safe area, fit, no clipping, clean log |
 
-Deliberately **not** in 0.3.1: the graphics jig, hot reload, animation,
-particles, shaders, audio, HOST or Boss visual variation, landscape, final art
-direction, a theme/recolour system, content, and any gameplay change.
+Deliberately **not** in 0.3.2: localization behaviour, a pluralization engine,
+dialogue, rich text, text animation, final typography, accessibility scaling, a
+CSS-like stylesheet, audio, the graphics jig, and any gameplay change.
 
 ### Devices
 
@@ -150,13 +154,15 @@ release builds carry different signatures and cannot install over one another.
 ## Commands
 
 ```bash
-godot --headless -s res://tools/run_tests.gd            # 3,163 logic tests, no GPU
+godot --headless -s res://tools/run_tests.gd            # 3,340 logic tests, no GPU
 godot --headless --import                               # refresh the class cache
 node tools/gen/parity.mjs                               # battle differential gate
 node tools/gen/run_parity.mjs --seeds 0-1999            # Run/session differential
 node tools/gen/boss_parity.mjs --seeds 0-59             # Boss differential
 godot --headless -s res://tools/gen_assets.gd           # regenerate Asset Pack v0
 godot --headless -s res://tools/check_assets.gd         # pack structural checks
+godot --headless -s res://tools/check_fonts.gd          # bundled fonts cover the corpus
+python tools/export_workbook.py --check                 # data/ matches the workbook
 godot --headless -s res://tools/run_trace.gd -- --seed 42 --full   # dump one Run walk
 
 godot --headless --export-debug "Android" build/1c38r34kr.apk
@@ -179,12 +185,12 @@ that are perfectly fine.
 data/       ten CSV datasets — the content source of truth
 scripts/    game logic (pure RefCounted, no scene-tree dependencies)
 scenes/     Godot scenes — render from state, send intents to it
-tests/      23 headless suites
+tests/      24 headless suites
 tools/      headless runners: tests, traces, both parity harnesses
 staging/    build authorizations, decisions log, port notes, design reference
 ```
 
-~20,600 lines of GDScript: 11,200 logic, 3,400 scenes, 5,100 tests, 900 tools.
+~23,900 lines of GDScript: 11,500 logic, 4,500 scenes, 5,600 tests, 2,300 tools.
 
 ## Architecture
 
@@ -340,6 +346,50 @@ The pack is **generated**, not drawn — `tools/gen_assets.gd` reads the same
 reproduce it rather than approximate it. Rejecting an asset costs a code edit and
 a re-run, not a redrawn PNG.
 
+### Text
+
+Every player-facing string lives in `data/text_content.csv`, keyed
+`(SEMANTIC_CATEGORY, REF_ID)`. Screens ask for a reference and never hold a
+sentence:
+
+```gdscript
+Text.get_text(Text.UI_BUTTON_TEXT, "GAME_UI_PAUSE_RESUME")
+Text.format(Text.UI_STATUS_TEXT, "GAME_UI_BATTLE_TURN", {"turn": 7})
+Text.name_of("BOS_01")          # category derived from the id prefix
+```
+
+**165 rows: 56 gameplay-object names, 109 UI strings.** `EN` is the language
+column rather than a generic `STRING`, so a second language extends the sheet
+horizontally with no schema change. Localization *behaviour* is deliberately not
+built.
+
+**Missing text is visible, never blank.** An absent row renders
+`[MISSING: CATEGORY / REF_ID]` and logs; an unresolved `{token}` stays on screen
+as `{token}` and logs. A blank label reads as a layout bug and gets chased in
+the wrong file.
+
+**Style is behaviour inside a rectangle, not geometry.** `text_style.csv` carries
+font role, weight, nominal and minimum size, fit mode, line count, alignment and
+a semantic colour role — and no positions, widths or margins. Layout supplies the
+rectangle; the style decides what the text does inside it. `SHRINK` requires a
+`MIN_SIZE` and the loader refuses a row without one, which is what makes "no
+uncontrolled shrink" a rule rather than an intention.
+
+**Two font roles, three bundled faces.** `UI_SANS` (IBM Plex Sans, Regular and
+SemiBold) for prose; `UI_MONO` (IBM Plex Mono) for data readouts, because charge
+counters and report columns are digits that should align. Both SIL OFL 1.1, with
+`OFL.txt` beside them. `tools/check_fonts.gd` derives the game's real corpus from
+the content sheets and scene literals and asserts every character resolves — so a
+Packet named with a new symbol fails on a build machine rather than rendering as
+a hollow box on a device.
+
+**Two things deliberately outside the framework**, both recorded rather than
+hidden: the twelve battle messages composed in `scripts/logic/game.gd`, which are
+compared byte-for-byte against the alpha by the differentials and cannot move
+without breaking parity; and the content-validation failure screen, which reports
+the loader's errors and therefore cannot depend on data the loader may have
+failed to read.
+
 ### Saves
 
 The battle record is no longer the top level. A Run is saveable with no battle
@@ -382,7 +432,7 @@ rejected rather than restored against different rules than it was made under.
 | `staging/1c38r34kr-beta-0.2.0-build-authorization-revised.md` | the previous build's scope |
 | `staging/1c38r34kr-beta-0.2.0-authorization-review.md` | the pre-implementation review of it, and the seven items that needed resolving |
 | `staging/1c38r34kr-beta-0.1.0-build-authorization.md` | the previous build's scope, kept for reference |
-| `staging/decisions.md` | append-only decision log, D-001..D-040 |
+| `staging/decisions.md` | append-only decision log, D-001..D-046 |
 | `staging/port-notes.md` | every place the translation is non-literal, P-001..P-045 |
 | `staging/architect-notes.md` | design items raised during the port that must **not** be built as part of it |
 | `staging/1c38r34kr-beta-0.3.0-port-handback.md` | **the close-out** — what shipped, what the verification caught, and the final diff review |

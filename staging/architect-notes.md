@@ -561,10 +561,25 @@ it**.
 
 **What the director needs to do — one cell:**
 
-> `text_content` sheet, row `GAME_UI_PATH_BOSS_TAG`, set `EN` to exactly `BOSS`
-> (no leading spaces, no separator).
+> `text_content` sheet, **cell `C130`** (row `GAME_UI_PATH_BOSS_TAG`), set `EN`
+> to exactly `BOSS` — no leading spaces, no separator.
 
 Then `python tools/export_workbook.py` and the two agree again.
+
+**Status at closeout (2026-08-28): fixed in the director's working workbook,
+not yet re-staged.** `staging/breach datastructures.xlsx` is the copy from the
+Gate-B import and still reads `'·  BOSS'` at `C130`; the director's own copy has
+the correction and will be re-exported once other authoring changes accumulate.
+
+Nothing is at risk today — `data/text_content.csv` carries the correct value, so
+the shipped build is right, and the two will agree the moment the next export
+happens.
+
+**The thing to actually confirm at that import** is not this row but the
+whitespace class it belongs to: any row whose text begins with a space will have
+been flattened again, silently, by the same Excel behaviour. Run
+`python tools/export_workbook.py --check` before and `--check` after, and treat
+any unexpected drift as suspect rather than as noise.
 
 **The general point, which is the reason this is an architect note rather than a
 commit message.** §15 makes the workbook authoritative once imported, and this
