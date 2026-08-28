@@ -10,7 +10,11 @@ extends SceneTree
 ## stale one. Here the resource is derived from the files that actually exist,
 ## and re-running it after any pack change is the whole maintenance story.
 
-const PACK := "res://assets/packs/v0"
+## Which pack to build. Overridable so a new skin can be built without editing
+## this file:  godot --headless -s res://tools/gen_pack_resource.gd -- --pack v1
+const DEFAULT_PACK := "res://assets/packs/v0"
+
+var PACK := DEFAULT_PACK
 
 ## Semantic key → file, for the single-texture fields. The key is the exported
 ## property name on `GraphicsPack`; the value is its path within the pack.
@@ -56,6 +60,18 @@ const SPECIALS := ["bomb", "buff", "shield", "override"]
 
 
 func _initialize() -> void:
+	var args := OS.get_cmdline_user_args()
+	for i in args.size():
+		if args[i] == "--pack" and i + 1 < args.size():
+			var name: String = args[i + 1]
+			PACK = name if name.begins_with("res://") else "res://assets/packs/%s" % name
+
+	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(PACK)):
+		push_error("gen_pack_resource: no pack directory at %s" % PACK)
+		print("FAILED — %s does not exist" % PACK)
+		quit(1)
+		return
+
 	var pack := GraphicsPack.new()
 	var missing := PackedStringArray()
 
