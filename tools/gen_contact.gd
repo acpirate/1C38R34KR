@@ -26,6 +26,8 @@ func _initialize() -> void:
 	_packet_matrix()
 	_overlay_composition()
 	_scale_check()
+	_text_art_sheet()
+	_countdown_composition()
 	print("gate-b sheets written to %s" % OUT)
 	quit()
 
@@ -162,6 +164,74 @@ func _scale_check() -> void:
 		)
 
 	sheet.save_png("%s/sheet_scale_check.png" % OUT)
+
+
+## Sheet 4 — the title logo on the ground it will sit on.
+##
+## Authored white with alpha, so it is invisible against a white page and only
+## judgeable against the game's own background.
+func _text_art_sheet() -> void:
+	var logo := _load("chrome/title_logo")
+	var pad := 40
+	var sheet := Image.create_empty(
+		logo.get_width() + pad * 2, logo.get_height() + pad * 2, false, Image.FORMAT_RGBA8
+	)
+	sheet.fill(PacketStyle.PANEL)
+	sheet.blend_rect(
+		_tinted(logo, PacketStyle.TEXT_HEADING),
+		Rect2i(0, 0, logo.get_width(), logo.get_height()), Vector2i(pad, pad),
+	)
+	sheet.save_png("%s/sheet_title_logo.png" % OUT)
+
+
+## Sheet 5 — every countdown digit in the badge that will carry it.
+##
+## The check is legibility at REAL size and in both ownership polarities: a
+## digit is the only overlay state that still carries a number, and it has to be
+## as readable as the four type marks beside it.
+func _countdown_composition() -> void:
+	var cell := 128
+	var pad := 10
+	var sheet := Image.create_empty(
+		10 * (cell + pad) + pad, 2 * (cell + pad) + pad, false, Image.FORMAT_RGBA8
+	)
+	sheet.fill(PacketStyle.BOARD_SURROUND)
+
+	var bg := _load("battle/packet_cell")
+	bg.resize(cell, cell, Image.INTERPOLATE_LANCZOS)
+	var glyph := _load("packet/glyph_square")
+	var g := int(cell * 0.92)
+	glyph.resize(g, g, Image.INTERPOLATE_LANCZOS)
+	var tinted := _tinted(glyph, PacketStyle.COLOR_FILL[Types.PacketColor.YELLOW])
+
+	var badge_px := int(cell * 0.22 * 2.0 * OVERLAY_SPAN)
+	var digit_px := int(badge_px / OVERLAY_SPAN * 0.72)
+
+	for owner in 2:
+		for d in 10:
+			var x := pad + d * (cell + pad)
+			var y := pad + owner * (cell + pad)
+			sheet.blit_rect(bg, Rect2i(0, 0, cell, cell), Vector2i(x, y))
+			sheet.blend_rect(
+				tinted, Rect2i(0, 0, g, g), Vector2i(x + (cell - g) / 2, y + (cell - g) / 2)
+			)
+
+			var badge := _load("overlay/badge_%s" % ("player" if owner == 0 else "enemy"))
+			badge.resize(badge_px, badge_px, Image.INTERPOLATE_LANCZOS)
+			sheet.blend_rect(
+				badge, Rect2i(0, 0, badge_px, badge_px),
+				Vector2i(x + (cell - badge_px) / 2, y + (cell - badge_px) / 2),
+			)
+
+			var mark_col: Color = PacketStyle.BADGE_ENEMY if owner == 0 else PacketStyle.BADGE_PLAYER
+			var digit := _tinted(_load("overlay/digit_%d" % d), mark_col)
+			digit.resize(digit_px, digit_px, Image.INTERPOLATE_LANCZOS)
+			sheet.blend_rect(
+				digit, Rect2i(0, 0, digit_px, digit_px),
+				Vector2i(x + (cell - digit_px) / 2, y + (cell - digit_px) / 2),
+			)
+
+	sheet.save_png("%s/sheet_countdown_digits.png" % OUT)
 
 
 ## `modulate`, done exactly: multiply RGB, leave alpha alone.

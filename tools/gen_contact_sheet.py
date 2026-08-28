@@ -31,6 +31,10 @@ SHEET_NOTES = [
      "Six glyph textures × six palette entries = thirty-six Packets. If this needed thirty-six PNGs the architecture would be wrong. Each glyph carries a white core and a grey outline in one image, so a single multiply produces the fill and a proportionally darker edge."),
     ("sheet_overlay_composition.png", "Type, carried by the mark alone",
      "The type ring is suspended (D-037) — the alpha never had one, and it was widening the overlay by about a third, which is why a diamond used to disappear underneath it. Type now rides the centre mark, as in the alpha, and those four marks are art rather than font characters (D-038). Left column is Hacker-owned, right is System-owned; rows are BOMB, BUFF, SHIELD, OVERRIDE."),
+    ("sheet_title_logo.png", "The wordmark",
+     "Rasterised from IBM Plex Sans SemiBold at build time, tracked, cropped, and authored white with alpha so it can be tinted and composed over whatever background arrives later. It is art at runtime — the start screen loads no font to draw it."),
+    ("sheet_countdown_digits.png", "Countdown digits, both polarities",
+     "Ten individually addressable assets keyed by digit, rasterised from IBM Plex Mono so they ARE the game's own numerals rather than a lookalike. Shown at real badge size on a Packet: top row Hacker-owned, bottom row System-owned. After this the board depends on no typeface at all."),
     ("sheet_scale_check.png", "Two scales, one texture",
      "A glyph draws at ~118 px on the board and ~30 px as the binding swatch in a Program box. Top row is the board case, bottom is the swatch. Shape and colour survive the small case; the outline averages away."),
 ]

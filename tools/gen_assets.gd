@@ -57,6 +57,7 @@ func _initialize() -> void:
 	_packet()
 	_overlays()
 	_icons()
+	_text_art()
 
 	_write_manifest()
 	print("\nasset pack v0: %d PNGs written to %s" % [_manifest.size(), OUT])
@@ -394,6 +395,150 @@ func _cancel_icon() -> Image:
 	_thick_line(img, Vector2(big - m, m), Vector2(m, big - m), w, PacketStyle.DAMAGE)
 	img.resize(n, n, Image.INTERPOLATE_LANCZOS)
 	return img
+
+
+# ---------------------------------------------------------------------------
+# Text-derived art (beta 0.3.2)
+# ---------------------------------------------------------------------------
+#
+# The title logo and the countdown digits are ART, not text: after this build no
+# gameplay surface depends on a typeface at runtime (authorization §11.2, §12).
+#
+# They are nonetheless RASTERISED FROM THE BUNDLED FONTS at build time, which is
+# what makes them coordinated rather than merely consistent — the digits are the
+# game's own numerals and the wordmark is its own UI face. Hand-drawing either
+# would have produced art that drifts from the interface around it.
+#
+# FreeType is CPU-side, so this works with no rendering device.
+
+const SANS_BOLD := "res://assets/fonts/IBMPlexSans-SemiBold.ttf"
+const MONO := "res://assets/fonts/IBMPlexMono-Regular.ttf"
+
+## Countdown digits are authored on one square canvas so they compose without
+## per-digit nudging. A monospace face makes that honest — every advance is
+## already equal.
+const DIGIT_PX := 96
+
+
+func _text_art() -> void:
+	# §12 — the start screen's wordmark. Tracked, because a title set solid at
+	# this size reads as a word rather than a mark.
+	_save("chrome/title_logo", _text_image(SANS_BOLD, "1C38R34KR", 180, 14), 0)
+
+	# §11 — ten individually addressable digits, keyed by value.
+	for d in 10:
+		_save("overlay/digit_%d" % d, _digit_image(d), 0)
+
+
+## One digit, centred on a fixed square canvas.
+func _digit_image(d: int) -> Image:
+	var glyph := _text_image(MONO, str(d), DIGIT_PX, 0)
+	var canvas := Image.create_empty(DIGIT_PX, DIGIT_PX, false, Image.FORMAT_RGBA8)
+	canvas.fill(Color(1, 1, 1, 0))
+	canvas.blend_rect(
+		glyph, Rect2i(0, 0, glyph.get_width(), glyph.get_height()),
+		Vector2i((DIGIT_PX - glyph.get_width()) / 2, (DIGIT_PX - glyph.get_height()) / 2),
+	)
+	return canvas
+
+
+## Rasterises `text` to a tightly-cropped white image with coverage in alpha.
+##
+## White so the renderer tints it — the digits take the badge's mark colour, so
+## ownership polarity keeps working exactly as it does for the type marks.
+func _text_image(font_path: String, text: String, px: int, tracking: int) -> Image:
+	var font := FontFile.new()
+	if font.load_dynamic_font(font_path) != OK:
+		push_error("gen_assets: could not load %s" % font_path)
+		return _solid(8, 8, PacketStyle.MISSING_A)
+
+	var rids := font.get_rids()
+	if rids.is_empty():
+		push_error("gen_assets: %s produced no font RID" % font_path)
+		return _solid(8, 8, PacketStyle.MISSING_A)
+
+	var rid: RID = rids[0]
+	var ts := TextServerManager.get_primary_interface()
+	var key := Vector2i(px, 0)
+
+	# Two passes: measure, then draw. A single pass would need the canvas sized
+	# before the glyph metrics are known.
+	var ascent := ts.font_get_ascent(rid, px)
+	var descent := ts.font_get_descent(rid, px)
+	var width := 0.0
+	var glyphs: Array = []
+	for ch in text:
+		var idx := ts.font_get_glyph_index(rid, px, ch.unicode_at(0), 0)
+		ts.font_render_glyph(rid, key, idx)
+		glyphs.append(idx)
+		width += ts.font_get_glyph_advance(rid, px, idx).x + tracking
+
+	var w := int(ceil(width)) + 4
+	var h := int(ceil(ascent + descent)) + 4
+	var out := Image.create_empty(maxi(w, 1), maxi(h, 1), false, Image.FORMAT_RGBA8)
+	out.fill(Color(1, 1, 1, 0))
+
+	var pen := 2.0
+	for idx in glyphs:
+		var tex_idx := ts.font_get_glyph_texture_idx(rid, key, idx)
+		if tex_idx >= 0:
+			var atlas := ts.font_get_texture_image(rid, key, tex_idx)
+			var uv := ts.font_get_glyph_uv_rect(rid, key, idx)
+			var off := ts.font_get_glyph_offset(rid, key, idx)
+			_blit_coverage(
+				atlas, Rect2i(uv.position, uv.size), out,
+				Vector2i(int(pen + off.x) + 2, int(ascent + off.y) + 2),
+			)
+		pen += ts.font_get_glyph_advance(rid, px, idx).x + tracking
+
+	return _crop_to_content(out)
+
+
+## Copies a glyph out of the font atlas as white-with-alpha.
+##
+## The atlas is LA8 — luminance and coverage. Only coverage matters here: the
+## art is authored white so the renderer can tint it, exactly as the Packet
+## glyphs and overlay marks are.
+func _blit_coverage(atlas: Image, region: Rect2i, dest: Image, at: Vector2i) -> void:
+	for y in region.size.y:
+		for x in region.size.x:
+			var sx := region.position.x + x
+			var sy := region.position.y + y
+			if sx < 0 or sy < 0 or sx >= atlas.get_width() or sy >= atlas.get_height():
+				continue
+			var src := atlas.get_pixel(sx, sy)
+			# The atlas is LA8, which `get_pixel` surfaces as (l, l, l, a) with
+			# luminance pinned at 1.0 across the glyph's whole bounding box.
+			# Coverage lives in ALPHA alone — taking max(a, r) here filled every
+			# box solid and turned the wordmark into nine white rectangles.
+			var coverage: float = src.a
+			if coverage <= 0.0:
+				continue
+			var dx := at.x + x
+			var dy := at.y + y
+			if dx < 0 or dy < 0 or dx >= dest.get_width() or dy >= dest.get_height():
+				continue
+			var prev := dest.get_pixel(dx, dy)
+			dest.set_pixel(dx, dy, Color(1, 1, 1, maxf(prev.a, coverage)))
+
+
+## Trims fully transparent rows and columns, so the caller controls padding
+## rather than inheriting the font's.
+func _crop_to_content(img: Image) -> Image:
+	var min_x := img.get_width()
+	var min_y := img.get_height()
+	var max_x := -1
+	var max_y := -1
+	for y in img.get_height():
+		for x in img.get_width():
+			if img.get_pixel(x, y).a > 0.0:
+				min_x = mini(min_x, x)
+				min_y = mini(min_y, y)
+				max_x = maxi(max_x, x)
+				max_y = maxi(max_y, y)
+	if max_x < 0:
+		return img
+	return img.get_region(Rect2i(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1))
 
 
 # ---------------------------------------------------------------------------

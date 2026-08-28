@@ -395,9 +395,108 @@
       "slice": 0,
       "stretch": "",
       "w": 64
+    },
+    {
+      "alpha": true,
+      "h": 130,
+      "key": "title_logo",
+      "path": "chrome/title_logo.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 1114
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_0",
+      "path": "overlay/digit_0.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_1",
+      "path": "overlay/digit_1.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_2",
+      "path": "overlay/digit_2.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_3",
+      "path": "overlay/digit_3.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_4",
+      "path": "overlay/digit_4.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_5",
+      "path": "overlay/digit_5.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_6",
+      "path": "overlay/digit_6.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_7",
+      "path": "overlay/digit_7.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_8",
+      "path": "overlay/digit_8.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
+    },
+    {
+      "alpha": true,
+      "h": 96,
+      "key": "digit_9",
+      "path": "overlay/digit_9.png",
+      "slice": 0,
+      "stretch": "",
+      "w": 96
     }
   ],
   "build": "beta-0.3.1",
-  "count": 44,
+  "count": 55,
   "pack": "v0"
 }

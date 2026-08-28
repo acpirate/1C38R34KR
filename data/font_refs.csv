@@ -1,0 +1,4 @@
+FONT_ROLE,WEIGHT,FONT_FILE
+UI_SANS,REGULAR,assets/fonts/IBMPlexSans-Regular.ttf
+UI_SANS,BOLD,assets/fonts/IBMPlexSans-SemiBold.ttf
+UI_MONO,REGULAR,assets/fonts/IBMPlexMono-Regular.ttf
