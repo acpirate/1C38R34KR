@@ -13,6 +13,10 @@ extends Control
 
 const TITLE := "1C38R34KR"
 
+## The wordmark's width, in alpha CSS px — a little under the panel's 250 so it
+## breathes rather than touching the edges.
+const TITLE_LOGO_WIDTH := 210
+
 var _shell: MarginContainer
 var _panel: PanelContainer
 var _root: VBoxContainer
@@ -182,6 +186,38 @@ func _fresh_screen(compact := false) -> VBoxContainer:
 	return _root
 
 
+## The wordmark, as art rather than as text (§12).
+##
+## Sized as a FRACTION of the panel it sits in with a ceiling, never a fixed
+## pixel size — the phone and tablet differ in width, and pinning one resolution
+## is the mistake the graphics pass spent 0.3.1 avoiding.
+##
+## `EXPAND_FIT_WIDTH_PROPORTIONAL` lets the height follow the width, so the
+## reserved space matches the art instead of being guessed at.
+func _title_logo() -> void:
+	var logo := TextureRect.new()
+	logo.texture = Graphics.pack().title_logo
+	if logo.texture == null:
+		logo.texture = Graphics.missing()
+	# Both dimensions are reserved explicitly, from the art's own aspect ratio.
+	#
+	# `EXPAND_FIT_WIDTH_PROPORTIONAL` derives height from width — but inside a
+	# VBoxContainer there is no width to derive from until layout has run, so the
+	# control reserved zero height and the wordmark was invisible on device while
+	# looking correct in every check that did not render it.
+	var tex_size := logo.texture.get_size()
+	var w := float(UiTheme.px(TITLE_LOGO_WIDTH))
+	logo.custom_minimum_size = Vector2(w, w * tex_size.y / maxf(tex_size.x, 1.0))
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# The art is authored WHITE with alpha so it can be tinted — the same
+	# convention as the Packet glyphs and overlay marks. Untinted it is white on
+	# a near-white nothing, which is exactly how it first shipped: invisible.
+	logo.modulate = PacketStyle.TEXT_HEADING
+	_root.add_child(logo)
+
+
 ## Bold, letter-spaced, upper case. It is the alpha's most recognisable piece of
 ## identity and costs one font-size override to keep.
 func _heading(text: String) -> void:
@@ -220,7 +256,7 @@ func _divider() -> void:
 
 func _show_title(fingerprint: String) -> void:
 	_fresh_screen(true)
-	_heading(TITLE)
+	_title_logo()
 	# Derived from GAME_VERSION rather than typed, so a version bump cannot leave
 	# the title screen claiming the previous build. It read "beta 0.2" through
 	# the whole of 0.3 development because it was a literal.

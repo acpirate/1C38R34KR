@@ -613,3 +613,49 @@ by eye. The comparison took minutes to write and is now permanent
 
 The second half is the part worth defending when schedule pressure arrives,
 because it looks like duplicated effort and is not.
+
+## The export step is a different environment, and it finds different bugs
+
+**Beta 0.3.2 Phase D, 2026-08-28.**
+
+Three defects landed in a row, all with the same shape: **correct on desktop,
+broken in the APK**, and none reachable by the 3,276-assertion suite because
+every one of them was about how a resource reaches an exported build.
+
+**1. Godot auto-imported the text CSVs as `Translation` resources.** A CSV whose
+first column looks like a translation key gets `importer="csv_translation"`, and
+the raw file stops shipping. The game booted to `cannot open
+res://data/text_content.csv`. The ten existing sheets were all `importer="keep"`
+— a convention nobody had written down, so the three new sheets did not inherit
+it.
+
+**2. Font existence was checked with `FileAccess.file_exists`.** A `.ttf` is
+imported to a `.fontdata` resource, so the authored path is absent from an
+export even though the font ships. The check passed on desktop and failed on
+device, and it was *my own validator* reporting a false error about a file that
+was genuinely there.
+
+**3. `FontFile.load_dynamic_font` reads the source file**, which does not exist
+in an export either. Same cause, one layer down.
+
+**The rule that covers all three: in an exported Godot build, ask the RESOURCE
+system, never the filesystem.** `ResourceLoader.exists` and `ResourceLoader.load`
+work in both environments; `FileAccess` and `load_dynamic_font` only work where
+the source tree does.
+
+**The wider point is about where the boundary of testability sits.** The suite
+runs against the project directory, so it validates the source tree — which is a
+different thing from what a player installs. Everything that changes between
+those two — importers, remaps, filters, `.import` settings — is invisible to it
+by construction.
+
+The graphics build learned that eyes are needed past the logic layer. This is the
+same lesson one step further out: **the export is its own environment, and the
+only instrument that covers it is installing the artefact and launching it.**
+
+**One consolation worth recording.** Every failure was caught by the *content
+validation screen*, reporting all three errors together with file, row, field and
+value. Two builds ago that screen's strings were deliberately left as literals
+because it "cannot depend on the thing it reports on" — and here it was, the one
+screen still working while text loading was broken, telling us exactly which
+rows to fix. That decision paid for itself the first time it was tested.

@@ -39,6 +39,7 @@ const SINGLES := {
 	"build_slot": "battle/build_slot",
 	"ring_selected": "packet/ring_selected",
 	"ring_targeting": "packet/ring_targeting",
+	"title_logo": "chrome/title_logo",
 	"badge_player": "overlay/badge_player",
 	"badge_enemy": "overlay/badge_enemy",
 	"icon_menu": "icon/menu",
@@ -67,6 +68,7 @@ func _initialize() -> void:
 	pack.packet_glyph = _series("packet/glyph_%s", SHAPES, missing)
 	pack.overlay_mark = _series("overlay/mark_%s", SPECIALS, missing)
 	pack.overlay_ring = _series("overlay/ring_%s", SPECIALS, missing)
+	pack.countdown_digit = _series("overlay/digit_%s", range(10), missing)
 	pack.palette_svg = "%s/packet_palette.svg" % PACK
 
 	if not missing.is_empty():

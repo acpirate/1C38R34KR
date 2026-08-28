@@ -47,10 +47,13 @@ static func of(role: String, weight := "REGULAR") -> Font:
 		_cache[key] = fallback
 		return fallback
 
-	var font := FontFile.new()
-	var err := font.load_dynamic_font(path)
-	if err != OK:
-		_warn_once(key, "text: '%s' failed to load (error %d)" % [path, err])
+	# `ResourceLoader`, not `FontFile.load_dynamic_font`: the .ttf is imported to
+	# a .fontdata resource and the authored path does not exist in an exported
+	# build. Reading the source file works on desktop and fails on device.
+	var res := ResourceLoader.load(path)
+	var font := res as Font
+	if font == null:
+		_warn_once(key, "text: '%s' did not load as a Font" % path)
 		var fallback := ThemeDB.fallback_font
 		_cache[key] = fallback
 		return fallback

@@ -49,10 +49,11 @@ func _initialize() -> void:
 
 
 func _check_one(path: String, corpus: Array) -> int:
-	var font := FontFile.new()
-	var err := font.load_dynamic_font(path)
-	if err != OK:
-		push_error("check_fonts: %s did not load (error %d)" % [path, err])
+	# Through the resource system, exactly as the game does — a checker that
+	# loads differently from the runtime can certify a font the game cannot use.
+	var font := ResourceLoader.load(path) as Font
+	if font == null:
+		push_error("check_fonts: %s did not load as a Font" % path)
 		print("  FAIL  %-32s unreadable" % path.get_file())
 		return 1
 

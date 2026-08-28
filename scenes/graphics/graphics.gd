@@ -86,6 +86,13 @@ static func mark(type_index: int) -> Texture2D:
 	return _at(pack().overlay_mark, type_index)
 
 
+## One countdown numeral, keyed by DIGIT VALUE rather than by index into a
+## string — so composing a multi-digit number is a loop over its digits and
+## nothing has to parse anything (§11.3).
+static func digit(value: int) -> Texture2D:
+	return _at(pack().countdown_digit, value)
+
+
 ## The suspended type ring, keyed by `Tile.Special.Type` (D-037).
 ##
 ## Nothing calls this today. It exists so that restoring the ring is a renderer

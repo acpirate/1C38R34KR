@@ -185,17 +185,34 @@ func _draw_overlay(rect: Rect2, special: Dictionary) -> void:
 	)
 
 
-## The remaining turns on an armed overlay.
+## The remaining turns on an armed overlay, composed from digit ART (§11).
 ##
-## Still drawn text, and deliberately: a countdown is a live VALUE, and the
-## choice between 0-9 sprites, text, or something more iconic belongs to the
-## text pass rather than to this one.
+## The last font dependency on the board, retired: after this nothing on the
+## Datastream loads a typeface. The digits were drawn with
+## `ThemeDB.fallback_font`, so a countdown's legibility depended on whatever
+## face a device happened to supply — the same exposure D-038 removed from the
+## four type marks.
+##
+## Composed left to right from the value's own digits, so a two-digit countdown
+## already works (§11.3). Current content never exceeds 9, but the renderer not
+## being ABLE to show 10 would be a limit hiding in the view layer.
+##
+## Multi-digit numbers narrow each glyph so the pair still fits inside the badge
+## rather than spilling over its ring.
 func _draw_countdown(centre: Vector2, badge_r: float, countdown: int, colour: Color) -> void:
-	var text := str(countdown)
-	var font := ThemeDB.fallback_font
-	var fs := int(badge_r * 1.5)
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_string(
-		font, centre + Vector2(-w * 0.5, badge_r * 0.52), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, fs, colour,
-	)
+	var text := str(maxi(0, countdown))
+	var count := text.length()
+
+	var height := badge_r * MARK_SCALE * 2.0
+	var width := height if count == 1 else height * 0.62
+	var total := width * count
+	var x := centre.x - total * 0.5
+
+	for ch in text:
+		var d := ch.to_int()
+		draw_texture_rect(
+			Graphics.digit(d),
+			Rect2(Vector2(x, centre.y - height * 0.5), Vector2(width, height)),
+			false, colour,
+		)
+		x += width

@@ -459,9 +459,15 @@ func read_font_refs() -> void:
 			continue
 
 		# §6.2 — production text must not fall back to a device font. A missing
-		# file is a content error, caught here rather than at first draw.
+		# font is a content error, caught here rather than at first draw.
+		#
+		# `ResourceLoader.exists`, NOT `FileAccess.file_exists`: Godot imports a
+		# .ttf into a .fontdata resource, so the authored path is absent from an
+		# exported build even though the font ships. Checking the filesystem
+		# passed on desktop and failed on device — which is the whole class of
+		# bug the export step exists to surface.
 		var res := "res://%s" % file if not file.begins_with("res://") else file
-		if not FileAccess.file_exists(res):
+		if not ResourceLoader.exists(res):
 			c["field"] = "FONT_FILE"
 			c["value"] = file
 			c["reason"] = "bundled font file not found"

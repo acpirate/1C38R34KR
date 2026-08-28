@@ -38,6 +38,9 @@ extends Resource
 @export var bar_fill_ice: Texture2D
 @export var bar_fill_charge: Texture2D
 @export var bar_fill_charge_ready: Texture2D
+## The start screen's wordmark (beta 0.3.2 §12). Art, not text — nothing loads a
+## font to draw it.
+@export var title_logo: Texture2D
 
 @export_group("Battle chrome")
 @export var avatar_box: Texture2D
@@ -65,6 +68,9 @@ extends Resource
 ## is suspended (D-037) pending a designer decision. Kept in the contract so
 ## restoring it needs no schema change.
 @export var overlay_ring: Array[Texture2D] = []
+## Countdown numerals 0-9, indexed by digit (beta 0.3.2 §11). An armed overlay's
+## remaining turns are composed from these, so the board depends on no typeface.
+@export var countdown_digit: Array[Texture2D] = []
 
 @export_group("Icons")
 @export var icon_menu: Texture2D
@@ -88,6 +94,7 @@ func _expected_sizes() -> Dictionary:
 		"packet_glyph": Types.PacketShape.size(),
 		"overlay_mark": Tile.Special.Type.size(),
 		"overlay_ring": Tile.Special.Type.size(),
+		"countdown_digit": 10,
 	}
 
 
