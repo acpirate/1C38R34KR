@@ -657,3 +657,66 @@ because a question about *future* packs prompted a check that could see it.
 **`fix_imports.py --check` should join the verification gate**, alongside
 `export_workbook.py --check`. Both are the same shape — a boundary where a
 setting can revert without anyone touching it.
+
+---
+
+## AN-014 — The authoring bundle: art without architecture
+
+**Requested by the director, 2026-08-28, ahead of the graphics-jig
+authorization. Built.**
+
+**The ask:** a directory containing only asset files, handable to an artist, an
+agent, or the director himself, editable "without having to consider the
+architecture to which it will be applied".
+
+**The shape:** `authoring/<name>/` holds the PNGs, the palette SVG, and a
+generated `README.md`. Nothing else — no `.import` files, no `pack.tres`, no
+`manifest.json`. It can be zipped and sent to someone who has never seen this
+repository, and everything needed to make it loadable happens on the engine side
+of the line.
+
+```
+python tools/asset_bundle.py export v0            # pack   -> bundle
+python tools/asset_bundle.py check v0             # validate
+python tools/asset_bundle.py build v0 --pack v1   # bundle -> pack
+```
+
+**`.gdignore` is what makes it possible.** Without it Godot generates `.import`
+files inside the bundle the moment the editor opens, and the separation
+collapses silently. Verified: a full `--import` leaves the tree untouched.
+
+### The spec is the contract
+
+`asset_bundle.py`'s `SPEC` lists every semantic key with its dimensions, its
+9-slice margin, whether the game **tints it at runtime**, and one line on what it
+is. `check` validates a bundle against it, so a missing or mis-sized asset fails
+on a build machine rather than as a magenta checker on a device. Confirmed by
+damaging a bundle deliberately — both a deleted file and a wrong-sized one were
+caught with the specifics.
+
+**The tint rule is the one that matters and the one no validator can catch.**
+A tinted asset is authored white with its shape in the alpha channel; the game
+multiplies it by a colour chosen at runtime. Author it in colour and the game
+looks wrong with no error anywhere, because the file is perfectly valid. The
+generated README states it first, marks every affected asset **TINT** in the
+table, and says explicitly that it is the one mistake that produces no error.
+
+### Round trip verified
+
+`authoring/v0` → `assets/packs/v1` → loads at runtime with six glyphs, ten
+digits and a parsed palette, `pack.tres` carrying 56 self-referencing paths and
+zero leftovers from the source pack. The test pack was then removed; creating a
+real skin is the director's call.
+
+### For the jig authorization
+
+The jig's job is rapid iteration on art. This gives it a natural input: a jig
+that watches `authoring/<name>/` and rebuilds a pack from it is a much simpler
+thing to specify than one that manipulates engine resources directly, and it
+reuses `build` + `fix_imports` + `gen_pack_resource` rather than growing a
+parallel path — which is what §19 of the 0.3.1 authorization asked for.
+
+Worth noting for scope: **the bundle boundary is now the third of these seams**
+this project has drawn, after the graphics pack contract and the text sheets.
+Each one converted "remember to do the right thing" into "the tool does it, and
+`--check` says when it hasn't".

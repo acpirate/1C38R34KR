@@ -346,6 +346,34 @@ The pack is **generated**, not drawn — `tools/gen_assets.gd` reads the same
 reproduce it rather than approximate it. Rejecting an asset costs a code edit and
 a re-run, not a redrawn PNG.
 
+#### Authoring a new skin
+
+`authoring/<name>/` is the artist-facing side: **only** PNGs, the palette SVG, and
+a generated README describing every asset — no `.import` files, no `pack.tres`,
+nothing about Godot. It can be zipped and handed to someone who has never seen
+this repository. `authoring/.gdignore` keeps the tree out of the import system so
+the raw files stay raw.
+
+```bash
+python tools/asset_bundle.py export v0          # pack   -> clean bundle
+python tools/asset_bundle.py check v0           # validate against the spec
+python tools/asset_bundle.py build v0 --pack v1 # bundle -> pack
+godot --headless --import
+python tools/fix_imports.py v1
+godot --headless -s res://tools/gen_pack_resource.gd -- --pack v1
+```
+
+`asset_bundle.py`'s `SPEC` is the contract — every key, its dimensions, its
+9-slice margin, and **whether the game tints it at runtime**. That last one is
+the rule an artist most needs and would never guess: a tinted asset is authored
+white with the shape in alpha, and authoring it in colour produces a wrong-looking
+game with no error anywhere, because the file is perfectly valid. `check` catches
+missing and mis-sized assets; nothing can catch that one, so the README says it
+three times.
+
+Cloning a pack directly is also supported (`tools/new_pack.py`) and is documented
+in AN-013, along with the two silent failures it exists to prevent.
+
 ### Text
 
 Every player-facing string lives in `data/text_content.csv`, keyed
