@@ -26,6 +26,7 @@ const SUITES := [
 	"res://tests/test_charge_routing.gd",
 	# Phase 5 — presentation.
 	"res://tests/test_presentation.gd",
+	"res://tests/test_text.gd",
 	# Beta 0.2 Phase A — the Run session model. Ahead of persistence because the
 	# save envelope is built around these shapes.
 	"res://tests/test_run_state.gd",

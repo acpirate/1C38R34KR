@@ -110,6 +110,10 @@ func _ready() -> void:
 
 	Content.set_active(result["content"])
 	Passives.clear_cache()
+	# Styles and fonts are resolved from the sheet and cached, so they must not
+	# outlive the content they came from — same reason as `Passives`.
+	TextStyles.clear_cache()
+	Fonts.clear_cache()
 	_show_title(result["fingerprint"])
 
 

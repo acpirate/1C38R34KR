@@ -1051,6 +1051,13 @@ func build_resolved() -> Dictionary:
 		"hosts": _resolve_identity(host_rows, psv_by_id, fn_by_id),
 		"upgrades": _resolve_identity(upgrade_rows, psv_by_id, fn_by_id),
 		"bosses": _resolve_identity(boss_rows, psv_by_id, fn_by_id),
+
+		# Text framework (beta 0.3.2). Carried in the same resolved dictionary as
+		# everything else so there is ONE published content object — a second
+		# channel would be the competing source of truth §15 forbids.
+		"text": text_rows,
+		"styles": style_rows,
+		"fonts": font_rows,
 	}
 
 
