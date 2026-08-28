@@ -560,3 +560,56 @@ indistinguishable from tiling it and costs less.
 Cached the boxes while fixing it. The board redraws constantly across sixty-four
 Packets, and building a `StyleBoxTexture` per draw call would allocate thousands
 a second to say the same thing each time.
+
+## Automate for precision and endurance; cross-check for prudence and discernment
+
+**Beta 0.3.2, 2026-08-28. The director's formulation, and the better one.**
+
+> If the task requires precision or endurance then (probably) automate it. If it
+> requires prudence or qualitative discernment then both teams should sanity
+> check each other.
+
+It came out of a concrete half hour. The director imported three generated CSVs
+into the master workbook, deleted the deprecated columns, and exported. Three
+things happened, and they went three different ways:
+
+| What | Cause | Verdict |
+| --- | --- | --- |
+| `BOS_ID` deleted — the Boss sheet's primary key | hand edit | error |
+| `GRAPHICS` / `graphics_ref` deleted from six sheets | hand edit | **an improvement the agent had missed** |
+| Leading spaces stripped from four strings | **Excel itself** | silent corruption |
+
+**The middle row is why "just let the agent do it" is wrong.** Those columns
+were POC scaffolding that the 0.3.1 graphics pack had made redundant. They were
+not on the agent's migration map — the agent would have preserved them
+faithfully and forever. Knowing a field is dead weight is design intent, and it
+lived with the director.
+
+**The first row is why "just do it by hand" is wrong.** Deleting a column in a
+grid is a spatial operation with no schema enforcement and no reviewable diff.
+`BOS_ID` was column A, adjacent to the three being cleared. That is not
+carelessness; it is an operation badly matched to its tool.
+
+**The third row is the one that actually matters, and it is nobody's fault.**
+Excel discards leading whitespace on CSV import. That flattened the battle log's
+indented sub-messages, and it is unrecoverable from the workbook. Neither party
+would have caught it by reading. Its cost is unbounded precisely because it is
+silent.
+
+**What changed the economics was neither party — it was the diff.** All three
+were found because the round trip was compared mechanically instead of reviewed
+by eye. The comparison took minutes to write and is now permanent
+(`tools/export_workbook.py --check`).
+
+**The generalizable rule, in the director's terms:**
+
+- **Precision or endurance → automate.** Transcription, bulk reshaping, column
+  surgery, anything where being right the four-hundredth time matters as much as
+  the first. Humans and spreadsheets both degrade here; scripts do not.
+- **Prudence or qualitative discernment → both teams sanity check.** Not "the
+  human reviews the agent". *Mutually.* In this episode the director caught
+  something the agent had missed, and the agent caught two things the director
+  could not have seen. Each was blind exactly where the other was not.
+
+The second half is the part worth defending when schedule pressure arrives,
+because it looks like duplicated effort and is not.

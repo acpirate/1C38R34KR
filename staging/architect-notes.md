@@ -499,3 +499,41 @@ than on a device.
 
 **So the sequencing is: subset, then let the existing checker prove it.** That
 is the whole reason to do it deliberately rather than opportunistically.
+
+---
+
+## AN-011 — Excel strips leading whitespace on CSV import
+
+**Found during Beta 0.3.2 Gate B import, 2026-08-28. Worked around, not
+solved — the constraint belongs to the tool.**
+
+Four `text_content.csv` rows encoded the battle log's hierarchy as two leading
+spaces. After the director imported the CSVs into the master workbook and
+exported, those spaces were gone — not from the export, from **the workbook
+itself**. Excel discards leading whitespace when importing a CSV cell.
+
+Interior whitespace survives: `"Weak:   {colors}, {shapes}"` came back intact.
+Only leading is lost.
+
+**Consequences worth knowing before authoring more copy:**
+
+- Any string whose meaning depends on a leading space cannot survive this
+  authoring pipeline. Indentation, hanging alignment, and deliberate leading
+  padding are all unsafe.
+- The loss is **silent and unrecoverable from the workbook**. Once imported, the
+  original is gone; only the agent's generated CSV or version control has it.
+- It is not caught by reading. Both parties looked at the sheet and saw nothing
+  wrong. It surfaced from a mechanical diff of the round trip.
+
+**Worked around** by moving the indentation into the renderer (D-046), which is
+where it arguably belonged anyway.
+
+**If leading whitespace is ever genuinely needed in authored copy**, the options
+are a sentinel character the loader converts (`_` or `·` → space), a dedicated
+`INDENT` column in `text_style.csv`, or authoring that sheet outside the
+workbook. None is needed today, and none should be built speculatively.
+
+The general shape is worth keeping: **a round trip through a spreadsheet is a
+lossy channel, and which losses it inflicts are not obvious in advance.** The
+mitigation is not to trust it less but to diff it every time —
+`tools/export_workbook.py --check` exists for that.

@@ -25,6 +25,9 @@ const DATASET_SYSTEMS := "systems"
 const DATASET_HOSTS := "hosts"
 const DATASET_UPGRADES := "upgrades"
 const DATASET_BOSSES := "bosses"
+const DATASET_TEXT_CONTENT := "text-content"
+const DATASET_TEXT_STYLE := "text-style"
+const DATASET_FONT_REFS := "font-refs"
 const DATASET_CONTENT := "content"
 
 var issues: Array[Dictionary] = []

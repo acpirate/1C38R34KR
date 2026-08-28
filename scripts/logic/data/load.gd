@@ -29,6 +29,9 @@ const FILES := {
 	"hosts": "hst.csv",
 	"upgrades": "upg.csv",
 	"bosses": "bos.csv",
+	"text_content": "text_content.csv",
+	"text_style": "text_style.csv",
+	"font_refs": "font_refs.csv",
 }
 
 var issues := DataIssues.new()
@@ -42,6 +45,13 @@ var system_rows: Array[Dictionary] = []
 var host_rows: Array[Dictionary] = []
 var upgrade_rows: Array[Dictionary] = []
 var boss_rows: Array[Dictionary] = []
+
+## Text framework stores (beta 0.3.2). Dictionaries rather than row arrays: every
+## consumer is a keyed lookup, and a duplicate key is an authoring error the
+## reader rejects rather than a shape the runtime has to resolve.
+var text_rows := {}    ## "CATEGORY/REF_ID" -> EN
+var style_rows := {}   ## STYLE_ID -> resolved row
+var font_rows := {}    ## "ROLE/WEIGHT" -> res:// path
 
 
 func _path(role: String) -> String:
@@ -262,7 +272,7 @@ func read_passives() -> void:
 		var scope_ok := _check_passive_scope(table.get_cell(i, "agent_scope"), ctx)
 		var payload := _check_passive_payload(table.get_cell(i, "function_payload"), effect_raw, contract, ctx)
 		var tuple := _check_passive_params(table.get_cell(i, "params"), effect_raw, contract, ctx)
-		var display_ok := _check_passive_display(table.get_cell(i, "display"), contract, ctx)
+		var display_ok := _check_passive_display(_passive_template(id), contract, ctx)
 
 		if not (activation_ok and scope_ok and payload["ok"] and tuple["ok"] and display_ok):
 			continue
@@ -275,7 +285,7 @@ func read_passives() -> void:
 			var kind: int = contract["params"][k]
 			shown.append(Vocab.title_case(tokens[k]) if kind == PassiveEffects.ParamKind.COLOR else tokens[k])
 
-		var template := table.get_cell(i, "display").strip_edges()
+		var template := _passive_template(id)
 
 		passive_rows.append({
 			"file": table.file,
@@ -292,6 +302,173 @@ func read_passives() -> void:
 			"display_template": template,
 			"param_tokens": tokens,
 		})
+
+
+## A PASSIVE's display template, from `text_content.csv`.
+##
+## Moved out of `psv.csv` in beta 0.3.2, but the CONTRACT did not move: the
+## template's positional `%0`/`%1` tokens are still checked against the effect's
+## declared params at load, because that validator knows how many params an
+## effect has and that a COLOUR renders title-cased. Only storage changed
+## (D-043).
+##
+## Requires `read_text_content()` to have run first — enforced by ordering in
+## `read_all()`, and a missing row is reported by the display check rather than
+## silently yielding an empty string.
+func _passive_template(passive_id: String) -> String:
+	return str(text_rows.get("PASSIVE_TEXT/%s" % passive_id, ""))
+
+
+# ---------------------------------------------------------------------------
+# Text framework sheets (beta 0.3.2)
+# ---------------------------------------------------------------------------
+
+## `what the game says`, keyed `CATEGORY/REF_ID`.
+##
+## The EN column is NOT stripped. Whitespace inside a string is content — the
+## battle log indents sub-messages with leading spaces — and the loader stripping
+## it would destroy authored copy the way the spreadsheet round trip already
+## does (AN-011).
+func read_text_content() -> void:
+	var table := DataTable.read(_path("text_content"), DataIssues.DATASET_TEXT_CONTENT, Vocab.TEXT_CONTENT_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var category := table.get_cell(i, "SEMANTIC_CATEGORY").strip_edges()
+		var ref_id := table.get_cell(i, "REF_ID").strip_edges()
+		var en := table.get_cell(i, "EN")
+
+		var c := {
+			"dataset": DataIssues.DATASET_TEXT_CONTENT, "file": table.file,
+			"row": table.line_of(i), "id": ref_id,
+		}
+		if category == "" or ref_id == "":
+			c["reason"] = "text row needs both SEMANTIC_CATEGORY and REF_ID"
+			issues.error(c)
+			continue
+
+		var key := "%s/%s" % [category, ref_id]
+		if text_rows.has(key):
+			c["reason"] = "duplicate text row %s" % key
+			issues.error(c)
+			continue
+		text_rows[key] = en
+
+
+## How a semantic class of text behaves inside the rectangle layout gives it.
+func read_text_styles() -> void:
+	var table := DataTable.read(_path("text_style"), DataIssues.DATASET_TEXT_STYLE, Vocab.TEXT_STYLE_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var id := table.get_cell(i, "STYLE_ID").strip_edges()
+		var c := {
+			"dataset": DataIssues.DATASET_TEXT_STYLE, "file": table.file,
+			"row": table.line_of(i), "id": id,
+		}
+		if id == "":
+			c["reason"] = "style row needs a STYLE_ID"
+			issues.error(c)
+			continue
+		if style_rows.has(id):
+			c["reason"] = "duplicate STYLE_ID"
+			issues.error(c)
+			continue
+
+		var fit := table.get_cell(i, "FIT_MODE").strip_edges().to_upper()
+		var align := table.get_cell(i, "H_ALIGN").strip_edges().to_upper()
+		var colour := table.get_cell(i, "COLOR_ROLE").strip_edges().to_upper()
+		var weight := table.get_cell(i, "WEIGHT").strip_edges().to_upper()
+		var nominal := int(table.get_cell(i, "NOMINAL_SIZE").strip_edges())
+		var minimum := int(table.get_cell(i, "MIN_SIZE").strip_edges())
+
+		var ok := true
+		for pair in [[fit, Vocab.FIT_MODES, "FIT_MODE"], [align, Vocab.H_ALIGNS, "H_ALIGN"],
+				[colour, Vocab.COLOR_ROLES, "COLOR_ROLE"], [weight, Vocab.FONT_WEIGHTS, "WEIGHT"]]:
+			if not (pair[1] as Array).has(pair[0]):
+				var f := c.duplicate()
+				f["field"] = pair[2]
+				f["value"] = pair[0]
+				f["expected"] = "|".join(pair[1])
+				f["reason"] = "unknown %s" % pair[2]
+				issues.error(f)
+				ok = false
+
+		# §5.2 — no uncontrolled shrink. A style that may reduce its size must
+		# declare where it stops, and the floor must actually be a floor.
+		if nominal <= 0:
+			var f := c.duplicate()
+			f["field"] = "NOMINAL_SIZE"
+			f["reason"] = "NOMINAL_SIZE must be positive"
+			issues.error(f)
+			ok = false
+		if fit == "SHRINK" and minimum <= 0:
+			var f := c.duplicate()
+			f["field"] = "MIN_SIZE"
+			f["reason"] = "SHRINK requires a positive MIN_SIZE"
+			issues.error(f)
+			ok = false
+		if minimum > nominal:
+			var f := c.duplicate()
+			f["field"] = "MIN_SIZE"
+			f["reason"] = "MIN_SIZE %d exceeds NOMINAL_SIZE %d" % [minimum, nominal]
+			issues.error(f)
+			ok = false
+
+		if not ok:
+			continue
+
+		style_rows[id] = {
+			"id": id,
+			"font_role": table.get_cell(i, "FONT_ROLE").strip_edges().to_upper(),
+			"weight": weight,
+			"nominal": nominal,
+			"minimum": minimum,
+			"fit": fit,
+			"max_lines": int(table.get_cell(i, "MAX_LINES").strip_edges()),
+			"align": align,
+			"color_role": colour,
+		}
+
+
+## Semantic font roles to bundled files, keyed `ROLE/WEIGHT`.
+func read_font_refs() -> void:
+	var table := DataTable.read(_path("font_refs"), DataIssues.DATASET_FONT_REFS, Vocab.FONT_REFS_HEADER, issues)
+	if table == null:
+		return
+
+	for i in table.row_count():
+		var role := table.get_cell(i, "FONT_ROLE").strip_edges().to_upper()
+		var weight := table.get_cell(i, "WEIGHT").strip_edges().to_upper()
+		var file := table.get_cell(i, "FONT_FILE").strip_edges()
+		var c := {
+			"dataset": DataIssues.DATASET_FONT_REFS, "file": table.file,
+			"row": table.line_of(i), "id": "%s/%s" % [role, weight],
+		}
+		if role == "" or file == "":
+			c["reason"] = "font row needs a FONT_ROLE and a FONT_FILE"
+			issues.error(c)
+			continue
+		if not Vocab.FONT_WEIGHTS.has(weight):
+			c["field"] = "WEIGHT"
+			c["expected"] = "|".join(Vocab.FONT_WEIGHTS)
+			c["reason"] = "unknown WEIGHT"
+			issues.error(c)
+			continue
+
+		# §6.2 — production text must not fall back to a device font. A missing
+		# file is a content error, caught here rather than at first draw.
+		var res := "res://%s" % file if not file.begins_with("res://") else file
+		if not FileAccess.file_exists(res):
+			c["field"] = "FONT_FILE"
+			c["value"] = file
+			c["reason"] = "bundled font file not found"
+			issues.error(c)
+			continue
+
+		font_rows["%s/%s" % [role, weight]] = res
 
 
 ## The effect/activation pairing is part of the contract, not a free
@@ -565,8 +742,6 @@ func read_hosts() -> void:
 		host_rows.append({
 			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
 			"name": name["value"], "passive_ids": passive_ids, "in_pool": in_pool,
-			"display_text": table.get_cell(i, "display_text").strip_edges(),
-			"graphics": table.get_cell(i, "graphics_ref").strip_edges(),
 		})
 
 
@@ -598,8 +773,6 @@ func read_upgrades() -> void:
 		upgrade_rows.append({
 			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
 			"name": name["value"], "passive_ids": passive_ids,
-			"display_text": table.get_cell(i, "display_text").strip_edges(),
-			"graphics": table.get_cell(i, "graphics_ref").strip_edges(),
 		})
 
 
@@ -634,8 +807,6 @@ func read_hackers() -> void:
 			"strong_colors": colors, "strong_shapes": shapes,
 			"portfolio": portfolio, "passive_ids": passive_ids,
 			# Presentation placeholders: retained verbatim, never interpreted.
-			"bio": table.get_cell(i, "BIO").strip_edges(),
-			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
 		})
 
 
@@ -678,8 +849,6 @@ func read_decks() -> void:
 			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
 			"name": name["value"], "add_link": add_link["value"],
 			"portfolio": portfolio, "function_id": function_id,
-			"descript": table.get_cell(i, "DESCRIPT").strip_edges(),
-			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
 		})
 
 
@@ -716,8 +885,6 @@ func read_systems() -> void:
 			"name": name["value"], "base_ice": base_ice["value"],
 			"strong_colors": colors, "strong_shapes": shapes,
 			"programs": programs, "passive_ids": passive_ids, "in_pool": in_pool,
-			"bio": table.get_cell(i, "BIO").strip_edges(),
-			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
 		})
 
 
@@ -760,9 +927,6 @@ func read_bosses() -> void:
 			"strong_colors": colors, "strong_shapes": shapes,
 			"programs": programs, "in_pool": in_pool,
 			# Presentation only: never mechanic authority and never fingerprinted.
-			"passive_description": table.get_cell(i, "BOSS_PASSIVE_DESCRIPTION").strip_edges(),
-			"bio": table.get_cell(i, "BIO").strip_edges(),
-			"graphics": table.get_cell(i, "GRAPHICS").strip_edges(),
 		})
 
 
@@ -910,6 +1074,13 @@ func _resolve_identity(rows: Array, psv_by_id: Dictionary, fn_by_id: Dictionary)
 ## Reads all ten datasets. Every reader runs regardless of earlier failures, so
 ## an author sees every problem in one pass.
 func read_all() -> void:
+	# Text FIRST. PASSIVE display templates now live in `text_content.csv`, so
+	# `read_passives()` cannot validate its param contract until the strings
+	# exist. Ordering carries that dependency rather than a lazy lookup.
+	read_text_content()
+	read_text_styles()
+	read_font_refs()
+
 	read_programs("hacker_programs", DataIssues.DATASET_HACKER_PROGRAMS, "PRG_H_")
 	read_programs("system_programs", DataIssues.DATASET_SYSTEM_PROGRAMS, "PRG_S_")
 	read_functions()

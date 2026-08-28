@@ -53,26 +53,67 @@ const FUNCTION_HEADER: Array[String] = [
 
 const HACKER_HEADER: Array[String] = [
 	"HAK_ID", "name", "BASE_LINK", "STRONG_COLORS", "STRONG_SHAPES", "PRG_SET",
-	"PASSIVES", "BIO", "GRAPHICS",
+	"PASSIVES",
 ]
 
+## `display` moved to `text_content.csv` as `PASSIVE_TEXT` in beta 0.3.2. The
+## template's positional `%0`/`%1` tokens are still validated against each
+## effect's param contract at load — only where the string is STORED changed.
 const PASSIVE_HEADER: Array[String] = [
 	"PASSIVE_ID", "passive_effect", "params", "activation", "function_payload",
-	"agent_scope", "display", "notes",
+	"agent_scope", "notes",
 ]
 
-const DECK_HEADER: Array[String] = ["DEK_ID", "name", "ADD_LINK", "PRG_SET", "FUNCTIONS", "DESCRIPT", "GRAPHICS"]
+const DECK_HEADER: Array[String] = ["DEK_ID", "name", "ADD_LINK", "PRG_SET", "FUNCTIONS"]
 
 ## The durability column is BASE_ICE, never BASE_LINK.
 const SYSTEM_HEADER: Array[String] = [
 	"SYS_ID", "name", "in_pool", "BASE_ICE", "STRONG_COLORS", "STRONG_SHAPES",
-	"PRG_SET", "PASSIVES", "BIO", "GRAPHICS",
+	"PRG_SET", "PASSIVES",
 ]
 
 ## HOST carries `in_pool`; UPGRADE does not, because UPGRADE eligibility is Run
 ## state (acquired or not) rather than authored content.
-const HOST_HEADER: Array[String] = ["HOST_ID", "name", "passives", "in_pool", "display_text", "graphics_ref", "notes"]
-const UPGRADE_HEADER: Array[String] = ["UPGRADE_ID", "name", "passives", "display_text", "graphics_ref", "notes"]
+const HOST_HEADER: Array[String] = ["HOST_ID", "name", "passives", "in_pool", "notes"]
+const UPGRADE_HEADER: Array[String] = ["UPGRADE_ID", "name", "passives", "notes"]
+
+# ---------------------------------------------------------------------------
+# Text framework (beta 0.3.2)
+# ---------------------------------------------------------------------------
+#
+# Three sheets that load through the ordinary content path, so they get the same
+# header contract, the same issue reporting, and the same shipping mechanism as
+# every other datasheet. Authorization §15: no second pipeline.
+
+const TEXT_CONTENT_HEADER: Array[String] = ["SEMANTIC_CATEGORY", "REF_ID", "EN"]
+const TEXT_STYLE_HEADER: Array[String] = [
+	"STYLE_ID", "FONT_ROLE", "WEIGHT", "NOMINAL_SIZE", "MIN_SIZE",
+	"FIT_MODE", "MAX_LINES", "H_ALIGN", "COLOR_ROLE",
+]
+const FONT_REFS_HEADER: Array[String] = ["FONT_ROLE", "WEIGHT", "FONT_FILE"]
+
+## How text behaves inside the rectangle layout gives it (§5.2).
+##
+## Deliberately four. `SHRINK` is the only one that may reduce the authored
+## size, and it is the only one that requires a `MIN_SIZE` — which is what makes
+## "no uncontrolled shrink until it fits" enforceable rather than aspirational.
+const FIT_MODES: Array[String] = ["FIXED", "SHRINK", "WRAP", "ELLIPSIS"]
+
+const H_ALIGNS: Array[String] = ["LEFT", "CENTER", "RIGHT"]
+
+## Semantic text colours. A naming layer over `PacketStyle`, NOT a recolouring
+## system — every role resolves to a constant that already existed.
+const COLOR_ROLES: Array[String] = [
+	"PRIMARY", "SECONDARY", "FAINT", "HEADING", "STATUS", "EMPHASIS", "DAMAGE",
+]
+
+const FONT_WEIGHTS: Array[String] = ["REGULAR", "BOLD"]
+
+## The style every unknown `STYLE_ID` falls back to. Must exist in the sheet.
+const FALLBACK_STYLE_ID := "BODY"
+
+## The font role an unknown role falls back to. Must exist in `font_refs.csv`.
+const FALLBACK_FONT_ROLE := "UI_SANS"
 
 ## Deliberately NOT the System header: no `PASSIVES` column and no
 ## `MECHANIC_ID`. A Boss contributes no identity PASSIVEs, and ODANSHAY's
@@ -80,7 +121,7 @@ const UPGRADE_HEADER: Array[String] = ["UPGRADE_ID", "name", "passives", "displa
 ## scripting field, so no column is invented to hold it.
 const BOSS_HEADER: Array[String] = [
 	"BOS_ID", "name", "in_pool", "BASE_ICE", "STRONG_COLORS", "STRONG_SHAPES",
-	"PRG_SET", "BOSS_PASSIVE_DESCRIPTION", "BIO", "GRAPHICS",
+	"PRG_SET",
 ]
 
 

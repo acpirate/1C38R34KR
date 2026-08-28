@@ -1031,3 +1031,52 @@ because the code still compiles and the screen still looks broadly right.
 Both were caught by comparing against the pre-conversion captures rather than by
 looking at the new screen and asking whether it seemed fine. That is the
 argument for taking a before set at all.
+
+---
+
+## D-045 — Alpha CSV fidelity narrows to shared columns, by design
+
+**Beta 0.3.2, 2026-08-28.**
+
+`test_csv.gd` compared `data/*.csv` field-by-field against fixtures generated
+from the alpha's sheets. Seven of ten sheets now fail that comparison, because
+the beta's content no longer carries the alpha's presentation columns: `BIO`,
+`GRAPHICS`, `graphics_ref`, `display_text`, `DESCRIPT`,
+`BOSS_PASSIVE_DESCRIPTION`, and the PASSIVE `display` template have moved into
+the text framework or been deleted as POC stubs.
+
+**The comparison is now column-wise by header name across the shared columns.**
+Every column both builds still have is proven byte-identical; the removed ones
+are simply not asserted.
+
+**This is the plan working, not a loss of coverage.** The 0.3.0 handback said
+the oracle stops being able to adjudicate the moment content moves. Content has
+now moved, deliberately, with the director's sign-off — and alpha fidelity
+becomes progressively less relevant the further the beta goes. Holding the old
+comparison would have meant holding the beta to a shape it has outgrown.
+
+What the alpha still adjudicates is unchanged and is the part that matters: the
+rules engine, through the battle, Boss and Run differentials. Those compare
+BEHAVIOUR, and behaviour has not moved.
+
+---
+
+## D-046 — Battle-log indentation moves from content into code
+
+**Beta 0.3.2, 2026-08-28.**
+
+Four battle messages encoded their hierarchy as two leading spaces —
+`"  {amount} damage to {target}"` reads as a sub-line under the action that
+caused it.
+
+**Excel discards leading whitespace on CSV import**, so the indentation was
+gone from the workbook before anyone looked, and is unrecoverable from it.
+
+Rather than re-encode it and lose it again on the next round trip, the indent
+moves to the three call sites that emit sub-messages. That is where it belonged:
+the indent is not part of *what the game says*, it is how a line is presented
+relative to its parent. A string whose meaning depends on leading whitespace is
+unsafe in any pipeline that passes through a spreadsheet.
+
+The exporter now preserves whitespace exactly rather than stripping it, so it
+cannot compound the problem — but it cannot undo the import either. See AN-011.
