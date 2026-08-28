@@ -414,3 +414,88 @@ something more useful. Over a Run battle the honest line is the one the Build
 screen already computes — `Battle 3 of 4 · vs MIDNIGHT` — and that is
 information a paused player actually wants. That is a design call, not a bug
 fix, which is the other reason to leave it here rather than decide it mid-pass.
+
+---
+
+## AN-009 — Font licences must reach the player before release
+
+**Raised by the director, 2026-08-28, during Beta 0.3.2 font selection.
+Deliberately deferred — do not build during this iteration.**
+
+The v0 bundled fonts are **IBM Plex Sans** and **IBM Plex Mono**, both under the
+SIL Open Font License 1.1. `assets/fonts/OFL.txt` sits with the font files, and
+the two families ship the byte-identical licence (IBM Corp, Reserved Font Name
+"Plex"), so one copy covers both.
+
+OFL 1.1 permits bundling in a commercial product. What it also requires is that
+the licence **travel with the Font Software** — a copy in the repository
+satisfies that for the source tree, and does not obviously satisfy it for a
+player holding only an installed APK.
+
+**Deferred by decision, not by oversight.** While the director is the only
+person building and running the application, the repository copy is sufficient.
+The obligation becomes real at first distribution to anyone else.
+
+**What a future build needs to decide:**
+
+- whether a link is sufficient, or whether the licence text must be reachable
+  from inside the game;
+- if in-game: an attribution screen, a credits panel, or a line in a settings
+  screen — none of which exist yet;
+- whether the final chosen fonts even carry this requirement. v0 is explicitly
+  not the final typography (§6.2), and a different licence may ask for
+  something different or nothing at all.
+
+**The cheap version, for whoever picks this up:** the text framework this build
+creates already makes an attribution screen nearly free — it is a screen title,
+a body block, and a Back button, all of which are semantic content rows by then.
+The work is deciding where it lives in the menu, not building it.
+
+---
+
+## AN-010 — The bundled fonts carry ~40× more glyphs than the game uses
+
+**Raised by the director, 2026-08-28. Not addressed in Beta 0.3.2.**
+
+The three bundled faces total **557 KB**:
+
+| File | Size |
+| --- | --- |
+| `IBMPlexSans-Regular.ttf` | 213.1 KB |
+| `IBMPlexSans-SemiBold.ttf` | 213.1 KB |
+| `IBMPlexMono-Regular.ttf` | 130.7 KB |
+
+The game's entire verified corpus is **98 characters** — printable ASCII plus
+`·`, `—` and `→`. IBM Plex ships Latin Extended, Greek, Cyrillic and a large
+symbol range, so the overwhelming majority of every file is glyphs this game
+cannot display.
+
+A subset limited to the actual corpus would plausibly land in the **10–25 KB**
+range per face, cutting roughly half a megabyte.
+
+**Why it is not urgent.** The APK is ~55 MB, so this is about 1% of it. It is
+not why the build is large, and doing it under time pressure would risk the
+saving being taken out of a glyph somebody needed.
+
+**Why it is worth doing anyway.** The cost is per-face, so it grows with every
+weight or role added — three faces today, and a real typography pass could
+easily want six. Subsetting once establishes the step; adding it later means
+re-litigating it against a bigger pile.
+
+**The mechanism.** `pyftsubset` (from `fonttools`) is the standard tool, run at
+build time with the corpus as its glyph list and the subset TTFs committed. Two
+caveats worth writing down now:
+
+- it adds a Python build dependency the project does not currently have;
+- a subset font is **silently wrong** if the corpus later grows — a new
+  character renders as a hollow box with no error anywhere.
+
+**That second risk is already handled.** `tools/check_fonts.gd` derives the
+corpus from the content CSVs and scene literals and asserts every character
+resolves to a glyph in every bundled face. It was written for this build's
+coverage requirement, and it happens to be exactly the guard that makes
+subsetting safe: subset too aggressively and it fails on a build machine rather
+than on a device.
+
+**So the sequencing is: subset, then let the existing checker prove it.** That
+is the whole reason to do it deliberately rather than opportunistically.
