@@ -17,6 +17,10 @@ const TITLE := "1C38R34KR"
 ## breathes rather than touching the edges.
 const TITLE_LOGO_WIDTH := 210
 
+## What separates a card's name from a suffix tag. Held here rather than inside
+## the text row because leading spaces do not survive a spreadsheet round trip.
+const BOSS_TAG_SEPARATOR := "  ·  "
+
 var _shell: MarginContainer
 var _panel: PanelContainer
 var _root: VBoxContainer
@@ -1130,7 +1134,11 @@ func _show_path_choice() -> void:
 			"id": str(o.index),
 			"name": "%s%s" % [
 				Text.name_of(str(o.opponent_id)),
-				_ui(Text.UI_STATUS_TEXT, "GAME_UI_PATH_BOSS_TAG") if o.opponent_kind == Types.OpponentKind.BOS else "",
+				# The separator is composed, not authored. Leading whitespace does
+				# not survive the workbook (AN-011), and "  ·  " in front of a
+				# word is spacing rather than something the game says.
+				(BOSS_TAG_SEPARATOR + _ui(Text.UI_STATUS_TEXT, "GAME_UI_PATH_BOSS_TAG"))
+				if o.opponent_kind == Types.OpponentKind.BOS else "",
 			],
 			"lines": [
 				_ui(Text.UI_STATUS_TEXT, "GAME_UI_CARD_ICE", {"ice": Run.resolve_run_ice(_run.settings, o.opponent_kind, o.opponent_id, pending.step)}),

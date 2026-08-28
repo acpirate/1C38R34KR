@@ -537,3 +537,40 @@ The general shape is worth keeping: **a round trip through a spreadsheet is a
 lossy channel, and which losses it inflicts are not obvious in advance.** The
 mitigation is not to trust it less but to diff it every time —
 `tools/export_workbook.py --check` exists for that.
+
+---
+
+## AN-012 — One text row was fixed in `data/`, not in the workbook
+
+**Beta 0.3.2 Phase G, 2026-08-28. Needs one workbook edit before the next
+export, or the fix is silently reverted.**
+
+`GAME_UI_PATH_BOSS_TAG` rendered as `ODANSHAY·  BOSS` — no space before the
+separator. Its authored value was `"  ·  BOSS"`, and Excel discarded the two
+LEADING spaces on import (AN-011), leaving `"·  BOSS"`.
+
+**Fixed the same way D-046 fixed the battle log:** the row is now the bare word
+`BOSS`, and the separator `"  ·  "` is composed in `main.gd`. Spacing that
+positions a suffix against a name is composition, not something the game says —
+and it is the one kind of content this authoring pipeline cannot carry.
+
+**The problem:** the fix was applied to `data/text_content.csv` directly, so the
+workbook and the exported data now disagree. `tools/export_workbook.py --check`
+reports the drift, and **the next export from the workbook will silently undo
+it**.
+
+**What the director needs to do — one cell:**
+
+> `text_content` sheet, row `GAME_UI_PATH_BOSS_TAG`, set `EN` to exactly `BOSS`
+> (no leading spaces, no separator).
+
+Then `python tools/export_workbook.py` and the two agree again.
+
+**The general point, which is the reason this is an architect note rather than a
+commit message.** §15 makes the workbook authoritative once imported, and this
+build has now produced two edits that went the wrong way through that boundary —
+this one and the earlier `BOS_ID` restoration. A one-way authority needs a
+one-way habit: **fix in the workbook, export, never edit `data/` by hand.**
+
+`--check` exists precisely so a violation is visible rather than silent, and it
+should probably run as part of the verification gate rather than on request.
