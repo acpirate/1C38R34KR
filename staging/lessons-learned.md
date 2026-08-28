@@ -659,3 +659,33 @@ value. Two builds ago that screen's strings were deliberately left as literals
 because it "cannot depend on the thing it reports on" — and here it was, the one
 screen still working while text loading was broken, telling us exactly which
 rows to fix. That decision paid for itself the first time it was tested.
+
+## A green suite that never loads the file it broke
+
+**Beta 0.3.2 Phase E, 2026-08-28.**
+
+Renaming `_heading` to `_heading_ref` left four call sites behind. `main.gd`
+stopped compiling. **The suite reported 3,325 passing**, the export succeeded,
+the APK installed, and the game booted to a blank grey screen.
+
+The suite instantiates logic classes and asserts against them. It had never
+loaded a scene script, because the scene layer has no automated coverage — a
+deliberate architectural decision, and the right one. But "no behavioural
+coverage" had quietly become "not even checked for syntax", and those are very
+different things.
+
+**The fix is four lines**: walk `scenes/`, `ResourceLoader.load` each `.gd`, and
+assert it returns a `GDScript`. It proves nothing about behaviour. It proves the
+file is *loadable*, which is the one property a compiler will check for free and
+the exact property that was broken.
+
+**The generalizable point: "we deliberately don't test X" is worth re-examining
+whenever the reason is architectural rather than practical.** Layer purity is why
+the scene layer has no behavioural tests. It was never a reason to skip the
+compiler — that conclusion was inherited, not decided.
+
+This is the fourth defect in two builds found by installing the artefact rather
+than by running the suite (after the three export failures in Phase D). The
+pattern holds: **the further a defect sits from the logic layer, the more likely
+only a device will find it** — and each time, a cheap mechanical check turns out
+to exist that would have caught it earlier.

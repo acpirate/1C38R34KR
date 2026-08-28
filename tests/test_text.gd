@@ -27,6 +27,7 @@ func run(t: TestCase) -> void:
 	_test_styles(t)
 	_test_fonts(t)
 	_test_sheet_integrity(t)
+	_test_no_name_drift(t)
 
 	Content.clear()
 	TextStyles.clear_cache()
@@ -207,3 +208,44 @@ func _test_sheet_integrity(t: TestCase) -> void:
 		t.check("program %s has a name" % id, Text.has(Text.PROGRAM_NAME, id))
 	for id in Content.active()["functions"]:
 		t.check("function %s has a name" % id, Text.has(Text.FUNCTION_NAME, id))
+
+
+## The display name exists in TWO places, and they must not disagree.
+##
+## `name` survives in the gameplay sheets because `scripts/logic/game.gd`
+## composes twelve battle messages from it, and those messages are compared
+## byte-for-byte against the alpha by the differentials — so the column cannot
+## be retired until the oracle is (see the 0.3.2 handback).
+##
+## Meanwhile every player-facing surface reads `text_content.csv`. Two sources
+## for one fact is precisely the shape §15 warns about, and the danger is not
+## that they differ now but that they will drift the first time somebody renames
+## a Program in one file.
+##
+## So the duplication is ACCEPTED and made noisy: rename in one place and this
+## fails immediately, naming the row.
+func _test_no_name_drift(t: TestCase) -> void:
+	t.group("text / gameplay names match the text sheet")
+
+	var checks := [
+		["programs", Text.PROGRAM_NAME],
+		["functions", Text.FUNCTION_NAME],
+		["hosts", Text.HOST_NAME],
+		["upgrades", Text.UPGRADE_NAME],
+		["systems", Text.SYSTEM_NAME],
+		["bosses", Text.BOSS_NAME],
+		["hackers", Text.HACKER_NAME],
+		["decks", Text.DECK_NAME],
+	]
+
+	for pair in checks:
+		var table: Dictionary = Content.active().get(pair[0], {})
+		for id in table:
+			var row: Dictionary = table[id]
+			if not row.has("name"):
+				continue
+			t.eq(
+				"%s %s matches the text sheet" % [pair[0], id],
+				Text.get_text(pair[1], str(id)),
+				str(row["name"]),
+			)

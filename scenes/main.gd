@@ -218,26 +218,46 @@ func _title_logo() -> void:
 	_root.add_child(logo)
 
 
-## Bold, letter-spaced, upper case. It is the alpha's most recognisable piece of
-## identity and costs one font-size override to keep.
-func _heading(text: String) -> void:
+## A screen's heading, by semantic reference.
+##
+## Takes a REF rather than a string, so the screen names what it wants to say and
+## the sheet decides the words. `_heading_text` remains for the handful of
+## headings composed at runtime.
+func _heading_ref(ref_id: String, args := {}) -> void:
+	_heading_text(_ui(Text.UI_SCREEN_TITLE, ref_id, args))
+
+
+func _heading_text(text: String) -> void:
 	var l := Label.new()
 	l.text = text
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", UiTheme.font_heading())
-	l.add_theme_color_override("font_color", PacketStyle.TEXT_HEADING)
+	TextStyles.of("SCREEN_HEADING").apply_to(l)
 	_root.add_child(l)
 
 
 ## The grey line under a heading: what this screen is asking for, in one phrase.
-func _subheading(text: String) -> void:
+func _subheading_ref(ref_id: String, args := {}) -> void:
+	_subheading_text(_ui(Text.UI_SCREEN_PROMPT, ref_id, args))
+
+
+func _subheading_text(text: String) -> void:
 	var l := Label.new()
 	l.text = text
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.add_theme_font_size_override("font_size", UiTheme.font_subheading())
-	l.add_theme_color_override("font_color", PacketStyle.TEXT_DIM)
+	TextStyles.of("SCREEN_PROMPT").apply_to(l)
 	_root.add_child(l)
+
+
+## One semantic string, formatted if it carries placeholders.
+##
+## A single helper rather than each call site choosing between `get_text` and
+## `format`: a template that gains a placeholder should not require its caller to
+## change shape, and one that loses one should not break.
+func _ui(category: String, ref_id: String, args := {}) -> String:
+	return Text.format(category, ref_id, args) if not args.is_empty() else Text.get_text(category, ref_id)
+
+
+## A button labelled by semantic reference.
+func _button_ref(ref_id: String, action: Callable, args := {}) -> Button:
+	return _button(_ui(Text.UI_BUTTON_TEXT, ref_id, args), action)
 
 
 func _button(text: String, action: Callable) -> Button:
@@ -260,7 +280,7 @@ func _show_title(fingerprint: String) -> void:
 	# Derived from GAME_VERSION rather than typed, so a version bump cannot leave
 	# the title screen claiming the previous build. It read "beta 0.2" through
 	# the whole of 0.3 development because it was a literal.
-	_subheading(Content.GAME_VERSION.replace("beta-", "beta ").trim_suffix(".0"))
+	_subheading_text(Content.GAME_VERSION.replace("beta-", "beta ").trim_suffix(".0"))
 
 	# Leaving the title drops whatever session was on screen, so nothing stale
 	# survives into a new one.
@@ -273,11 +293,11 @@ func _show_title(fingerprint: String) -> void:
 	if saved["ok"]:
 		_button(_continue_label(saved), func(): _resume_session(saved))
 
-	_button("New Run", _show_boss_select)
-	_button("Constructed Quick Match", func():
+	_button_ref("GAME_UI_TITLE_NEW_RUN", _show_boss_select)
+	_button_ref("GAME_UI_TITLE_QUICK_CONSTRUCTED", func():
 		_run = null
 		_show_system_select())
-	_button("Random Quick Match", _start_random_quick_match)
+	_button_ref("GAME_UI_TITLE_QUICK_RANDOM", _start_random_quick_match)
 
 	_divider()
 
@@ -301,7 +321,7 @@ func _show_system_select() -> void:
 		var s := Content.system(id)
 		options.append({
 			"id": str(id),
-			"name": "%s [%s]" % [s["name"], id],
+			"name": "%s [%s]" % [Text.name_of(id), id],
 			# Both halves of the matchup. Weak is the complement of Strong and so
 			# is derivable, but the player is choosing what to play INTO — making
 			# them compute it from six colours and six shapes in their head is
@@ -322,7 +342,7 @@ func _show_system_select() -> void:
 	var choose := func(id):
 		_system_id = id
 		_show_host_select()
-	_show_chooser("SELECT SYSTEM", "Choose the System you will breach", options, choose)
+	_show_chooser("GAME_UI_SYSTEM_SELECT_HEADING", "GAME_UI_SYSTEM_SELECT_PROMPT", options, choose)
 
 
 func _show_host_select() -> void:
@@ -338,19 +358,19 @@ func _show_host_select() -> void:
 				# Function's name rather than as a blank line.
 				var text := str(p["display"])
 				if text == "":
-					text = str(Content.function(str(p["function_id"]))["name"])
+					text = Text.name_of(str(p["function_id"]))
 				parts.append(text)
 			effect = ", ".join(parts)
 		options.append({
 			"id": str(id),
-			"name": "%s [%s]" % [h["name"], id],
+			"name": "%s [%s]" % [Text.name_of(id), id],
 			"lines": [effect],
 		})
 
 	var choose := func(id):
 		_host_id = id
 		_show_build()
-	_show_chooser("SELECT HOST", "Choose the HOST you will run from", options, choose, _show_system_select)
+	_show_chooser("GAME_UI_HOST_SELECT_HEADING", "GAME_UI_HOST_SELECT_PROMPT", options, choose, _show_system_select)
 
 
 ## Select-then-confirm, rather than commit-on-tap.
@@ -359,10 +379,19 @@ func _show_host_select() -> void:
 ## unrecoverable — it drops you into the next screen having chosen something you
 ## did not read. Marking a card and confirming separately costs one extra tap
 ## and makes every wrong one free.
-func _show_chooser(title: String, prompt: String, options: Array, on_choose: Callable, on_back = null) -> void:
+## `title_ref` and `prompt_ref` are semantic references, not strings.
+##
+## Six screens share this, so resolving here means each caller names WHICH
+## screen it is rather than what the words are — and the one screen whose
+## heading is composed at runtime (Path Choice, "BATTLE n OF m") passes its
+## arguments through rather than pre-rendering.
+func _show_chooser(
+	title_ref: String, prompt_ref: String, options: Array, on_choose: Callable,
+	on_back = null, title_args := {}, prompt_args := {},
+) -> void:
 	_fresh_screen()
-	_heading(title)
-	_subheading(prompt)
+	_heading_ref(title_ref, title_args)
+	_subheading_ref(prompt_ref, prompt_args)
 
 	var chosen := {"id": ""}
 	var confirm := Button.new()
@@ -403,7 +432,7 @@ func _show_chooser(title: String, prompt: String, options: Array, on_choose: Cal
 		list.add_child(card)
 		cards.append(card)
 
-	confirm.text = "Choose"
+	confirm.text = Text.get_text(Text.UI_BUTTON_TEXT, "GAME_UI_CHOOSER_CONFIRM")
 	confirm.custom_minimum_size.y = UiTheme.control_height()
 	confirm.disabled = true
 	confirm.pressed.connect(func():
@@ -412,7 +441,7 @@ func _show_chooser(title: String, prompt: String, options: Array, on_choose: Cal
 	_root.add_child(confirm)
 
 	if on_back is Callable:
-		_button("Back", on_back)
+		_button_ref("GAME_UI_CHOOSER_BACK", on_back)
 
 
 ## The Build screen: four active Programs drawn from the six-Program inventory,
@@ -422,8 +451,8 @@ func _show_build() -> void:
 	if _build.is_empty():
 		_build = Session.default_build()
 	_fresh_screen()
-	_heading("BUILD")
-	_subheading("ACTIVE BUILD (top to bottom) — order is charge priority")
+	_heading_ref("GAME_UI_BUILD_HEADING")
+	_subheading_ref("GAME_UI_BUILD_PROMPT")
 
 	# A Run builds against its OWN selected Hacker and Deck, and against a known
 	# encounter. Quick Match keeps the pinned pair.
@@ -467,9 +496,9 @@ func _show_build() -> void:
 		var current := Content.program(active[slot])
 		var summary := Button.new()
 		summary.text = "%d. %s\n%s — %s (%d)" % [
-			slot + 1, current["name"],
+			slot + 1, Text.name_of(str(current["id"])),
 			_binding_text(current),
-			current["fn"]["name"], int(current["cost"]),
+			Text.name_of(str(current["fn"]["id"])), int(current["cost"]),
 		]
 		summary.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		summary.custom_minimum_size.y = UiTheme.px(52)
@@ -506,7 +535,7 @@ func _show_build() -> void:
 		for pid in inventory:
 			var prog := Content.program(pid)
 			var b := Button.new()
-			b.text = str(prog["name"])
+			b.text = Text.name_of(str(prog["id"]))
 			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			b.clip_text = true
 			b.custom_minimum_size.y = UiTheme.px(34)
@@ -543,7 +572,7 @@ func _show_build() -> void:
 		_root.add_child(seed_row)
 
 	if _run != null:
-		_button("Begin battle %d" % _run.step, _start_run_battle)
+		_button_ref("GAME_UI_BUILD_BEGIN_RUN", _start_run_battle, {"step": _run.step})
 		# Debug-only Force Win (D-029). It lives HERE, before the battle, rather
 		# than on the defeat screen: the point is to reach a later battle
 		# without playing the earlier ones, and a control that first requires
@@ -554,7 +583,7 @@ func _show_build() -> void:
 				_run.confirm_build(_build_origin)
 				_advance_run())
 	else:
-		_button("Begin", _start_battle)
+		_button_ref("GAME_UI_BUILD_BEGIN_QUICK", _start_battle)
 
 
 ## The build the Build screen is editing. A Run owns its own; Quick Match keeps
@@ -754,8 +783,8 @@ func _show_result(winner: int) -> void:
 	# Not compact: the report needs room to scroll. The exits stay above it, so
 	# they remain reachable without scrolling past the whole thing.
 	_fresh_screen(_finished_state == null or _finished_state.metrics == null)
-	_heading("VICTORY" if won else "DEFEAT")
-	_subheading("System ICE breached." if won else "Hacker LINK severed.")
+	_heading_ref("GAME_UI_RESULT_VICTORY" if won else "GAME_UI_RESULT_DEFEAT")
+	_subheading_ref("GAME_UI_RESULT_QUICK_WIN" if won else "GAME_UI_RESULT_LOSS")
 
 	# The exits sit ABOVE the report, so they stay reachable on a phone without
 	# scrolling past it. When metrics land in Phase 6 the report goes below this
@@ -763,8 +792,8 @@ func _show_result(winner: int) -> void:
 	#
 	# Same seed replays an identical battle, which is the only reliable way to
 	# reproduce a visual bug: a fresh seed means a fresh board.
-	_button("Replay this seed", _replay_battle)
-	_button("New battle", func():
+	_button_ref("GAME_UI_RESULT_REPLAY_SEED", _replay_battle)
+	_button_ref("GAME_UI_RESULT_NEW_BATTLE", func():
 		# A new battle means a new board. With a seed pinned, step it so the
 		# tester still walks a reproducible sequence instead of replaying one
 		# board forever.
@@ -772,7 +801,7 @@ func _show_result(winner: int) -> void:
 			_seed_override += 1
 		_gameplay_seed = _next_gameplay_seed()
 		_replay_battle())
-	_button("Back to title", func(): _show_title(Content.fingerprint()))
+	_button_ref("GAME_UI_RESULT_BACK_TO_TITLE", func(): _show_title(Content.fingerprint()))
 
 	_divider()
 
@@ -857,13 +886,13 @@ func _append_side(out: PackedStringArray, m: Metrics.Battle, side: Types.Side, t
 			continue
 		var prog := Content.program(u)
 		out.append("%s [%s]: fired %d, effect %d" % [
-			prog["name"], u, um.fires, roundi(um.effect),
+			Text.name_of(u), u, um.fires, roundi(um.effect),
 		])
 
 	if side == Types.Side.PLAYER and _finished_state != null:
 		var deck := Content.deck(_finished_state.identity["deck_id"])
 		out.append("%s [%s deck]: fired %d, neutral charge %d (wasted %d)" % [
-			deck["name"], deck["id"], s.deck.fires,
+			Text.name_of(str(deck["id"])), deck["id"], s.deck.fires,
 			s.deck.charge_from_neutral, s.deck.charge_wasted,
 		])
 
@@ -904,7 +933,7 @@ func _continue_label(saved: Dictionary) -> String:
 	match str(saved["mode"]):
 		"RUN_SETUP":
 			var s: RunSetup = saved["setup"]
-			return "Continue Run — %s setup" % Content.boss(s.boss_id)["name"]
+			return Text.format(Text.UI_BUTTON_TEXT, "GAME_UI_TITLE_CONTINUE_SETUP", {"step": Text.name_of(s.boss_id)})
 		"RUN":
 			var r: Run = saved["run"]
 			if r.is_pending_boss_battle():
@@ -965,7 +994,7 @@ func _show_boss_select() -> void:
 	for b in Content.all_bosses():
 		options.append({
 			"id": str(b["id"]),
-			"name": "%s [%s]" % [b["name"], b["id"]],
+			"name": "%s [%s]" % [Text.name_of(str(b["id"])), b["id"]],
 			"lines": [
 				"ICE %d" % int(b["base_ice"]),
 				"Strong: %s, %s" % [
@@ -995,8 +1024,8 @@ func _show_boss_select() -> void:
 		_show_hacker_select()
 
 	_show_chooser(
-		"SELECT BOSS",
-		"The Run ends here. Chosen now, fought last.",
+		"GAME_UI_BOSS_SELECT_HEADING",
+		"GAME_UI_BOSS_SELECT_PROMPT",
 		options, choose, func(): _show_title(Content.fingerprint())
 	)
 
@@ -1007,7 +1036,7 @@ func _show_hacker_select() -> void:
 		var h := Content.hacker(id)
 		options.append({
 			"id": str(id),
-			"name": "%s [%s]" % [h["name"], id],
+			"name": "%s [%s]" % [Text.name_of(id), id],
 			"lines": [
 				"LINK %d" % int(h["base_link"]),
 				"Strong: %s, %s" % [
@@ -1028,7 +1057,7 @@ func _show_hacker_select() -> void:
 
 	# No Back to Boss Selection: the Boss is committed and fixed for the Run.
 	# Offering a way back that could not actually change it would be a lie.
-	_show_chooser("SELECT HACKER", "Choose who runs this breach", options, choose)
+	_show_chooser("GAME_UI_HACKER_SELECT_HEADING", "GAME_UI_HACKER_SELECT_PROMPT", options, choose)
 
 
 func _show_deck_select() -> void:
@@ -1037,10 +1066,10 @@ func _show_deck_select() -> void:
 		var d := Content.deck(id)
 		options.append({
 			"id": str(id),
-			"name": "%s [%s]" % [d["name"], id],
+			"name": "%s [%s]" % [Text.name_of(id), id],
 			"lines": [
 				"+%d LINK" % int(d["add_link"]),
-				"Function: %s" % str(d["fn"]["name"]),
+				Text.format(Text.UI_STATUS_TEXT, "GAME_UI_CARD_FUNCTION", {"function": Text.name_of(str(d["fn"]["id"]))}),
 			],
 		})
 
@@ -1057,7 +1086,7 @@ func _show_deck_select() -> void:
 		SessionSave.write(SessionSave.run_to_dict(_run, null))
 		_show_path_choice()
 
-	_show_chooser("SELECT DECK", "Choose the Deck you carry", options, choose)
+	_show_chooser("GAME_UI_DECK_SELECT_HEADING", "GAME_UI_DECK_SELECT_PROMPT", options, choose)
 
 
 # ---- path choice ----
@@ -1078,13 +1107,13 @@ func _show_path_choice() -> void:
 		options.append({
 			"id": str(o.index),
 			"name": "%s%s" % [
-				str(enemy["name"]),
+				Text.name_of(str(o.opponent_id)),
 				"  ·  BOSS" if o.opponent_kind == Types.OpponentKind.BOS else "",
 			],
 			"lines": [
 				"ICE %d" % Run.resolve_run_ice(_run.settings, o.opponent_kind, o.opponent_id, pending.step),
-				"HOST: %s — %s" % [str(host["name"]), _passive_summary(host)],
-				"UPGRADE: %s — %s" % [str(upgrade["name"]), _passive_summary(upgrade)],
+				Text.format(Text.UI_STATUS_TEXT, "GAME_UI_PATH_HOST_LINE", {"host": Text.name_of(str(o.host_id)), "effect": _passive_summary(host)}),
+				Text.format(Text.UI_STATUS_TEXT, "GAME_UI_PATH_UPGRADE_LINE", {"upgrade": Text.name_of(str(o.upgrade_id)), "effect": _passive_summary(upgrade)}),
 			],
 		})
 
@@ -1098,13 +1127,16 @@ func _show_path_choice() -> void:
 		SessionSave.write(SessionSave.run_to_dict(_run, null))
 		_show_build()
 
-	var exhausted := ""
-	if pending.upgrade_exhausted:
-		exhausted = "  ·  one UPGRADE remains, so both paths offer it"
+	# Two whole prompts rather than a stem plus an appended clause: a translator
+	# cannot reorder a sentence that arrives in fragments, and the framework
+	# exists partly to stop copy being assembled by concatenation.
+	var prompt_ref := (
+		"GAME_UI_PATH_PROMPT_EXHAUSTED" if pending.upgrade_exhausted
+		else "GAME_UI_PATH_PROMPT"
+	)
 	_show_chooser(
-		"BATTLE %d OF %d" % [pending.step, Run.RUN_LENGTH],
-		"Choose your route%s" % exhausted,
-		options, choose
+		"GAME_UI_PATH_HEADING", prompt_ref, options, choose, null,
+		{"current": pending.step, "total": Run.RUN_LENGTH},
 	)
 
 
@@ -1118,7 +1150,7 @@ func _passive_summary(row: Dictionary) -> String:
 	for p in passives:
 		var text := str(p["display"])
 		if text == "":
-			text = str(Content.function(str(p["function_id"]))["name"])
+			text = Text.name_of(str(p["function_id"]))
 		parts.append(text)
 	return ", ".join(parts)
 
@@ -1134,16 +1166,17 @@ func _run_context_lines() -> PackedStringArray:
 		else Content.system(_run.opponent_id)
 	)
 	var out := PackedStringArray()
-	out.append("Battle %d of %d  ·  vs %s  ·  ICE %d" % [
-		_run.step, Run.RUN_LENGTH, str(enemy["name"]), _run.encounter_ice(),
-	])
-	out.append("HOST %s  ·  LINK %d" % [str(Content.host(_run.host_id)["name"]), _run.hacker_max_link])
+	out.append(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_BUILD_CONTEXT_BATTLE", {
+		"current": _run.step, "total": Run.RUN_LENGTH,
+		"opponent": Text.name_of(str(_run.opponent_id)), "ice": _run.encounter_ice(),
+	}))
+	out.append(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_BUILD_CONTEXT_HOST", {"host": Text.name_of(_run.host_id), "link": _run.hacker_max_link}))
 	if _run.upgrade_ids.is_empty():
 		out.append("UPGRADEs: none yet")
 	else:
 		var names := PackedStringArray()
 		for uid in _run.upgrade_ids:
-			names.append(str(Content.upgrade(uid)["name"]))
+			names.append(Text.name_of(uid))
 		out.append("UPGRADEs: %s" % ", ".join(names))
 	out.append("Boss: %s" % str(Content.boss(_run.boss_id)["name"]))
 	return out
@@ -1195,8 +1228,8 @@ func _show_run_complete() -> void:
 
 	var boss_name := str(Content.boss(_run.boss_id)["name"])
 	_fresh_screen(true)
-	_heading("RUN COMPLETE")
-	_subheading("%s is breached." % boss_name)
+	_heading_ref("GAME_UI_RUN_COMPLETE_HEADING")
+	_subheading_ref("GAME_UI_RUN_COMPLETE_PROMPT", {"opponent": boss_name})
 
 	for line in _run_context_lines():
 		var l := Label.new()
@@ -1225,8 +1258,8 @@ func _show_pending_boss_battle() -> void:
 		_content = null
 
 	_fresh_screen(true)
-	_heading("ROUTE COMMITTED")
-	_subheading("Boss battle port continues in Beta 0.3")
+	_heading_ref("GAME_UI_ROUTE_COMMITTED_HEADING")
+	_subheading_ref("GAME_UI_ROUTE_COMMITTED_PROMPT")
 
 	for line in _run_context_lines():
 		var l := Label.new()
@@ -1251,17 +1284,16 @@ func _show_run_result(winner: int) -> void:
 
 	var won := winner == Types.Side.PLAYER
 	_fresh_screen(true)
-	_heading("VICTORY" if won else "DEFEAT")
-	# Name the opponent rather than saying "System" over a Boss (§16). The Run
-	# context below already reads ODANSHAY; the headline saying otherwise was the
-	# same assumption that broke the battle header.
-	var enemy_name := str(Content.opponent_of_identity({
-		"opponent_kind": _run.opponent_kind, "opponent_id": _run.opponent_id,
-	})["name"])
-	_subheading(
-		"%s breached — battle %d of %d." % [enemy_name, _run.step, Run.RUN_LENGTH]
-		if won else "Hacker LINK severed."
-	)
+	_heading_ref("GAME_UI_RESULT_VICTORY" if won else "GAME_UI_RESULT_DEFEAT")
+	# Name the opponent rather than saying "System" over a Boss (§16). Resolved
+	# from the id through the union, so a Boss and a System take the same path.
+	if won:
+		_subheading_ref("GAME_UI_RESULT_RUN_WIN", {
+			"opponent": Text.name_of(str(_run.opponent_id)),
+			"current": _run.step, "total": Run.RUN_LENGTH,
+		})
+	else:
+		_subheading_ref("GAME_UI_RESULT_LOSS")
 
 	if won:
 		_button(
@@ -1271,13 +1303,13 @@ func _show_run_result(winner: int) -> void:
 	else:
 		# A retry is the SAME encounter with the SAME build — nothing rerolls
 		# and no reward is granted twice.
-		_button("Retry battle %d" % _run.step, func():
+		_button_ref("GAME_UI_RESULT_RETRY", func():
 			_run.retry_battle()
 			_build_origin = _run.opening_build_origin()
 			SessionSave.write(SessionSave.run_to_dict(_run, null))
 			_show_build())
 
-	_button("Abandon Run", func():
+	_button_ref("GAME_UI_RESULT_ABANDON", func():
 		SessionLog.run_abandoned(_run)
 		SessionSave.clear()
 		_show_title(Content.fingerprint()))

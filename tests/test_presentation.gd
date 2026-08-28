@@ -26,6 +26,7 @@ func run(t: TestCase) -> void:
 	_test_graphics_pack(t)
 	_test_missing_asset_behaviour(t)
 	_test_palette_source(t)
+	_test_scenes_parse(t)
 
 
 func _test_registry_shape(t: TestCase) -> void:
@@ -229,3 +230,23 @@ func _test_palette_source(t: TestCase) -> void:
 			"colour %d matches the registry" % i,
 			parsed.colors[i].is_equal_approx(PacketStyle.COLOR_FILL[i]),
 		)
+
+
+## Every scene script COMPILES.
+##
+## The suite instantiates logic classes and never loads a scene script, so a
+## GDScript parse error in `main.gd` or `battle_screen.gd` passed 3,325
+## assertions and then failed on the device with a blank grey screen. A renamed
+## helper with one call site left behind is exactly the shape that produces.
+##
+## This does not test behaviour — the scene layer still has no automated
+## coverage, and that is by design. It tests the one property a compiler can
+## check for free, which is that the file is loadable at all.
+func _test_scenes_parse(t: TestCase) -> void:
+	t.group("presentation / scene scripts compile")
+	var checked := 0
+	for path in _gd_files(SCENES_DIR):
+		var script := ResourceLoader.load(path)
+		t.check("%s compiles" % path.get_file(), script != null and script is GDScript)
+		checked += 1
+	t.check("scene scripts were found", checked > 0)

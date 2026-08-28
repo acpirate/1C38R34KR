@@ -96,8 +96,8 @@ func _build_ui() -> void:
 	root.add_child(header)
 
 	_hacker_box = AvatarBox.new()
-	_hacker_box.title = "HACKER"
-	_hacker_box.stat = "LINK"
+	_hacker_box.title = Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_BATTLE_HACKER")
+	_hacker_box.stat = Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_BATTLE_LINK")
 	_hacker_box.bar_fill = Graphics.pack().bar_fill_link
 	header.add_child(_hacker_box)
 
@@ -117,7 +117,7 @@ func _build_ui() -> void:
 	# a whole build when the refresh aborted early (P-042); a placeholder that is
 	# wrong is worse than no placeholder, because it looks like an answer.
 	_system_box.title = _opponent_name()
-	_system_box.stat = "ICE"
+	_system_box.stat = Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_BATTLE_ICE")
 	_system_box.bar_fill = Graphics.pack().bar_fill_ice
 	header.add_child(_system_box)
 
@@ -241,7 +241,7 @@ func _build_pause_panel() -> void:
 	_pause_panel.add_child(box)
 
 	var head := Label.new()
-	head.text = "PAUSED"
+	head.text = Text.get_text(Text.UI_SCREEN_TITLE, "GAME_UI_PAUSE_HEADING")
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.add_theme_font_size_override("font_size", UiTheme.font_heading())
 	head.add_theme_color_override("font_color", PacketStyle.TEXT_HEADING)
@@ -255,13 +255,13 @@ func _build_pause_panel() -> void:
 	box.add_child(mode)
 
 	var resume := Button.new()
-	resume.text = "Resume"
+	resume.text = Text.get_text(Text.UI_BUTTON_TEXT, "GAME_UI_PAUSE_RESUME")
 	resume.custom_minimum_size.y = UiTheme.control_height()
 	resume.pressed.connect(_toggle_pause)
 	box.add_child(resume)
 
 	var save := Button.new()
-	save.text = "Save and Quit"
+	save.text = Text.get_text(Text.UI_BUTTON_TEXT, "GAME_UI_PAUSE_SAVE_QUIT")
 	save.custom_minimum_size.y = UiTheme.control_height()
 	save.pressed.connect(_on_save_and_quit)
 	box.add_child(save)
@@ -788,7 +788,7 @@ func _refresh_bars() -> void:
 	# Through the UNION, never `Content.system`: a Boss id is not in the systems
 	# registry, and the failed lookup used to abort this refresh before the ICE
 	# readout below ever ran (§16).
-	_system_box.title = str(Content.opponent_of_identity(state.identity)["name"])
+	_system_box.title = Text.name_of(str(state.identity["opponent_id"]))
 	_system_box.set_stat(state.hp[Types.Side.ENEMY], state.config["enemy_hp"])
 	_system_box.set_totals(
 		Resolve.shield_value(state, Types.Side.ENEMY),
@@ -805,7 +805,7 @@ func _refresh_programs() -> void:
 
 	var deck := Content.deck(state.identity["deck_id"])
 	var deck_cost := int(deck["fn"]["cost"])
-	_deck_box.label = str(deck["name"])
+	_deck_box.label = Text.name_of(str(deck["id"]))
 	_deck_box.charge = state.deck_charge
 	_deck_box.cost = deck_cost
 	_deck_box.actionable = interactive and state.deck_charge >= deck_cost
@@ -826,7 +826,7 @@ func _fill_side(boxes: Array[UnitBox], side: Types.Side, interactive: bool, targ
 		box.visible = true
 		var u: GameState.UnitState = units[i]
 		var prog := Content.program(u.program_id)
-		box.label = str(prog["name"])
+		box.label = Text.name_of(str(prog["id"]))
 		box.charge = u.charge
 		box.cost = int(prog["cost"])
 		box.set_binding(_first_or(prog["colors"]), _first_or(prog["shapes"]))
