@@ -587,7 +587,9 @@ func _play_one(ev: Dictionary) -> void:
 			# The header for an activation. Kept even where a later message
 			# repeats the name, because it is the only event that fires for
 			# EVERY activation — several Effects emit no message at all.
-			_log("%s fires %s" % [_who(ev.get("side", 0)), ev.get("name", "?")])
+			_log(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_MSG_FIRES", {
+				"who": _who(ev.get("side", 0)), "function": str(ev.get("name", "?")),
+			}))
 			_refresh_programs()
 			# WHICH control fired, shown on the control itself. A Function whose
 			# Effect touches no Packet — a Drain, a Buff — otherwise produced no
@@ -611,26 +613,32 @@ func _play_one(ev: Dictionary) -> void:
 		Types.EVT.SHAKE:
 			await _pause(0.24 / speed)
 		Types.EVT.LINE_CLEAR:
-			_log("  line clear")
+			_sub_log(Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_MSG_LINE_CLEAR"))
 			await _pause(0.24 / speed)
 		Types.EVT.WITHHOLD:
 			# Worth surfacing: a ready Program that declines to act looks
 			# identical to one that is not charged unless it says so.
-			_log("  %s withheld — %s" % [ev.get("program_id", "?"), ev.get("reason", "")])
+			_sub_log(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_MSG_WITHHELD", {
+				"who": str(ev.get("program_id", "?")), "reason": str(ev.get("reason", "")),
+			}))
 			await _pause(0.30 / speed)
 		Types.EVT.OP:
 			if not ev.get("resolved", true):
-				_log("  fizzled")
+				_sub_log(Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_MSG_FIZZLED"))
 				await _pause(0.24 / speed)
 
 		Types.EVT.DAMAGE:
 			_refresh_bars()
 			_float_damage(int(ev.get("target", 0)), int(ev.get("amount", 0)))
-			_log("  %d damage to %s" % [int(ev.get("amount", 0)), _who(ev.get("target", 0))])
+			_sub_log(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_MSG_DAMAGE", {
+				"amount": int(ev.get("amount", 0)), "target": _who(ev.get("target", 0)),
+			}))
 			await _pause(0.24 / speed)
 		Types.EVT.SHIELD:
 			_refresh_bars()
-			_log("  shield absorbed %d" % int(ev.get("prevented", 0)))
+			_sub_log(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_MSG_SHIELD_ABSORBED", {
+				"amount": int(ev.get("prevented", 0)),
+			}))
 			await _pause(0.24 / speed)
 		Types.EVT.MSG:
 			_log(str(ev["text"]))
@@ -640,7 +648,7 @@ func _play_one(ev: Dictionary) -> void:
 			await _pause(0.45 / speed)
 		Types.EVT.OVER:
 			_refresh_all()
-			_log("%s wins" % _who(ev["winner"]))
+			_log(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_MSG_WINS", {"who": _who(ev["winner"])}))
 		_:
 			pass
 
@@ -655,9 +663,22 @@ func _play_one(ev: Dictionary) -> void:
 ## Resolved through the opponent union, never `Content.system`: a Boss id is not
 ## in the systems registry, and the failed lookup is what aborted the header
 ## refresh in 0.3.
+## A sub-message: a consequence of the line above it.
+##
+## The indent lives HERE rather than in the string, because Excel discards
+## leading whitespace on CSV import and flattened these when the copy first went
+## through the workbook (AN-011, D-046). Indentation is how a line is presented
+## relative to its parent, not part of what it says — so the renderer owns it.
+const SUB_INDENT := "  "
+
+
+func _sub_log(text: String) -> void:
+	_log(SUB_INDENT + text)
+
+
 func _who(side) -> String:
 	if int(side) == Types.Side.PLAYER:
-		return "Hacker"
+		return Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_SIDE_HACKER")
 	return _opponent_name()
 
 
@@ -860,7 +881,7 @@ func _on_save_and_quit() -> void:
 	if SaveState.write(state):
 		quit_requested.emit()
 	else:
-		_log("Save failed")
+		_log(Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_MSG_SAVE_FAILED"))
 
 
 func _on_program_pressed(idx: int) -> void:
@@ -897,7 +918,7 @@ func _begin_activation(source: Dictionary, fn: Dictionary) -> void:
 		return
 
 	_pending_target = {"source": source}
-	_log("Choose a Packet — tap the Function again to cancel")
+	_log(Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_MSG_TARGETING"))
 	_stream.set_targeting(state.occupied_cells())
 	# Redrawn so the armed control lights and every other one recedes: "what can
 	# I tap right now?" is answered by the layout, with no extra text.
@@ -909,7 +930,7 @@ func _cancel_targeting() -> void:
 		return
 	_pending_target = {}
 	_stream.clear_targeting()
-	_log("Targeting cancelled")
+	_log(Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_MSG_TARGETING_CANCELLED"))
 	_refresh_programs()
 
 

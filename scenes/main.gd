@@ -305,7 +305,7 @@ func _show_title(fingerprint: String) -> void:
 	# The fingerprint on the title screen is deliberate: it identifies exactly
 	# which content a device build is running, which is the first question worth
 	# asking when a device behaves unlike the harness.
-	stamp.text = "content %s" % fingerprint
+	stamp.text = _ui(Text.UI_STATUS_TEXT, "GAME_UI_TITLE_CONTENT_STAMP", {"fingerprint": fingerprint})
 	stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stamp.add_theme_font_size_override("font_size", UiTheme.font_small())
 	stamp.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
@@ -327,7 +327,7 @@ func _show_system_select() -> void:
 			# them compute it from six colours and six shapes in their head is
 			# the kind of hidden arithmetic that makes a choice feel arbitrary.
 			"lines": [
-				"ICE %d" % int(s["base_ice"]),
+				_ui(Text.UI_STATUS_TEXT, "GAME_UI_CARD_ICE", {"ice": int(s["base_ice"])}),
 				"Strong: %s, %s" % [
 					_token_list(s["strong_colors"], Vocab.COLOR_TOKENS),
 					_token_list(s["strong_shapes"], Vocab.SHAPE_TOKENS),
@@ -350,7 +350,7 @@ func _show_host_select() -> void:
 	for id in Content.active()["hosts"]:
 		var h := Content.host(id)
 		var passives: Array = h["passives"]
-		var effect := "no PASSIVEs"
+		var effect := Text.get_text(Text.UI_STATUS_TEXT, "GAME_UI_CARD_NO_PASSIVES")
 		if not passives.is_empty():
 			var parts := PackedStringArray()
 			for p in passives:
@@ -836,46 +836,68 @@ func _show_metrics(state: GameState) -> void:
 	scroll.add_child(body)
 
 
+## The battle report, composed from semantic rows.
+##
+## Every line is a `GAME_UI_REPORT_*` template. The wording is transcribed
+## verbatim from what shipped and must render IDENTICALLY — verified by
+## capturing the report before and after this migration and diffing it, rather
+## than by eye.
+##
+## Numbers are formatted in code and passed as filled strings. A template
+## carries `{amount}`, never `%d`: the sheet says what is said, and the code
+## says how a value is rendered. That is also why the percentage works — it
+## arrives already formatted to one decimal.
 func _metrics_lines(state: GameState) -> PackedStringArray:
 	var m := state.metrics
 	var out := PackedStringArray()
 
-	out.append("BATTLE")
-	out.append("Turns to resolution: %d" % m.turns)
-	out.append("Sync-locks (auto-reshuffles): %d" % m.auto_reshuffles)
-	out.append("Detonations: %d" % m.detonations)
-	out.append("System withholds: %d" % m.system_withholds)
-	out.append("System shields — created %d, sliced %d" % [m.enemy_shield_created, m.enemy_shield_removed])
-	out.append("Shielded hits: %d, damage prevented: %d" % [m.enemy_shield_instances, m.enemy_shield_prevented])
+	out.append(_report("GAME_UI_REPORT_BATTLE_HEADING"))
+	out.append(_report("GAME_UI_REPORT_TURNS", {"turns": m.turns}))
+	out.append(_report("GAME_UI_REPORT_SYNC_LOCKS", {"count": m.auto_reshuffles}))
+	out.append(_report("GAME_UI_REPORT_DETONATIONS", {"count": m.detonations}))
+	out.append(_report("GAME_UI_REPORT_WITHHOLDS", {"count": m.system_withholds}))
+	out.append(_report("GAME_UI_REPORT_SHIELDS", {
+		"created": m.enemy_shield_created, "sliced": m.enemy_shield_removed,
+	}))
+	out.append(_report("GAME_UI_REPORT_SHIELDED_HITS", {
+		"hits": m.enemy_shield_instances, "prevented": m.enemy_shield_prevented,
+	}))
 
-	_append_side(out, m, Types.Side.PLAYER, "HACKER")
-	_append_side(out, m, Types.Side.ENEMY, "SYSTEM")
+	_append_side(out, m, Types.Side.PLAYER, "GAME_UI_REPORT_SIDE_HACKER")
+	_append_side(out, m, Types.Side.ENEMY, "GAME_UI_REPORT_SIDE_SYSTEM")
 	return out
 
 
-func _append_side(out: PackedStringArray, m: Metrics.Battle, side: Types.Side, title: String) -> void:
+## One report row.
+func _report(ref_id: String, args := {}) -> String:
+	return _ui(Text.UI_STATUS_TEXT, ref_id, args)
+
+
+func _append_side(out: PackedStringArray, m: Metrics.Battle, side: Types.Side, title_ref: String) -> void:
 	var s := m.side(side)
 	out.append("")
-	out.append(title)
-	out.append("Total damage dealt: %d" % s.total_damage)
+	out.append(_report(title_ref))
+	out.append(_report("GAME_UI_REPORT_TOTAL_DAMAGE", {"amount": s.total_damage}))
 	# Rounded for display only. The stored values are pre-floor floats — a
 	# Shield rescales them proportionally — and rounding here rather than in the
 	# accumulator is what keeps the buckets summing to the total exactly.
-	out.append("Sync-caused (incl. its cascades): %d" % roundi(s.match_damage))
-	out.append("bomb-caused (incl. its cascades): %d" % roundi(s.bomb_damage))
-	out.append("line-slice-caused (incl. its cascades): %d" % roundi(s.lineslice_damage))
-	out.append("transform-caused (incl. its cascades): %d" % roundi(s.transform_damage))
-	out.append("Function-caused (incl. its cascades): %d" % roundi(s.attacker_damage))
-	out.append("PASSIVE-caused: %d" % roundi(s.passive_damage))
-	out.append("Buff added: %d" % roundi(s.buff_damage_added))
-	out.append("Deepest cascade: %d RNG rounds" % s.deepest_cascade)
-	out.append("Line clears: %d" % s.line_clears)
+	out.append(_report("GAME_UI_REPORT_SYNC_DAMAGE", {"amount": roundi(s.match_damage)}))
+	out.append(_report("GAME_UI_REPORT_BOMB_DAMAGE", {"amount": roundi(s.bomb_damage)}))
+	out.append(_report("GAME_UI_REPORT_LINESLICE_DAMAGE", {"amount": roundi(s.lineslice_damage)}))
+	out.append(_report("GAME_UI_REPORT_TRANSFORM_DAMAGE", {"amount": roundi(s.transform_damage)}))
+	out.append(_report("GAME_UI_REPORT_FUNCTION_DAMAGE", {"amount": roundi(s.attacker_damage)}))
+	out.append(_report("GAME_UI_REPORT_PASSIVE_DAMAGE", {"amount": roundi(s.passive_damage)}))
+	out.append(_report("GAME_UI_REPORT_BUFF_ADDED", {"amount": roundi(s.buff_damage_added)}))
+	out.append(_report("GAME_UI_REPORT_DEEPEST_CASCADE", {"rounds": s.deepest_cascade}))
+	out.append(_report("GAME_UI_REPORT_LINE_CLEARS", {"count": s.line_clears}))
 
 	var contested := s.contention_tiles
 	var destroyed := s.tiles_destroyed
 	var pct := (100.0 * float(contested) / float(destroyed)) if destroyed > 0 else 0.0
-	out.append("Opponent-bound Packets sliced: %d of %d (%.1f%%)" % [contested, destroyed, pct])
-	out.append("Charge wasted (no Program could take it): %d" % s.charge_wasted_total)
+	out.append(_report("GAME_UI_REPORT_CONTESTED", {
+		"contested": contested, "destroyed": destroyed, "percent": "%.1f" % pct,
+	}))
+	out.append(_report("GAME_UI_REPORT_CHARGE_WASTED", {"amount": s.charge_wasted_total}))
 
 	# Ordered by the battle's own roster rather than by the metrics Dictionary,
 	# so the report reads in charge-routing priority order — the same order the
@@ -884,23 +906,23 @@ func _append_side(out: PackedStringArray, m: Metrics.Battle, side: Types.Side, t
 		var um: Metrics.Unit = s.units.get(u, null)
 		if um == null:
 			continue
-		var prog := Content.program(u)
-		out.append("%s [%s]: fired %d, effect %d" % [
-			Text.name_of(u), u, um.fires, roundi(um.effect),
-		])
+		out.append(_report("GAME_UI_REPORT_UNIT", {
+			"name": Text.name_of(u), "id": u, "fires": um.fires, "effect": roundi(um.effect),
+		}))
 
 	if side == Types.Side.PLAYER and _finished_state != null:
-		var deck := Content.deck(_finished_state.identity["deck_id"])
-		out.append("%s [%s deck]: fired %d, neutral charge %d (wasted %d)" % [
-			Text.name_of(str(deck["id"])), deck["id"], s.deck.fires,
-			s.deck.charge_from_neutral, s.deck.charge_wasted,
-		])
+		var deck_id := str(_finished_state.identity["deck_id"])
+		out.append(_report("GAME_UI_REPORT_DECK", {
+			"name": Text.name_of(deck_id), "id": deck_id, "fires": s.deck.fires,
+			"charge": s.deck.charge_from_neutral, "wasted": s.deck.charge_wasted,
+		}))
 
 	for key in s.passives:
 		var p: Metrics.Passive = s.passives[key]
-		out.append("%s via %s: %d trigger(s), %d damage" % [
-			p.passive_id, p.source_id, p.triggers, roundi(p.damage),
-		])
+		out.append(_report("GAME_UI_REPORT_PASSIVE", {
+			"passive": p.passive_id, "source": p.source_id,
+			"triggers": p.triggers, "damage": roundi(p.damage),
+		}))
 
 
 ## The side's Program IDs in roster order, read from the battle rather than from
@@ -937,10 +959,10 @@ func _continue_label(saved: Dictionary) -> String:
 		"RUN":
 			var r: Run = saved["run"]
 			if r.is_pending_boss_battle():
-				return "Continue Run — Boss route ready"
-			return "Continue Run — battle %d of %d" % [r.step, Run.RUN_LENGTH]
+				return Text.get_text(Text.UI_BUTTON_TEXT, "GAME_UI_TITLE_CONTINUE_BOSS")
+			return Text.format(Text.UI_BUTTON_TEXT, "GAME_UI_TITLE_CONTINUE_BATTLE", {"current": r.step, "total": Run.RUN_LENGTH})
 		_:
-			return "Continue — turn %d" % (saved["state"] as GameState).turn
+			return Text.format(Text.UI_BUTTON_TEXT, "GAME_UI_TITLE_CONTINUE_TURN", {"turn": (saved["state"] as GameState).turn})
 
 
 func _resume_session(saved: Dictionary) -> void:
@@ -1038,7 +1060,7 @@ func _show_hacker_select() -> void:
 			"id": str(id),
 			"name": "%s [%s]" % [Text.name_of(id), id],
 			"lines": [
-				"LINK %d" % int(h["base_link"]),
+				_ui(Text.UI_STATUS_TEXT, "GAME_UI_CARD_LINK", {"link": int(h["base_link"])}),
 				"Strong: %s, %s" % [
 					_token_list(h["strong_colors"], Vocab.COLOR_TOKENS),
 					_token_list(h["strong_shapes"], Vocab.SHAPE_TOKENS),
@@ -1068,7 +1090,7 @@ func _show_deck_select() -> void:
 			"id": str(id),
 			"name": "%s [%s]" % [Text.name_of(id), id],
 			"lines": [
-				"+%d LINK" % int(d["add_link"]),
+				_ui(Text.UI_STATUS_TEXT, "GAME_UI_CARD_ADD_LINK", {"link": int(d["add_link"])}),
 				Text.format(Text.UI_STATUS_TEXT, "GAME_UI_CARD_FUNCTION", {"function": Text.name_of(str(d["fn"]["id"]))}),
 			],
 		})
@@ -1108,10 +1130,10 @@ func _show_path_choice() -> void:
 			"id": str(o.index),
 			"name": "%s%s" % [
 				Text.name_of(str(o.opponent_id)),
-				"  ·  BOSS" if o.opponent_kind == Types.OpponentKind.BOS else "",
+				_ui(Text.UI_STATUS_TEXT, "GAME_UI_PATH_BOSS_TAG") if o.opponent_kind == Types.OpponentKind.BOS else "",
 			],
 			"lines": [
-				"ICE %d" % Run.resolve_run_ice(_run.settings, o.opponent_kind, o.opponent_id, pending.step),
+				_ui(Text.UI_STATUS_TEXT, "GAME_UI_CARD_ICE", {"ice": Run.resolve_run_ice(_run.settings, o.opponent_kind, o.opponent_id, pending.step)}),
 				Text.format(Text.UI_STATUS_TEXT, "GAME_UI_PATH_HOST_LINE", {"host": Text.name_of(str(o.host_id)), "effect": _passive_summary(host)}),
 				Text.format(Text.UI_STATUS_TEXT, "GAME_UI_PATH_UPGRADE_LINE", {"upgrade": Text.name_of(str(o.upgrade_id)), "effect": _passive_summary(upgrade)}),
 			],
@@ -1172,13 +1194,13 @@ func _run_context_lines() -> PackedStringArray:
 	}))
 	out.append(Text.format(Text.UI_STATUS_TEXT, "GAME_UI_BUILD_CONTEXT_HOST", {"host": Text.name_of(_run.host_id), "link": _run.hacker_max_link}))
 	if _run.upgrade_ids.is_empty():
-		out.append("UPGRADEs: none yet")
+		out.append(_ui(Text.UI_STATUS_TEXT, "GAME_UI_BUILD_CONTEXT_UPGRADES_NONE"))
 	else:
 		var names := PackedStringArray()
 		for uid in _run.upgrade_ids:
 			names.append(Text.name_of(uid))
-		out.append("UPGRADEs: %s" % ", ".join(names))
-	out.append("Boss: %s" % str(Content.boss(_run.boss_id)["name"]))
+		out.append(_ui(Text.UI_STATUS_TEXT, "GAME_UI_BUILD_CONTEXT_UPGRADES", {"upgrades": ", ".join(names)}))
+	out.append(_ui(Text.UI_STATUS_TEXT, "GAME_UI_BUILD_CONTEXT_BOSS", {"boss": Text.name_of(_run.boss_id)}))
 	return out
 
 
@@ -1240,7 +1262,7 @@ func _show_run_complete() -> void:
 		_root.add_child(l)
 
 	_divider()
-	_button("Back to title", func():
+	_button_ref("GAME_UI_RESULT_BACK_TO_TITLE", func():
 		SessionSave.clear()
 		_show_title(Content.fingerprint()))
 
@@ -1272,7 +1294,7 @@ func _show_pending_boss_battle() -> void:
 	_divider()
 	# The Run is PRESERVED, not ended. Returning to the title and continuing
 	# comes straight back here.
-	_button("Back to title", func(): _show_title(Content.fingerprint()))
+	_button_ref("GAME_UI_RESULT_BACK_TO_TITLE", func(): _show_title(Content.fingerprint()))
 
 
 ## The result of a Run battle. Progression, retry, and abandonment live here; a
@@ -1297,7 +1319,7 @@ func _show_run_result(winner: int) -> void:
 
 	if won:
 		_button(
-			"Complete Run" if _run.step == Run.RUN_LENGTH else "Continue Run",
+			Text.get_text(Text.UI_BUTTON_TEXT, "GAME_UI_RESULT_COMPLETE_RUN" if _run.step == Run.RUN_LENGTH else "GAME_UI_RESULT_CONTINUE_RUN"),
 			_advance_run
 		)
 	else:
