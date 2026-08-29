@@ -1,0 +1,97 @@
+[gd_resource type="Resource" script_class="GraphicsPack" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/avatar_box.png" id="1_x13sd"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/badge_enemy.png" id="2_ofhyd"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/badge_player.png" id="3_v7th5"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/bar_fill_charge.png" id="4_772v1"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/bar_fill_charge_ready.png" id="5_gp45h"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/bar_fill_ice.png" id="6_pgy6p"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/bar_fill_link.png" id="7_drdhd"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/bar_track.png" id="8_3upa8"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/board_surround.png" id="9_880ka"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/build_slot.png" id="10_bua7y"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/button_disabled.png" id="11_6esir"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/button_normal.png" id="12_80qr0"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/button_pressed.png" id="13_5yy32"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/button_selected.png" id="14_2hr3n"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_0.png" id="15_lpi0u"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_1.png" id="16_yk40g"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_2.png" id="17_xf70k"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_3.png" id="18_5r2pg"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_4.png" id="19_1cmpm"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_5.png" id="20_o8om5"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_6.png" id="21_jpfrh"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_7.png" id="22_wcd62"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_8.png" id="23_vq5t8"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/digit_9.png" id="24_xv4mb"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/icon/arrow_down.png" id="25_gc48u"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/icon/arrow_up.png" id="26_shgiv"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/icon/cancel.png" id="27_11csj"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/icon/menu.png" id="28_bwku4"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/mark_bomb.png" id="29_gex3d"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/mark_buff.png" id="30_ne07v"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/mark_shield.png" id="31_1xhe3"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/mark_override.png" id="32_g6rcn"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/ring_bomb.png" id="33_7w0s6"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/ring_buff.png" id="34_lkf0f"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/ring_shield.png" id="35_shou8"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/overlay/ring_override.png" id="36_32764"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/packet_cell.png" id="37_6i1jb"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/glyph_circle.png" id="38_vhqhl"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/glyph_square.png" id="39_ivnf8"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/glyph_triangle.png" id="40_nl03i"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/glyph_diamond.png" id="41_rjw67"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/glyph_star.png" id="42_mnllq"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/glyph_cross.png" id="43_g41yc"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/panel.png" id="44_6351c"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/program_box_armed.png" id="45_qcabk"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/program_box_charged.png" id="46_h8tsy"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/program_box_idle.png" id="47_rmyki"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/battle/program_box_ready.png" id="48_ureen"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/ring_selected.png" id="49_fo077"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/packet/ring_targeting.png" id="50_tm5qq"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/rule.png" id="51_p4q5h"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/screen_bg.png" id="52_pm8jl"]
+[ext_resource type="Script" path="res://scenes/graphics/graphics_pack.gd" id="53_gpg4m"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/scroll_thumb.png" id="54_06wtw"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/scroll_track.png" id="55_627s5"]
+[ext_resource type="Texture2D" path="res://assets/packs/16bit/chrome/title_logo.png" id="56_o5lah"]
+
+[resource]
+script = ExtResource("53_gpg4m")
+screen_bg = ExtResource("52_pm8jl")
+panel = ExtResource("44_6351c")
+button_normal = ExtResource("12_80qr0")
+button_pressed = ExtResource("13_5yy32")
+button_selected = ExtResource("14_2hr3n")
+button_disabled = ExtResource("11_6esir")
+rule = ExtResource("51_p4q5h")
+scroll_track = ExtResource("55_627s5")
+scroll_thumb = ExtResource("54_06wtw")
+bar_track = ExtResource("8_3upa8")
+bar_fill_link = ExtResource("7_drdhd")
+bar_fill_ice = ExtResource("6_pgy6p")
+bar_fill_charge = ExtResource("4_772v1")
+bar_fill_charge_ready = ExtResource("5_gp45h")
+title_logo = ExtResource("56_o5lah")
+avatar_box = ExtResource("1_x13sd")
+program_box_idle = ExtResource("47_rmyki")
+program_box_charged = ExtResource("46_h8tsy")
+program_box_ready = ExtResource("48_ureen")
+program_box_armed = ExtResource("45_qcabk")
+board_surround = ExtResource("9_880ka")
+packet_cell = ExtResource("37_6i1jb")
+build_slot = ExtResource("10_bua7y")
+packet_glyph = Array[Texture2D]([ExtResource("38_vhqhl"), ExtResource("39_ivnf8"), ExtResource("40_nl03i"), ExtResource("41_rjw67"), ExtResource("42_mnllq"), ExtResource("43_g41yc")])
+ring_selected = ExtResource("49_fo077")
+ring_targeting = ExtResource("50_tm5qq")
+badge_player = ExtResource("3_v7th5")
+badge_enemy = ExtResource("2_ofhyd")
+overlay_mark = Array[Texture2D]([ExtResource("29_gex3d"), ExtResource("30_ne07v"), ExtResource("31_1xhe3"), ExtResource("32_g6rcn")])
+overlay_ring = Array[Texture2D]([ExtResource("33_7w0s6"), ExtResource("34_lkf0f"), ExtResource("35_shou8"), ExtResource("36_32764")])
+countdown_digit = Array[Texture2D]([ExtResource("15_lpi0u"), ExtResource("16_yk40g"), ExtResource("17_xf70k"), ExtResource("18_5r2pg"), ExtResource("19_1cmpm"), ExtResource("20_o8om5"), ExtResource("21_jpfrh"), ExtResource("22_wcd62"), ExtResource("23_vq5t8"), ExtResource("24_xv4mb")])
+icon_menu = ExtResource("28_bwku4")
+icon_arrow_up = ExtResource("26_shgiv")
+icon_arrow_down = ExtResource("25_gc48u")
+icon_cancel = ExtResource("27_11csj")
+palette_svg = "res://assets/packs/16bit/packet_palette.svg"
