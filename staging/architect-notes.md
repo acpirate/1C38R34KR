@@ -822,3 +822,78 @@ this project intends to do the latter.
 
 `phosphor` is a proof of the pipeline, not a finished look — a mechanical
 recolour with the contrast problem above still in it.
+
+---
+
+## AN-016 — Skins can change pixels but not representation
+
+**Director observation, 2026-08-28, after seeing six skins swapped live. For
+requirements analysis during the dedicated art phase — not to be built now.**
+
+The skin system swaps **which pixels**. It cannot swap **what a thing is made
+of**. A Program's charge is always a horizontal track with a proportional fill,
+because that is what `UnitBox._draw` does; a skin can restyle the track and the
+fill and nothing else.
+
+The director's examples: show charge as large `x/y` numerals instead, or as a
+circle filling radially. Both are the same *value* presented as a different
+*thing*, and no amount of art can express either.
+
+### The distinction worth carrying into the requirement
+
+Three concerns, not two, and the middle one does not exist today:
+
+| | What it decides | Where it lives now |
+| --- | --- | --- |
+| **Layout** | where a control is, how large, what it sits inside | code — deliberately, and a req-defined build changes it |
+| **Composition** | what a control is MADE OF — bar vs numerals vs radial | **nowhere. Hardcoded in each `_draw`.** |
+| **Skin** | what those parts look like | the asset pack, swappable today |
+
+Calling the gap "layout flexibility" undersells it and risks the requirement
+asking for the wrong thing. Position is not the problem — nobody wants to move
+the charge bar three pixels. **Representation** is the problem.
+
+### What it would plausibly look like
+
+A small sheet in the shape of `text_style.csv`, which already proves the pattern:
+a data file that says how a class of thing behaves without saying where it is.
+
+```
+COMPONENT,VARIANT
+PROGRAM_CHARGE,BAR | NUMERALS | RADIAL
+AVATAR_STAT,BAR | NUMERALS
+PACKET_OVERLAY,BADGE | CORNER_TAG
+```
+
+A bounded enum, not a stylesheet — which respects the "not full CSS" instinct
+and bounds the work naturally, because **every variant is a draw path somebody
+has to write.** Three variants is three implementations. That cost is the
+feature: it keeps the vocabulary honest.
+
+### What already helps
+
+`UnitBox._draw` is not a monolith — it already draws frame, binding swatch,
+name, charge text and charge bar as separable steps, each reading a value it
+does not own. The refactor is extracting those into selectable renderers, not
+inventing a component model from nothing. `AvatarBox` is the same shape.
+
+### Two cautions for whoever writes the requirement
+
+**Variants multiply the constraints that are already hard to check.** A numerals
+variant makes the mono font load-bearing where it is currently a nicety. A
+radial variant makes the control's aspect ratio matter where it currently does
+not. The "pairs that must stay different" rule in the bundle README grows a
+dimension: a skin could pick two variants that are individually fine and
+together unreadable.
+
+**Sequence it after content.** Which representations are worth building depends
+on what the game needs to communicate, and content adds things to communicate. A
+variant vocabulary chosen against the current four UPGRADEs and one Boss would be
+chosen against a skeleton.
+
+### Related
+
+This is the third thing deferred to the art phase, and they interlock: the VFX
+and audio work in AN-015 needs a jig, and a jig previewing components is a much
+more useful tool than one previewing textures. Worth authorizing them together
+rather than separately.
