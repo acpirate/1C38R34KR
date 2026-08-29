@@ -7,16 +7,23 @@
 Run after `godot --headless --import` regenerates `.import` files, which happens
 whenever a texture is added, a pack is cloned, or the import cache is cleared.
 
-## The one setting that matters
+## Two things, not one
 
-`detect_3d/compress_to` defaults to **1**, which tells Godot to silently
+**1. `detect_3d/compress_to` defaults to 1**, which tells Godot to silently
 re-import a texture as VRAM-compressed the first time it believes it is used in
 3D. Nothing here is 3D — but the setting is a trapdoor: it turns a lossless
 authored asset lossy with nobody editing anything, which is exactly what the
 graphics authorization's §2.2 forbids.
 
-It was patched across all 44 assets in beta 0.3.1. The patch does **not** survive
-regeneration, so this has to be re-runnable rather than a one-time fix.
+**2. `packet_palette.svg` must NOT be imported as a texture.** Godot's default
+for an SVG is `importer="texture"`, which converts it to a `CompressedTexture2D`
+and stops the raw file shipping — and the game parses that file as TEXT at
+startup to read the six Packet colours. Left alone, a cloned pack loads with no
+palette and logs `no palette SVG at …`, which is exactly how it was found: on a
+device, after a skin switch, with the UI otherwise correct.
+
+Neither patch survives regeneration, so this has to be re-runnable rather than a
+one-time fix.
 
 `--check` reports drift without writing, so a verification gate can fail on it
 instead of someone remembering.
@@ -35,6 +42,11 @@ PACKS = ROOT / "assets" / "packs"
 FIXES = {
     "detect_3d/compress_to=1": "detect_3d/compress_to=0",
 }
+
+## What an SVG's `.import` must contain. Anything else means Godot has decided
+## to rasterise it, and the palette stops being readable as text.
+SVG_IMPORT = "\n".join(["[remap]", "", 'importer="keep"', ""])
+
 
 
 def main():
@@ -64,6 +76,23 @@ def main():
         else:
             f.write_text(fixed, encoding="utf-8")
             print("  fixed %s" % f.relative_to(ROOT))
+
+    # The palette SVG, which must stay unimported so the game can read it.
+    for svg in sorted(root.rglob("*.svg")):
+        imp = svg.with_suffix(svg.suffix + ".import")
+        scanned += 1
+        if imp.exists() and imp.read_text(encoding="utf-8") == SVG_IMPORT:
+            continue
+        changed += 1
+        if args.check:
+            print("  DRIFT %s (SVG must be importer=keep)" % imp.relative_to(ROOT))
+        else:
+            imp.write_text(SVG_IMPORT, encoding="utf-8")
+            # Godot leaves the rasterised copy behind; it is stale the moment
+            # the importer changes.
+            for junk in imp.parent.glob(svg.stem + ".*.translation"):
+                junk.unlink()
+            print("  fixed %s (importer=keep)" % imp.relative_to(ROOT))
 
     if changed == 0:
         print("all %d texture import(s) already correct" % scanned)

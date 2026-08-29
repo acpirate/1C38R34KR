@@ -26,6 +26,21 @@ measured in source pixels. Double the image and you double the border.
 **3. Transparency is real.** PNG alpha is used throughout — a shape on a
 transparent ground, not a shape on a coloured square.
 
+## Pairs that must stay different from each other
+
+Some assets carry meaning only by CONTRAST with another asset. A recolour
+that treats each file on its own can leave both valid and the game
+unreadable — every check will pass and a player will not be able to tell
+two states apart.
+
+| These | Must differ because |
+| --- | --- |
+| `bar_fill_link` vs `bar_fill_ice` | They are the two sides' health, side by side in the header. Same colour means you cannot tell who is winning. |
+| `badge_player` vs `badge_enemy` | The ONLY signal of who owns an overlay. One must read light, the other dark. |
+| the four `program_box_*` | Idle, charged, yours-and-charged, armed. Four states of the same control. |
+| `button_selected` vs `button_disabled` | Chosen versus unavailable. Differing only in brightness is what made this ambiguous before. |
+| the six palette colours | Packet identity. Two that read alike make a match ambiguous. |
+
 ## The palette
 
 `packet_palette.svg` holds the **six Packet colours** and opens in

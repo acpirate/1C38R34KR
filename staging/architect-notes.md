@@ -793,6 +793,32 @@ missing any one leaves a half-swapped UI that reads as a rendering bug.
 
 A second skin, `phosphor`, was generated from `03-terminal-phosphor.jpg` through
 the authoring bundle to prove the whole path: recolour a bundle, `check`,
-`build`, import, `fix_imports`, `gen_pack_resource`. It touched no engine file
-and the palette validator caught a malformed hex value in it, which is the
-framework doing its job on the first real use.
+`build`, import, `fix_imports`, `gen_pack_resource`. It touched no engine file.
+
+**Verified on the tablet**: the picker reads `[debug] skin: v0`, tapping it
+swaps panel, buttons, rule, board and Packet palette live, and the log is clean.
+
+### Two defects the exercise found
+
+**The palette SVG was imported as a texture in the cloned pack.** `fix_imports`
+only handled `*.png.import`, so nothing re-applied `importer="keep"` and Godot
+rasterised the file — which stops it shipping, and the game reads it as TEXT at
+startup. The skin swapped with no palette and logged `no palette SVG at …`. Same
+class as the text CSVs in Phase D, and found the same way: on a device. Fixed in
+the tool, so it cannot recur for a future pack.
+
+**`bar_fill_link` and `bar_fill_ice` both became green.** A mechanical recolour
+treats each file independently, and those two carry meaning only by CONTRAST —
+they are the two sides' health, side by side in the header. Both files were
+valid, every check passed, and the result was a screen where you cannot tell who
+is winning.
+
+That is a whole class the validator cannot reach, so it went into the bundle
+README as a table: **pairs that must stay different from each other** — the two
+bar fills, the two ownership badges, the four Program-box states, selected vs
+disabled, and the six palette colours. An artist recolouring by hand would
+probably preserve these by instinct; an agent recolouring by rule will not, and
+this project intends to do the latter.
+
+`phosphor` is a proof of the pipeline, not a finished look — a mechanical
+recolour with the contrast problem above still in it.
