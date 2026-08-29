@@ -897,3 +897,100 @@ This is the third thing deferred to the art phase, and they interlock: the VFX
 and audio work in AN-015 needs a jig, and a jig previewing components is a much
 more useful tool than one previewing textures. Worth authorizing them together
 rather than separately.
+
+### AN-016a — corner treatments imply a content inset the code cannot know
+
+The director's second example: let a skin round or chamfer its box corners.
+
+The art side is already possible — `panel.png` is a 9-slice and a skin can draw
+whatever corner it likes. What is not possible is the consequence. A chamfer
+eats the corner, so text that currently sits at `px(6)` has to move in, and
+**only the art knows by how much.** Content margins are code constants shared by
+every skin, so a heavy chamfer either clips its own label or every skin pays for
+the worst case.
+
+Cheap to close, and the file already exists. Each manifest entry carries `slice`,
+`stretch`, `w`, `h`, `alpha`:
+
+```json
+{"key": "panel", "slice": 16, "stretch": "", "w": 48, "h": 48}
+```
+
+A `pad` alongside `slice` is the same kind of number in the same place, read by
+the same loader, validated by the same bundle `check`. The art declares its own
+clearance and the layout honours it.
+
+**The director's caveat is the harder half, and is sharper than it first looks.**
+The impingement is not only the box's own text. Two Program boxes sit side by
+side; a chamfer on one's top-right and its neighbour's top-left both eat into
+the *same gutter*, at the same height. So the constraint is **between siblings**,
+not within a control — which means `pad` alone does not settle it, and the art
+phase needs a rule for whether neighbours may overlap their clearances or the
+gutter must grow to fit both.
+
+That is a real design question, not an implementation detail, and it is the
+reason this belongs in a requirement rather than in a quick change.
+
+---
+
+## AN-017 — The camera cutout as stage rather than hazard
+
+**Director observation from the `bzone` proof of concept, 2026-08-28. Not to be
+built now; sequence with the art phase.**
+
+`bzone` unifies the header into one continuous border across the top and
+happens to leave centre cutouts on the top and bottom edges. **This was not
+intentional.** The director's observation is that the top cutout falls where a
+phone's punch-hole camera sits — so a zone the app currently treats as dead
+margin could become deliberate framing.
+
+The idea is good and worth a requirement. Two things about it are not what they
+look like.
+
+### It is not an art feature
+
+Today `main.gd` and `battle_screen.gd` both apply the safe area as **margins on
+the container that holds everything.** Frame and content move inward together.
+There is no full-bleed layer, so there is currently nowhere for a border to be
+drawn that reaches the camera at all. Getting there means splitting the shell in
+two — background/frame full-bleed, content inset — which is a small change
+conceptually and a shell-wide one in practice.
+
+### The cutout's position is per-device, so it cannot be a texture
+
+This is the part that would go wrong if the requirement is written as "draw the
+frame with a cutout". `UiTheme.safe_area_insets` reduces
+`DisplayServer.get_display_safe_area()` to four scalars:
+
+```gdscript
+return Vector4i(safe.position.x * sx, safe.position.y * sy,
+                (screen.x - safe.end.x) * sx, (screen.y - safe.end.y) * sy)
+```
+
+It keeps **how much** is unsafe and throws away **where**. A cutout baked into a
+PNG at a fixed offset would be correct on the device it was authored against and
+wrong on every other — and on the Galaxy Tab A, which has no cutout and reports
+no inset, it would frame nothing and read as an unexplained notch in the border.
+
+So the top border cannot be one texture. It has to be composed at runtime — end
+caps plus a spanning piece, positioned from a safe-area **rect** the helper does
+not currently preserve. Widening that return value is the enabling change, and
+it is worth noting now because it is invisible from the art side.
+
+### The rule that keeps it safe
+
+Whatever goes in that zone must be **decorative only** — never text, never a
+control, never state a player needs. The camera occludes part of it on some
+devices and none on others, and the app cannot enumerate the shapes. Framing
+survives that; information does not.
+
+### Why it is worth doing anyway
+
+It costs screen area the app currently spends on nothing, on the hardware the
+game is actually played on, and it makes the frame look authored for the device
+rather than letterboxed onto it. That is squarely the "cool factor" the graphics
+pass was authorized for.
+
+Group it with AN-015 and AN-016 — one art-phase requirement covering
+composition, frame geometry and VFX/audio, with a jig that can preview all
+three, rather than three separate ones.
