@@ -897,6 +897,77 @@ state tells them apart.
 
 ---
 
+## D-033 — The palette SVG is a handoff channel, not a live pipeline
+
+**Beta 0.3.1, director call, 2026-08-26. Overrides authorization §11 and
+reinterprets §18.10.**
+
+§11 specified a live pipeline: edit the SVG, save, run the normal build workflow,
+and the game picks the values up. The director's instruction was that the SVG is
+a **lossless handoff channel from director to agent** — a way to give exact
+colours — not a production pipeline, and that the game may hardcode the values or
+ship and parse the file.
+
+**Implementation, of the two allowed: ship the SVG in the pack and parse it once
+at startup**, falling back loudly to `PacketStyle`'s constants.
+
+Hardcoding would leave the SVG in the repo as a document that can silently drift
+from the constants it defines, and drift between stale prose and live runtime
+values has cost this project twice (P-043). Parsing makes it structurally
+impossible. The jig is also required to read the SVG, so parsing means it reuses
+this code path rather than growing a parallel one.
+
+---
+
+## D-034 — Neutral static stays procedural
+
+**Beta 0.3.1, director call, 2026-08-26. A named exception to the asset
+contract.**
+
+A neutral Packet renders as per-cell deterministic noise seeded from its
+coordinate, so no two neutrals match. A sprite cannot vary per cell, and a field
+of identical neutrals would read as a deliberate repeating pattern rather than as
+static — weakening the "unmatchable" signal the state exists to send.
+
+Recorded as an exception rather than left implicit, so a later reader does not
+find one procedural component among fifty asset-driven ones and assume it was
+missed.
+
+---
+
+## D-035 — Text rendering is untouched in beta 0.3.1
+
+**Director call, 2026-08-26. Amended by D-038.**
+
+No font slot, no `Label` conversion, no typography decisions. Text was a separate
+build's problem, and mixing it into the graphics pass would have made both harder
+to verify.
+
+**Amended the same day by D-038**: the four overlay type marks became art, on the
+grounds that they are board signals rather than prose. The countdown digit stayed
+a font glyph, explicitly deferred to the text pass — where beta 0.3.2 turned it
+into art too.
+
+---
+
+## D-036 — Packet glyphs carry two tones in one texture
+
+**Beta 0.3.1, director call, 2026-08-26.**
+
+Each Packet shape is ONE monochrome PNG carrying the silhouette at white and its
+outline at mid-grey. A single `modulate` by the palette colour produces the fill
+AND a proportionally darker outline, from one texture and one palette entry.
+
+`COLOR_BORDER` is **retired** — the outline stops being an authored hue and
+becomes a fixed ratio of the fill. The twelve hand-picked constants collapse to
+six, the palette stays at exactly six swatches as §2.3 requires, and colour and
+shape remain independent: six glyphs cover thirty-six Packets.
+
+The result approximates the alpha's borders rather than reproducing them, which
+§2.5 permits.
+
+---
+
 ## D-037 — The overlay type ring is suspended, restoring alpha parity
 
 **Beta 0.3.1, director call, 2026-08-26.**
@@ -1031,6 +1102,91 @@ because the code still compiles and the screen still looks broadly right.
 Both were caught by comparing against the pre-conversion captures rather than by
 looking at the new screen and asking whether it seemed fine. That is the
 argument for taking a before set at all.
+
+---
+
+## D-041 — Display names move to the text sheet; logs carry IDs
+
+**Beta 0.3.2, director call, 2026-08-28.**
+
+Every gameplay object's display name moves to `text_content.csv`, and
+`scripts/logic/` emits stable object IDs rather than names. Anything
+human-readable is resolved presentation-side.
+
+**This fixes a live ambiguity rather than a stylistic one.** Display names are
+NOT unique: `ATTACKER` names both `PRG_H_003` and `PRG_S_003`, and `DISABLER`
+both `PRG_H_004` and `PRG_S_004` — the Hacker and System carry mirrored rosters.
+`battle_log` was writing `"ATTACKER fired BOMB"`, which cannot say which side
+fired.
+
+It also keeps layer purity intact: the logic layer never calls the text
+framework. And it makes log records stable — a record carrying a display name
+changes when someone fixes a typo, while an ID does not.
+
+**Consequence, accepted:** `name` survives in the gameplay sheets because
+`game.gd` composes twelve battle messages from it, and those are compared
+byte-for-byte against the alpha. So a display name lives in two places, and a
+test asserts they agree.
+
+---
+
+## D-042 — The four description columns are deleted, not migrated
+
+**Beta 0.3.2, director call, 2026-08-28.**
+
+`BIO` (×3), `BOSS_PASSIVE_DESCRIPTION`, `DESCRIPT`, and `display_text` (×2) are
+removed rather than moved into the text sheet.
+
+Inspection found they hold **stubs, not content** — every filled cell reads
+`"system biography goes here"` or similar, and `display_text` is entirely empty
+across all nine HOST and UPGRADE rows. Nothing outside the loader and test
+fixtures reads any of them; what HOST and UPGRADE cards actually display is
+`_passive_summary()`, which reads the PASSIVE display template.
+
+So this is deletion, not migration: no live copy to preserve, no before/after
+fidelity to protect. All are fingerprint-excluded, so removing them **cannot
+invalidate a save**. The text sheet gains the categories so authored copy has a
+home; it simply starts empty.
+
+---
+
+## D-043 — Two placeholder syntaxes, deliberately
+
+**Beta 0.3.2, director call, 2026-08-28.**
+
+`text_content.csv` uses named `{token}` placeholders. `psv.csv`'s `display`
+column keeps its positional `%0`/`%1`.
+
+PSV's positional tokens are validated at load against each effect's declared
+param contract — the validator knows how many params an effect has and that a
+COLOUR renders title-cased. Named placeholders cannot express that contract as
+cleanly, so unifying would trade working validation for cosmetic consistency.
+
+The split is legible: **positional appears only inside `psv.csv`, where a
+contract validates it; named appears only in `text_content.csv`, where none
+exists.**
+
+---
+
+## D-044 — Two font roles, and a schema change to keep them swappable
+
+**Beta 0.3.2, 2026-08-28.**
+
+`UI_SANS` for prose, `UI_MONO` for data readouts — charge counters, LINK/ICE,
+report columns — because those are columns of digits that should align and did
+not. Two rather than three: the title logo and countdown digits became art, so no
+display or numeric face is needed.
+
+Two schema deviations from the authorization, both defending §6.3's promise that
+swapping a font is a one-file edit:
+
+- **`text_style.csv` drops `LETTER_SPACING`** — nothing in the build sets
+  tracking, and an unused column invites someone to populate it before anything
+  reads it.
+- **`WEIGHT` is added to both `text_style.csv` and `font_refs.csv`** — a role
+  legitimately has more than one file. Without it, "sans bold" would have to be a
+  second ROLE, and changing the sans family would mean editing two role rows and
+  every style naming the bold one.
 
 ---
 

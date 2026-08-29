@@ -5,6 +5,8 @@
 **Gate A proposal:** `1c38r34kr-beta-0.3.2-text-framework-proposal.md`.
 **Gate B notes:** `1c38r34kr-beta-0.3.2-gate-b-notes.md`.
 **Date:** 2026-08-28. **Status:** complete. Both device gates signed off.
+**Amended** the same day with §7, covering work done after closeout at the
+director's request.
 
 ---
 
@@ -124,6 +126,13 @@ so the loss is visible rather than silent.
 | **D-045** | The alpha CSV cross-check narrows to shared columns. **This is the plan working** — the oracle stops adjudicating the moment content moves, and content has now moved deliberately. |
 | **D-046** | Battle-log indentation moves from content into code, because leading whitespace cannot survive the authoring pipeline. |
 
+**Records note:** D-033–D-036 and D-041–D-044 were originally written only into
+their Gate-A proposals and never migrated to `decisions.md`, leaving the
+append-only log with two gaps while the README claimed it held D-001..D-046. All
+eight have been migrated; the log is now unbroken. Worth remembering that a
+proposal is a *deliverable*, not the record — a decision is only durable once it
+is in the log.
+
 ---
 
 ## 6. Carried forward
@@ -177,7 +186,93 @@ join the verification gate rather than being run on request.
 
 ---
 
-## 7. For the next authorization
+## 7. After closeout — asset workflow and the jig decision
+
+Four pieces of work landed after the closeout was written, at the director's request
+and ahead of the graphics-jig authorization. They change nothing in 0.3.2's
+verdict; they change what the next authorization should ask for.
+
+### 7.1 Cloning a pack needs three fixes, two silent (AN-013)
+
+Answering "can I just copy the v0 directory?" by testing it: **no.** Duplicate
+resource UIDs (Godot warns and does not resolve them), `detect_3d/compress_to`
+reverting to its unsafe default on regeneration, and `pack.tres` holding absolute
+paths into the *source* pack — the last presenting as "I edited the PNGs and
+nothing changed".
+
+Automated as `tools/new_pack.py` + `tools/fix_imports.py`, with
+`gen_pack_resource.gd --pack <name>` so a new skin needs no file edits.
+
+**Writing the checker immediately found 11 of 55 v0 textures at the unsafe
+default** — `title_logo` and the ten countdown digits, every asset added during
+0.3.2. The 0.3.1 patch covered the 44 that existed then and nothing re-applied it
+to the eleven that arrived later. A live defect in the shipped pack, invisible to
+the game, the suite and the asset checker.
+
+### 7.2 The authoring bundle (AN-014)
+
+`authoring/<name>/` holds only art: PNGs, the palette SVG, and a generated README
+describing every asset. No `.import` files, no `pack.tres`, no manifest. It can
+be zipped and handed to a person or an agent who has never seen this repository.
+`.gdignore` keeps it out of Godot's import system so raw files stay raw.
+
+`asset_bundle.py`'s `SPEC` is the contract — dimensions, 9-slice margin, runtime
+tint, and one line on what each asset is. `check` validates against it.
+
+### 7.3 Live skin switching, and two more findings
+
+Packs are discovered at runtime; a debug control on the title screen cycles them.
+Verified on the tablet. Multiple skins ship in one build — a pack is ~130 KB
+against a 50 MB APK.
+
+A second skin, `phosphor`, was generated from concept art through the bundle to
+prove the path. It found two more things:
+
+- **The cloned palette SVG was imported as a texture**, because `fix_imports`
+  only handled PNGs. Same class as the text CSVs in Phase D, found the same way —
+  on a device. Fixed in the tool.
+- **`bar_fill_link` and `bar_fill_ice` both came out green.** A mechanical
+  recolour treats each file independently, and those two carry meaning only by
+  CONTRAST. Both files valid, every check green, and a screen where you cannot
+  tell who is winning.
+
+That second one is beyond what a validator can reach, so it became a table in the
+artist README: **pairs that must stay different from each other**. A human
+recolouring by hand would likely preserve them by instinct; an agent recolouring
+by rule will not, and the plan is to use agents.
+
+### 7.4 The jig is deferred, and its justification has changed (AN-015)
+
+It was justified as offline asset iteration. That case is now weak: a build is
+about three minutes and near-zero agent tokens, and the switcher covers comparing
+directions without rebuilding.
+
+**What actually needs a jig is work an agent cannot judge at all** — animation
+timing, VFX intensity, and above all **audio**, which unlike motion cannot even
+be partially approximated. That is a shorter and more durable criterion, and it
+produces a different tool: one that plays a real battle with scrub, slow and
+repeat, and live intensity and mix adjustment. Not an asset previewer.
+
+Its value scales with how much of the game is made of such work, which today is
+zero — no animation, particle, shader or audio system exists.
+
+**Sequence: content, then the presentation systems, then a jig to tune them.**
+
+### 7.5 Concept art
+
+Four director-generated directions are in `staging/concept-art/`, sorted by cost.
+Two (`02-neon-glow`, `03-terminal-phosphor`) are **skins** — the current layout
+restyled, achievable through the bundle. Two (`01-hud-wireframe`,
+`04-isometric-grid`) are **redesigns**: new panels, or a different board
+projection. That is layout, and layout is code.
+
+The README also records what a skin cannot do today: glow that spills outside a
+Packet's cell clips at about 4% margin, `screen_bg` is tiled so a single
+perspective image needs a different stretch mode, and nothing can express motion.
+
+---
+
+## 8. For the next authorization
 
 **The presentation infrastructure is now complete.** Layout, graphics and text
 each have a contract, a validator, and a failure mode that is visible rather than
