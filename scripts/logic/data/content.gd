@@ -20,7 +20,7 @@ extends RefCounted
 ## of the content fingerprint — that is `DATA_SCHEMA_VERSION` plus the content
 ## rows — so bumping it cannot invalidate differential parity or reinterpret a
 ## battle. It identifies the BUILD; the fingerprint identifies the CONTENT.
-const GAME_VERSION := "beta-0.3.2.1"
+const GAME_VERSION := "beta-0.3.2.2"
 
 ## Bumped independently of the game version — it changes only when the shape of
 ## fingerprinted content changes. It is fingerprint input, so it must match the

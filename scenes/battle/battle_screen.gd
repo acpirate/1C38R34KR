@@ -14,6 +14,9 @@ extends Control
 
 signal battle_finished(winner: int)
 signal quit_requested
+## Raised by the debug skin control. The swap rebuilds this view, so the
+## screen cannot perform it on itself.
+signal skin_cycle_requested
 
 const PLAYBACK_SPEEDS := [1.0, 2.0, 4.0, 0.25]
 
@@ -26,6 +29,11 @@ var game: Game
 ## AN-008: this was the literal "Quick Match" for every battle, and had been
 ## wrong for every Run battle since Beta 0.2 landed the Run loop.
 var context_line := "Quick Match"
+
+## Set when this view is being rebuilt over a battle that is ALREADY under
+## way — a skin swap. Suppresses the opening phase in `_ready`: the state is
+## mid-battle, and starting a player phase again would advance the game.
+var resume_only := false
 
 var _stream: Datastream
 var _hacker_box: AvatarBox
@@ -71,7 +79,7 @@ func setup(s: GameState) -> void:
 func _ready() -> void:
 	_build_ui()
 	_refresh_all()
-	if game != null:
+	if game != null and not resume_only:
 		await _play(game.start_player_phase())
 
 
@@ -351,7 +359,12 @@ func _build_debug_bar() -> Control:
 	# The highest-leverage diagnostic: it turns "something looked wrong on the
 	# phone" into a seed that replays in the headless harness with a full trace.
 	var seed_label := Label.new()
+	# The skin rides along here rather than on its button: this row is already
+	# free to be as wide as it likes, and after a swap the whole view is
+	# rebuilt, so the name is correct without anything having to update it.
 	seed_label.text = "seed %d" % _battle_seed()
+	if Graphics.installed_packs().size() > 1:
+		seed_label.text += "   ·   skin %s" % Graphics.current_pack_name()
 	seed_label.add_theme_font_size_override("font_size", UiTheme.font_small())
 	seed_label.add_theme_color_override("font_color", PacketStyle.TEXT_FAINT)
 	box.add_child(seed_label)
@@ -368,8 +381,27 @@ func _build_debug_bar() -> Control:
 	bar.add_child(_debug_button("ovl", _debug_seed_overlays))
 	bar.add_child(_debug_button("win", func(): _force_outcome(Types.Side.ENEMY)))
 	bar.add_child(_debug_button("lose", func(): _force_outcome(Types.Side.PLAYER)))
-	bar.add_child(_debug_button("log", func():
-		_log_overlay.visible = not _log_overlay.visible))
+	bar.add_child(_debug_button("log", _toggle_log))
+
+	# Skin cycling belongs here as well as on the title screen: the board, the
+	# Program boxes and every overlay state are only visible in battle, so this
+	# is where a skin is actually judged.
+	#
+	# The button says "skin", not the pack's name, and AN-006 is the reason. A
+	# Button's minimum width is its text, so a name here would size this row
+	# differently for `v0` than for `terminal` — the same variable-width label
+	# that once pushed the seed past a 1080 px viewport and clipped the board.
+	# `clip_text` was tried and is worse: it holds the width but shows `ter`,
+	# and a name you cannot read is not an answer to "which skin is this".
+	# The name goes on the seed row instead, which exists for exactly this —
+	# a line whose width is nobody else's problem.
+	if Graphics.installed_packs().size() > 1:
+		bar.add_child(_debug_button("skin", func():
+			# Mid-playback this view is suspended inside `_play`'s await chain.
+			# Freeing it then resumes that coroutine on a freed node.
+			if not _playing:
+				skin_cycle_requested.emit()))
+
 	return box
 
 
@@ -378,6 +410,54 @@ func _debug_button(label: String, action: Callable) -> Button:
 	b.text = label
 	b.pressed.connect(action)
 	return b
+
+
+## The view-only state a GameState does not carry.
+##
+## A skin swap rebuilds this screen from the battle state, which restores
+## everything the game owns and nothing the VIEW owns. Without this the
+## playback speed would snap back to 1x and the log would close every time
+## the skin changed — small, but it makes back-to-back comparison useless,
+## which is the whole point of the control.
+## Opens or closes the event tail, painting the backlog on the way open.
+##
+## `_note` only writes to the overlay while it is ALREADY visible, so before
+## this the control opened an empty box and stayed empty until the next
+## event — worst exactly when it is wanted, on a battle that has gone quiet.
+func _toggle_log() -> void:
+	_log_overlay.visible = not _log_overlay.visible
+	if _log_overlay.visible:
+		_paint_log()
+
+
+func _paint_log() -> void:
+	_log_overlay.text = " → ".join(_recent_events)
+
+
+func view_prefs() -> Dictionary:
+	return {
+		"speed": _speed_index,
+		"log": _log_overlay != null and _log_overlay.visible,
+		"messages": _messages.duplicate(),
+		"events": _recent_events.duplicate(),
+	}
+
+
+## Applies `view_prefs` to a freshly built screen. Call AFTER it enters the
+## tree — `_build_ui` runs in `_ready` and creates the nodes this touches.
+func apply_view_prefs(p: Dictionary) -> void:
+	_speed_index = int(p.get("speed", 0))
+	_update_speed_button()
+	_messages.assign(p.get("messages", []))
+	_recent_events.assign(p.get("events", []))
+	# Same as the log tail: `_log` paints this label as it appends, so a
+	# restored backlog needs painting explicitly.
+	if _message != null:
+		_message.text = "
+".join(_messages)
+	if _log_overlay != null:
+		_log_overlay.visible = bool(p.get("log", false))
+		_paint_log()
 
 
 func _battle_seed() -> int:

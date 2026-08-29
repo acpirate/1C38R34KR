@@ -4,8 +4,15 @@ Captured 2026-08-28 on the Galaxy Tab A (1200×1920), `beta-0.3.2.1`. Debug
 builds, so the seed row and `1x / charge / ovl / win / lose / log` are visible
 and would not appear in a release.
 
-Six skins ship in one APK. A debug control on the title screen cycles them live;
-a pack is ~130 KB against a 56 MB APK, so the whole set costs about 1%.
+Six skins ship in one APK. A pack is ~130 KB against a 56 MB APK, so the whole
+set costs about 1%.
+
+**Two controls cycle them: one on the title screen and one in the battle debug
+bar** (`skin`, added in `beta-0.3.2.2`). The battle one is where a skin is
+actually judged — the board, the Program boxes, the charge bars and every
+overlay state exist only there, and the title screen shows none of them.
+Swapping mid-battle leaves the battle untouched; the current pack is named on
+the seed row. See `battle-skin-control.png`.
 
 Each was built from `authoring/<name>/` through the ordinary path — `check`,
 `build`, import, `fix_imports`, `gen_pack_resource` — and **no engine file was
@@ -21,6 +28,7 @@ for.
 | `phosphor.png` | `phosphor` | Monochrome CRT with scanlines |
 | `terminal.png` | `terminal` | Green terminal, brighter and higher contrast than `phosphor` |
 | `terminal-overlays.png` | `terminal` | Every overlay state at once — see below |
+| `battle-skin-control.png` | `terminal` | The battle-bar skin control, five swaps into one battle |
 | — | `v0` | The generated baseline, retained as fallback and template |
 
 ## What these confirm

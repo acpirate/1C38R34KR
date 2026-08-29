@@ -206,10 +206,16 @@ func _fresh_screen(compact := false) -> VBoxContainer:
 ##
 ## Cheaper than it sounds because the pack cache clears itself on load, and a
 ## pack is under half a megabyte.
-func _cycle_skin() -> void:
+## Loads the next installed pack and rebuilds the Theme. Returns false when
+## there is only one pack and there is nothing to cycle to.
+##
+## Shared by the title control and the battle debug bar so both walk the same
+## order — cycling forward in battle and then again on the title should not
+## skip a skin.
+func _advance_pack() -> bool:
 	var packs := Graphics.installed_packs()
 	if packs.size() < 2:
-		return
+		return false
 
 	var here := Array(packs).find(Graphics.current_pack_name())
 	var next: String = packs[(here + 1) % packs.size()]
@@ -219,7 +225,50 @@ func _cycle_skin() -> void:
 
 	# The Theme holds textures from the pack that just went away.
 	theme = UiTheme.build()
-	_show_title(Content.fingerprint())
+	return true
+
+
+func _cycle_skin() -> void:
+	if _advance_pack():
+		_show_title(Content.fingerprint())
+
+
+## Swaps the skin without disturbing the battle underneath it.
+##
+## The title screen can simply rebuild itself; a battle cannot, because its
+## screen is mid-run. What makes this safe is layer purity: every fact about the
+## battle lives in the GameState, `Game` holds nothing but a reference to it,
+## and the whole scene layer is a view derived in `_build_ui` / `_refresh_all`.
+## So discarding the view and building a new one over the SAME state is lossless
+## by construction — and it re-fetches every texture, which a targeted refresh
+## would have to enumerate and could silently miss.
+##
+## Two things it has to get right, neither of them obvious:
+##
+## 1. `_ready` normally opens a player phase. On a rebuild the battle is already
+##    under way, so `resume_only` suppresses it — otherwise swapping a skin
+##    would advance the game.
+## 2. The old screen is removed from the tree BEFORE it is freed. `queue_free`
+##    alone leaves it drawing over the new one until the end of the frame.
+func _cycle_battle_skin() -> void:
+	var old := _content as BattleScreen
+	if old == null:
+		return
+
+	# Captured before the view goes away. The GameState is RefCounted, so it
+	# outlives the screen that was showing it.
+	var battle := old.state
+	var context := old.context_line
+	var prefs := old.view_prefs()
+
+	if not _advance_pack():
+		return
+
+	_content = null
+	remove_child(old)
+	old.queue_free()
+
+	_mount_battle(battle, context, true, prefs)
 
 
 ## The wordmark, as art rather than as text (§12).
@@ -779,11 +828,22 @@ func _enter_battle(state: GameState, context: String) -> void:
 
 	_finished_state = state
 
+	_mount_battle(state, context, false, {})
+
+
+## Builds the battle view over a GameState and wires it up.
+##
+## Split out of `_enter_battle` so a skin swap can rebuild the VIEW without
+## re-entering the battle: `resume` is the difference between starting a battle
+## and re-showing one already in progress.
+func _mount_battle(state: GameState, context: String, resume: bool, prefs: Dictionary) -> void:
 	var screen := BattleScreen.new()
 	screen.context_line = context
+	screen.resume_only = resume
 	screen.setup(state)
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	screen.battle_finished.connect(_on_battle_finished)
+	screen.skin_cycle_requested.connect(_cycle_battle_skin)
 	screen.quit_requested.connect(func():
 		# The save is written by the battle screen; this only returns to the
 		# title, which then offers Continue.
@@ -792,6 +852,11 @@ func _enter_battle(state: GameState, context: String) -> void:
 		_show_title(Content.fingerprint()))
 	_content = screen
 	add_child(screen)
+
+	# After `add_child`, because `_build_ui` runs in `_ready` and creates the
+	# nodes these preferences touch.
+	if not prefs.is_empty():
+		screen.apply_view_prefs(prefs)
 
 
 func _on_battle_finished(winner: int) -> void:
