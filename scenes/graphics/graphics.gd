@@ -14,10 +14,16 @@ extends RefCounted
 
 const DEFAULT_PACK := "res://assets/packs/v0/pack.tres"
 
+## Where packs live. A directory here holding a `pack.tres` is a skin.
+const PACKS_DIR := "res://assets/packs"
+
 static var _pack: GraphicsPack = null
 static var _palette: Array[Color] = []
 static var _missing: Texture2D = null
 static var _problems := PackedStringArray()
+
+## The loaded pack's directory name, for the skin picker to display.
+static var _current_name := ""
 
 ## Memoised 9-slice boxes, keyed on [texture, margin]. Cleared with the pack.
 static var _boxes := {}
@@ -46,11 +52,52 @@ static func load_pack(path := DEFAULT_PACK) -> PackedStringArray:
 		return _problems
 
 	_pack = res
+	# "…/packs/<name>/pack.tres" -> "<name>"
+	_current_name = path.get_base_dir().get_file()
 	for key in _pack.validate():
 		_problems.append("graphics: missing required asset '%s'" % key)
 
 	_load_palette()
 	return _problems
+
+
+## Every skin installed in this build, by name, sorted.
+##
+## Discovered rather than listed: adding a skin should mean adding a directory,
+## not editing code. A directory counts as a skin when it holds a `pack.tres` —
+## an authoring bundle or a half-built pack is skipped rather than offered and
+## then failing to load.
+##
+## `DirAccess` reads the export's file table, so this works in a shipped build
+## as well as in the project directory — which is the kind of claim this project
+## has learned to verify on a device rather than assume.
+static func installed_packs() -> PackedStringArray:
+	var out := PackedStringArray()
+	var dir := DirAccess.open(PACKS_DIR)
+	if dir == null:
+		return out
+
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while name != "":
+		if dir.current_is_dir() and not name.begins_with("."):
+			if ResourceLoader.exists("%s/%s/pack.tres" % [PACKS_DIR, name]):
+				out.append(name)
+		name = dir.get_next()
+	dir.list_dir_end()
+
+	out.sort()
+	return out
+
+
+## The pack currently loaded, by name.
+static func current_pack_name() -> String:
+	return _current_name
+
+
+## Loads a skin by name rather than by path.
+static func load_pack_named(name: String) -> PackedStringArray:
+	return load_pack("%s/%s/pack.tres" % [PACKS_DIR, name])
 
 
 ## Problems from the last `load_pack`, for a caller that wants them later.

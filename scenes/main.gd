@@ -190,6 +190,38 @@ func _fresh_screen(compact := false) -> VBoxContainer:
 	return _root
 
 
+## Switches to the next installed skin, live (beta 0.3.2).
+##
+## Debug-only, and deliberately on the title screen: it rebuilds the Theme,
+## which every screen inherits, so it must happen where no battle is in flight.
+##
+## Three things have to move together, and missing any one leaves a half-swapped
+## UI that looks like a rendering bug:
+##
+##   1. the pack — textures and the palette
+##   2. the Theme — `UiTheme.build()` BAKES pack textures into its styleboxes,
+##      so a stale Theme keeps drawing the old skin's buttons forever
+##   3. the screen — built imperatively, so it has to be reconstructed to pick
+##      up either of the above
+##
+## Cheaper than it sounds because the pack cache clears itself on load, and a
+## pack is under half a megabyte.
+func _cycle_skin() -> void:
+	var packs := Graphics.installed_packs()
+	if packs.size() < 2:
+		return
+
+	var here := Array(packs).find(Graphics.current_pack_name())
+	var next: String = packs[(here + 1) % packs.size()]
+
+	for problem in Graphics.load_pack_named(next):
+		push_error(problem)
+
+	# The Theme holds textures from the pack that just went away.
+	theme = UiTheme.build()
+	_show_title(Content.fingerprint())
+
+
 ## The wordmark, as art rather than as text (§12).
 ##
 ## Sized as a FRACTION of the panel it sits in with a ceiling, never a fixed
@@ -304,6 +336,14 @@ func _show_title(fingerprint: String) -> void:
 	_button_ref("GAME_UI_TITLE_QUICK_RANDOM", _start_random_quick_match)
 
 	_divider()
+
+	# Debug-only skin picker. Present only when there is something to switch
+	# between, so a single-skin build shows no dead control.
+	if OS.is_debug_build() and Graphics.installed_packs().size() > 1:
+		var skin := _button(
+			"[debug] skin: %s" % Graphics.current_pack_name(), _cycle_skin
+		)
+		skin.custom_minimum_size.y = UiTheme.px(34)
 
 	var stamp := Label.new()
 	# The fingerprint on the title screen is deliberate: it identifies exactly

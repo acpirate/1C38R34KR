@@ -720,3 +720,79 @@ Worth noting for scope: **the bundle boundary is now the third of these seams**
 this project has drawn, after the graphics pack contract and the text sheets.
 Each one converted "remember to do the right thing" into "the tool does it, and
 `--check` says when it hasn't".
+
+---
+
+## AN-015 — The jig is deferred, and its justification has changed
+
+**Director decision, 2026-08-28, after the graphics and text passes.**
+
+The graphics-jig iteration was named as the next planned build in the 0.3.1
+authorization §19. **It is deferred**, and the reasoning is worth recording
+because the case for it is now a *different* case than the one originally made.
+
+### The original justification no longer holds
+
+The jig was justified as offline asset iteration — trying art on a PC without
+spending a build cycle. Two things undercut that:
+
+- **A build is cheap.** Export plus install is about three minutes of wall clock
+  and near-zero agent tokens. The expensive part of a device check is driving
+  and verifying it, which a jig relocates rather than removes.
+- **A skin switcher covers the coarse case.** Built in this session: packs are
+  discovered at runtime, and a debug control on the title screen cycles them
+  live. Multiple skins ship in one build — a pack is 471 KB against a 50 MB
+  APK — so comparing directions no longer needs a rebuild at all.
+
+### What actually needs a jig
+
+**Work that cannot be delegated to an agent at all.** That is a much sharper
+criterion than "work that is slow", and it produces a much shorter list:
+
+| Work | Can an agent judge it? |
+| --- | --- |
+| Asset colour, shape, contrast | Yes — from a screenshot |
+| Layout, fit, overflow | Yes — from a screenshot |
+| **Animation timing and feel** | **No** — a still cannot carry motion |
+| **VFX intensity** | **No** — "too much / too little" is a felt judgement |
+| **Audio mix, timing, texture** | **No, and not even partially** |
+
+**Audio is the strongest argument, and the director's point.** Everything else on
+that list, an agent can at least approximate — frames can be captured, a
+sequence can be reasoned about. Audio it cannot touch at all: I cannot listen. A
+sound is not slow for me to evaluate, it is *impossible*, and no amount of
+tooling on this side changes that.
+
+So the jig's real purpose is **a harness for the judgements only a human can
+make**, and its value scales with how much of the game is made of those. Today
+that is zero: there is no animation system, no particles, no shaders, no audio —
+all explicitly out of scope in 0.3.1, and none of it added since.
+
+### Sequencing
+
+Build the jig **after** the systems it would preview exist, and after content, so
+the effort level the presentation warrants can be judged against a game that is
+actually there rather than a skeleton.
+
+When it is specified, specify it around the undelegatable work:
+
+- play a real battle, not a static preview — timing needs the game running
+- scrub, slow, and repeat a single effect
+- adjust intensity and timing without a rebuild
+- and for audio, the same, with a mix
+
+An asset previewer would be the wrong tool built on a justification that has
+already expired.
+
+### What was built instead
+
+`Graphics.installed_packs()` / `load_pack_named()`, and a debug skin picker on
+the title screen. A live swap moves three things together — the pack, the Theme
+(which bakes pack textures into its styleboxes), and the current screen — and
+missing any one leaves a half-swapped UI that reads as a rendering bug.
+
+A second skin, `phosphor`, was generated from `03-terminal-phosphor.jpg` through
+the authoring bundle to prove the whole path: recolour a bundle, `check`,
+`build`, import, `fix_imports`, `gen_pack_resource`. It touched no engine file
+and the palette validator caught a malformed hex value in it, which is the
+framework doing its job on the first real use.

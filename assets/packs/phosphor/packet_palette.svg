@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns="http://www.w3.org/2000/svg"
+   version="1.1"
+   width="720"
+   height="500"
+   viewBox="0 0 720 500">
+
+  <title>1C38R34KR — Packet palette</title>
+
+  <!--
+    THE SIX PACKET COLOURS. This file is the authoritative source; the game
+    reads the `fill` of each swatch by its `id` at startup.
+
+    RULES FOR EDITING
+      - Change the FILL of a swatch. That is the whole workflow.
+      - Do NOT rename an id. The id is how the game finds the colour.
+      - Do NOT add or remove swatches. Six, exactly, and only these six are
+        externally configurable — every other colour in the game is authored
+        into its PNG.
+      - Order below is the PacketColor enum order, and that order is gameplay
+        identity: a System's weak set is derived as the enum-order complement
+        of its strong set, so the INDEX under each name matters. Moving a
+        colour to a different index silently rewrites every weakness in the
+        game. Recolour in place; never reorder.
+
+    The backdrop is the game's own cell colour, so the swatches are judged in
+    roughly the context they will be seen in.
+  -->
+
+  <rect x="0" y="0" width="720" height="500" fill="#1b1b22"/>
+
+  <text x="40" y="52" font-family="sans-serif" font-size="26" font-weight="bold" fill="#eeeeee">
+    Packet palette
+  </text>
+  <text x="40" y="78" font-family="sans-serif" font-size="14" fill="#9a9aa8">
+    Six colours, in PacketColor enum order. Edit the fills; never the ids or the order.
+  </text>
+
+  <!-- row 1 -->
+  <g id="swatch_red">
+    <rect id="packet_red" x="40" y="110" width="180" height="120" fill="#ff5a4a"/>
+    <text x="40" y="256" font-family="sans-serif" font-size="17" font-weight="bold" fill="#eeeeee">0 · RED</text>
+    <text x="40" y="278" font-family="monospace" font-size="14" fill="#9a9aa8">packet_red</text>
+  </g>
+
+  <g id="swatch_yellow">
+    <rect id="packet_yellow" x="270" y="110" width="180" height="120" fill="#e8ff4a"/>
+    <text x="270" y="256" font-family="sans-serif" font-size="17" font-weight="bold" fill="#eeeeee">1 · YELLOW</text>
+    <text x="270" y="278" font-family="monospace" font-size="14" fill="#9a9aa8">packet_yellow</text>
+  </g>
+
+  <g id="swatch_magenta">
+    <rect id="packet_magenta" x="500" y="110" width="180" height="120" fill="#ff6ad5"/>
+    <text x="500" y="256" font-family="sans-serif" font-size="17" font-weight="bold" fill="#eeeeee">2 · MAGENTA</text>
+    <text x="500" y="278" font-family="monospace" font-size="14" fill="#9a9aa8">packet_magenta</text>
+  </g>
+
+  <!-- row 2 -->
+  <g id="swatch_green">
+    <rect id="packet_green" x="40" y="320" width="180" height="120" fill="#54ff92"/>
+    <text x="40" y="466" font-family="sans-serif" font-size="17" font-weight="bold" fill="#eeeeee">3 · GREEN</text>
+    <text x="40" y="488" font-family="monospace" font-size="14" fill="#9a9aa8">packet_green</text>
+  </g>
+
+  <g id="swatch_cyan">
+    <rect id="packet_cyan" x="270" y="320" width="180" height="120" fill="#4ae8ff"/>
+    <text x="270" y="466" font-family="sans-serif" font-size="17" font-weight="bold" fill="#eeeeee">4 · CYAN</text>
+    <text x="270" y="488" font-family="monospace" font-size="14" fill="#9a9aa8">packet_cyan</text>
+  </g>
+
+  <g id="swatch_blue">
+    <rect id="packet_blue" x="500" y="320" width="180" height="120" fill="#7a6aff"/>
+    <text x="500" y="466" font-family="sans-serif" font-size="17" font-weight="bold" fill="#eeeeee">5 · BLUE</text>
+    <text x="500" y="488" font-family="monospace" font-size="14" fill="#9a9aa8">packet_blue</text>
+  </g>
+
+</svg>
