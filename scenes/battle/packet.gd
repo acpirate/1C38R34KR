@@ -13,7 +13,12 @@ extends Control
 
 ## Overlay type names, in `Tile.Special.Type` order — the order the pack's mark
 ## and ring arrays are built in, so an index here is an index there.
-const TYPE_NAMES := ["bomb", "buff", "shield", "override"]
+##
+## Taken from the logic layer rather than restated. It WAS restated, and beta
+## 0.4 added two types: a private copy would have left every Capacitor and
+## Logic Bomb drawing as a Bomb, since `find` returns -1 and the fallback is
+## index 0. One list cannot disagree with itself.
+const TYPE_NAMES := Resolve.SPECIAL_TYPE_NAMES
 
 ## The overlay's authored coordinate space, as a multiple of the badge radius.
 ## Mirrors `tools/gen_assets.gd`: badge and mark are separate textures drawn into
@@ -43,6 +48,17 @@ var targeting := false:
 		targeting = v
 		queue_redraw()
 
+## Which Packet axis ECHOFALL is hiding, or -1 for none (beta 0.4 §8.2).
+##
+## PRESENTATION ONLY. `view` still carries the true colour and shape, and every
+## rule in the logic layer keeps reading them — this changes what is painted and
+## nothing else, which is why it is a property of the view rather than a
+## transformation applied to the data.
+var hidden_axis := -1:
+	set(v):
+		hidden_axis = v
+		queue_redraw()
+
 
 func _draw() -> void:
 	var rect := Rect2(Vector2.ZERO, size)
@@ -61,7 +77,15 @@ func _draw() -> void:
 		# A neutral has no colour and no shape, so it gets neither — it is
 		# static. Still drawn procedurally (D-034): the noise is seeded per cell
 		# so no two neutrals match, and a sprite cannot vary per cell.
+		#
+		# Concealment never touches a neutral: §8.2 requires neutrals to stay
+		# recognisable as neutral rather than start looking matchable.
 		_draw_static(cell)
+	elif hidden_axis == Types.ConcealAxis.SHAPE:
+		# Shape hidden: the static treatment, but carrying the Packet's REAL
+		# colour. That is what keeps it distinguishable from a neutral, which
+		# draws the same noise with no colour at all.
+		_draw_static(cell, Graphics.palette(int(view.get("color", 0))))
 	else:
 		# The Packet IS the coloured glyph: no tile field behind it, sized so the
 		# silhouette reaches near the cell edge. A white glyph on a coloured
@@ -74,10 +98,14 @@ func _draw() -> void:
 		# six glyphs cover thirty-six Packets.
 		var radius := size.x * 0.46
 		var glyph := Rect2(rect.get_center() - Vector2(radius, radius), Vector2(radius, radius) * 2.0)
-		draw_texture_rect(
-			Graphics.glyph(int(view.get("shape", 0))), glyph, false,
-			Graphics.palette(int(view.get("color", 0))),
+		# Colour hidden: the real glyph, modulated white. The texture's white
+		# core and grey outline survive, so the Packet still reads as a Packet
+		# and its shape is still matchable by eye — only the axis is gone.
+		var tint := (
+			PacketStyle.CONCEALED_AXIS if hidden_axis == Types.ConcealAxis.COLOR
+			else Graphics.palette(int(view.get("color", 0)))
 		)
+		draw_texture_rect(Graphics.glyph(int(view.get("shape", 0))), glyph, false, tint)
 
 	if view.has("special"):
 		_draw_overlay(rect, view["special"])
@@ -94,8 +122,11 @@ func _draw() -> void:
 ## where there is none, and the board redraws constantly during playback. This
 ## uses its own arithmetic rather than `Rng` — nothing here may draw from the
 ## game's stream, or the renderer would be able to change the battle.
-func _draw_static(area: Rect2) -> void:
-	draw_rect(area, PacketStyle.NEUTRAL_STATIC_DARK, true)
+## `tint` multiplies both static tones. White — the default — is the ordinary
+## neutral. ECHOFALL passes a Packet's real colour so a shape-concealed Packet
+## is visibly a coloured thing rather than a neutral.
+func _draw_static(area: Rect2, tint := Color.WHITE) -> void:
+	draw_rect(area, PacketStyle.NEUTRAL_STATIC_DARK * tint, true)
 	var steps := 6
 	var step := area.size / float(steps)
 	var h := (cell.x * 73856093) ^ (cell.y * 19349663)
@@ -103,7 +134,7 @@ func _draw_static(area: Rect2) -> void:
 		for x in steps:
 			h = (h * 1103515245 + 12345) & 0x7fffffff
 			if h % 5 < 2:
-				draw_rect(Rect2(area.position + Vector2(x, y) * step, step), PacketStyle.NEUTRAL_STATIC_LIGHT, true)
+				draw_rect(Rect2(area.position + Vector2(x, y) * step, step), PacketStyle.NEUTRAL_STATIC_LIGHT * tint, true)
 
 
 ## Overlays read as a badge CENTRED in the glyph, not a full-Packet treatment:

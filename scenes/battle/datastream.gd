@@ -17,6 +17,16 @@ signal packet_dragged(from_cell: Vector2i, to_cell: Vector2i)
 const GAP_RATIO := 0.06
 
 var _cells: Array[PacketView] = []
+
+## ECHOFALL's hidden axis, or -1. Set by the battle screen from battle state and
+## pushed to every cell, including cells created or refilled later.
+var hidden_axis := -1:
+	set(v):
+		if hidden_axis == v:
+			return
+		hidden_axis = v
+		for c in _cells:
+			c.hidden_axis = v
 var _selected := Vector2i(-1, -1)
 var _drag_origin := Vector2i(-1, -1)
 var _drag_start := Vector2.ZERO

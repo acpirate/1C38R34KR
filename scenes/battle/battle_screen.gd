@@ -627,6 +627,16 @@ func _play_one(ev: Dictionary) -> void:
 		Types.EVT.SPAWN:
 			await _animate(_stream.spawn(ev["tiles"], 0.13 / speed), 0.22 / speed)
 
+		# ECHOFALL hiding or restoring an axis. Played as its own beat rather
+		# than folded into the next refresh: the whole board changes appearance
+		# at once, and a player who does not SEE it happen reads the masked
+		# board as a rendering fault instead of as the Boss acting.
+		Types.EVT.BOSS_MECHANIC:
+			var kind := str(ev.get("kind", ""))
+			if kind == "AXIS_CONCEALED" or kind == "AXIS_REVEALED":
+				_refresh_board()
+				await _pause(0.30 / speed)
+
 		# A wholesale replacement — reshuffle or Shake. There is no motion to
 		# describe, so it snaps and holds long enough to be noticed.
 		Types.EVT.BOARD:
@@ -876,6 +886,10 @@ func _refresh_all() -> void:
 
 
 func _refresh_board() -> void:
+	# Concealment is pushed BEFORE the grid so a refreshed cell is never painted
+	# once unmasked and then again masked. ECHOFALL is the only Boss that ever
+	# sets this; every other battle leaves it at -1 and pays one assignment.
+	_stream.hidden_axis = state.hidden_axis
 	_stream.set_grid(Resolve._grid_view(state.board))
 	_stream.set_selected(_selected)
 

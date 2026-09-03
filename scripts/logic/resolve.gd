@@ -542,7 +542,10 @@ static func _refill_constrained(state: GameState, cells: Array, gen: BoardOps.Ti
 		state.board[p.y][p.x] = BoardOps.random_tile(gen)
 
 
-const SPECIAL_TYPE_NAMES := ["bomb", "buff", "shield", "override"]
+## In `Tile.Special.Type` order. The renderer indexes a pack's mark array by
+## the position a name has here, so this list, the enum, and every pack's
+## `overlay_mark` are one ordering wearing three hats.
+const SPECIAL_TYPE_NAMES := ["bomb", "buff", "shield", "override", "capacitor", "logic_bomb"]
 
 
 ## A Packet as the renderer and the trace see it.

@@ -130,6 +130,13 @@ const OVERLAY_TINT: Array[Color] = [
 	Color("ff7a1f"),  ## LOGIC_BOMB — hazard orange, distinct from BOMB's red
 ]
 
+## What a Packet is painted when ECHOFALL hides the COLOUR axis (beta 0.4 §8.2).
+##
+## White rather than a grey: the glyph texture carries its own darker outline,
+## so modulating by white leaves a legible shape with an edge, where a mid grey
+## would flatten the outline into the fill.
+const CONCEALED_AXIS := Color.WHITE
+
 ## The diagnostic checker a missing graphics asset resolves to (beta 0.3.1).
 ##
 ## Deliberately hideous. §9.4 requires an element that lost its asset to LOOK
