@@ -1236,3 +1236,102 @@ unsafe in any pipeline that passes through a spreadsheet.
 
 The exporter now preserves whitespace exactly rather than stripping it, so it
 cannot compound the problem — but it cannot undo the import either. See AN-011.
+
+---
+
+## D-047 — "Boss special" means any ENEMY-owned overlay
+
+**Beta 0.4 §6.3/§7.2. Director, 2026-09-02.**
+
+CAPACITOR and LOGIC BOMB placement prefer Packets carrying "no Boss special"
+and may overwrite one only through the fallback pool. The authorization never
+defines the term.
+
+It means **any overlay owned by the enemy side** — not merely the Boss-mechanic
+types. So the SHIELD placed by the Boss's own SHIELDER protects its Packet from
+a CAPACITOR exactly as an OVERRIDE does.
+
+That is the definition `Boss.override_targets` has used since 0.3, and all four
+Bosses field a SHIELDER, so the alternative reading would have Boss mechanics
+routinely eating their own Programs' output. Stated once in
+`Boss.has_boss_special` so the three mechanics cannot drift apart.
+
+---
+
+## D-048 — A Logic Bomb may not be armed on a neutral Packet
+
+**Beta 0.4 §7.2. Director, 2026-09-02.**
+
+§7.2 says "Packets in the top row" without excluding neutrals, where §6.3 states
+the exclusion outright for CAPACITOR.
+
+Neutrals are excluded, matching every other placement rule in the game — the
+silence is an omission, not an intent. A bomb riding a Packet that can never be
+Synced would descend by gravity alone, and no other overlay in the game sits on
+a neutral.
+
+---
+
+## D-049 — Only a manual swap ends ECHOFALL's concealment
+
+**Beta 0.4 §8.3/§8.4. Director, 2026-09-02.**
+
+§8.3 says concealment lasts "until the Hacker makes the first board Sync/slice
+attempt", and also that it persists while the Hacker fires Programs or the Deck
+Function "through any resulting board changes". Those conflict for a
+Program-driven line slice, which is a slice but not a manual move.
+
+Only an adjacent swap through `Game.attempt_swap` reveals. Programs, Deck
+Functions, and the slices and transforms they cause all resolve while still
+concealed. A fumbled non-adjacent drag is not an attempt and never fires
+BRAINSCRAMBLE.
+
+---
+
+## D-050 — RAHNDAHL's discharge is attributed to the ATTACKER bucket
+
+**Beta 0.4 §6.2.**
+
+The exponential tick is not an authored Function, so unlike every other Boss
+payload it has no `fn_id` and no Effect plan. §6.2 requires it to be an ordinary
+damage instance and explicitly forbids a new damage pipeline.
+
+It therefore calls `Resolve.deal_damage` with `DamageSource.ATTACKER` and no
+`program_id`, exactly as ODANSHAY's CODESHATTER already lands. A `BOSS_MECHANIC`
+damage source was considered and rejected: `Metrics` buckets unknown sources
+into `bomb_damage` through a `_:` default, so adding one silently mislabels it
+unless a metrics field is added too — schema churn for one rule, in a build that
+was told not to build pipelines.
+
+The cost is that a Boss's rule damage reads as "attacker damage" in the battle
+report. Recorded rather than hidden.
+
+---
+
+## D-051 — The whole-content fingerprint is beta-authored
+
+**Beta 0.4 §16.**
+
+`tests/fixtures/content.json` pinned `49c229cd-8ma`, generated from the alpha.
+Beta 0.4 authors four Bosses and twenty-two Functions where the alpha has one
+and twenty, so the alpha can no longer be the oracle for that hash.
+
+The fingerprint moves to `83434613-96w` and is now pinned from the beta's own
+load; `bos` and `fnc` rows in `csv_rows.json` likewise come from the beta's
+export. Everything else in those fixtures stays alpha-derived, and the issue and
+error-count expectations are unchanged.
+
+The test's name changed with its meaning — "fingerprint matches the pinned
+content", not "matches the alpha". It still catches accidental content drift
+exactly as before; it simply no longer claims agreement it cannot have.
+
+---
+
+## D-052 — Save schema 3
+
+**Beta 0.4 §15.**
+
+The envelope gained `boss_phase` and `hidden_axis`. A schema-2 save has neither,
+and resuming an ECHOFALL battle with concealment silently cleared would change
+what the next move means — so it is rejected rather than repaired, which is also
+the standing pre-release position on saves across a version (D-030).

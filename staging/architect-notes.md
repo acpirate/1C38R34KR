@@ -994,3 +994,80 @@ pass was authorized for.
 Group it with AN-015 and AN-016 — one art-phase requirement covering
 composition, frame geometry and VFX/audio, with a jig that can preview all
 three, rather than three separate ones.
+
+---
+
+## AN-018 — The logic layer writes player-facing prose, and gets it wrong
+
+**Found during beta 0.4 device verification. Pre-existing; not introduced by
+this build, and deliberately not fixed inside it.**
+
+A Boss firing a support Function produces two log lines:
+
+```
+ECHOFALL fires BRAINSCRAMBLE
+System fired BRAINSCRAMBLE
+```
+
+The first comes from `EVT.ABILITY`, rendered by the view, which resolves the
+opponent's name correctly. The second comes from `Game._cast_attack`, which
+builds its own message from:
+
+```gdscript
+var who := "Hacker" if owner == Types.Side.PLAYER else "System"   # game.gd:416
+```
+
+Two problems in one line. It is a **hardcoded player-facing literal in the logic
+layer**, which the 0.3.2 text framework exists to prevent (D-041). And it is
+**factually wrong in a Boss battle** — `battle_screen.gd:749` already says so in
+a comment: *"'System fires CODESHATTER' is simply false."* That was fixed in the
+battle header (P-042) and on the result screen (§16), and survived here because
+a log line is prose and nothing asserts prose.
+
+Beta 0.4 makes it more visible rather than worse: there are now five Boss
+support Functions instead of three, and RAHNDAHL and ECHOFALL fire theirs far
+more often than ODANSHAY fires CODESHATTER.
+
+### Why it was left alone
+
+The clean fix is for the logic layer to stop emitting prose at all — to emit the
+side and let the view name it, as `EVT.ABILITY` already does. That is a
+refactor across every `MSG` the logic layer produces, which beta 0.4 was
+explicitly told not to undertake (§19, §20). Half-fixing it — special-casing the
+Boss inside `_cast_attack` — would leave the literal in place and add a second
+naming path.
+
+### For the requirement
+
+Worth pairing with a rule that makes it stick: **`scripts/logic/` should contain
+no player-facing string.** That is testable — a grep-shaped test in the manner
+of `test_layer_purity.gd` — where the current convention is only a habit. The
+duplicate line above is one symptom; the interesting question is how many others
+there are, and a test answers it once instead of a person answering it per
+build.
+
+---
+
+## AN-019 — `check_assets.gd` examines one pack of six
+
+**Beta 0.4.**
+
+The structural checker — the one that catches a glyph whose two tones collapsed,
+an "alpha" asset that is opaque, a ring that is solid — is hardcoded to
+`res://assets/packs/v0`.
+
+That was proportionate when v0 was the only pack. With six installed it means
+five skins ship without any of those checks, and the authorization's requirement
+that "every currently installed skin must remain complete" is met only by
+`asset_bundle.py check` (presence and dimensions) and by `gen_pack_resource`
+refusing to write an incomplete `pack.tres`. Tone, coverage and distinctness are
+verified for v0 alone.
+
+One real hole WAS closed in 0.4: `_check_marks` kept a private list of four
+special-type names while the packs shipped six, so neither new mark was examined
+even in v0. It now reads `Resolve.SPECIAL_TYPE_NAMES`.
+
+Extending the tool to take `--pack <name>` / `--all` is small and was attempted;
+it is recorded here rather than rushed into a content build's closeout. Worth
+doing before the art phase, when hand-authored packs start arriving faster than
+anyone will inspect them.
