@@ -58,13 +58,20 @@ func _test_ice_ladder(t: TestCase) -> void:
 		"the step-4 modifier is not applied on top of the Boss base",
 		Run.resolve_run_ice(settings, Types.OpponentKind.BOS, boss_id, 4) != boss_base + 150
 	)
-	# Worth knowing when reading these numbers: ODANSHAY's authored 250 is
-	# EXACTLY what a 100-base System would reach through the step-4 modifier, so
-	# the correct and the double-counting-free-but-wrong paths agree here by
-	# coincidence of authoring. Only the 400 case distinguishes them, which is
-	# why the check above is phrased against the Boss's own base rather than
-	# against the System ladder.
-	t.eq("the authored Boss ICE coincides with the step-4 ladder value", boss_base, base + 150)
+	# This USED to be a coincidence worth flagging: ODANSHAY's authored 250 was
+	# exactly what a 100-base System reaches through the step-4 modifier, so a
+	# Boss that wrongly took the System ladder produced the right number anyway
+	# and only the 400 case could tell the paths apart.
+	#
+	# Beta 0.4 raised every Boss to 350, and the coincidence is gone. That makes
+	# the assertion above load-bearing rather than accidentally satisfied, and
+	# this check now pins the SEPARATION instead — if a future authoring choice
+	# reintroduces the collision, the earlier assertion silently stops proving
+	# anything and this is what says so.
+	t.check(
+		"the authored Boss ICE no longer collides with the step-4 ladder value",
+		boss_base != base + 150
+	)
 
 	# Normal LINK OFF replaces both, for every encounter, and is never combined
 	# with the base or the step modifier.

@@ -54,7 +54,7 @@ func _test_resolved_content(t: TestCase) -> void:
 	var deck := Content.deck(Content.DEFAULT_DECK_ID)
 	t.check("Deck carries its resolved Function", (deck["fn"] as Dictionary).has("plan"))
 
-	t.eq("fingerprint travels with the content", Content.fingerprint(), "49c229cd-8ma")
+	t.eq("fingerprint travels with the content", Content.fingerprint(), "83434613-96w")
 
 
 ## THRESHOLD contributes nothing, so a battle on it has only the Hacker's own

@@ -532,7 +532,7 @@ func _test_opponent_resolution(t: TestCase) -> void:
 	var resolved := Content.opponent_of_identity(boss_state.identity)
 	t.check("a Boss identity resolves", not resolved.is_empty())
 	t.eq("to ODANSHAY", str(resolved["name"]), str(Content.boss(Content.BOSS_MECHANIC_BOSS_ID)["name"]))
-	t.eq("with its authored ICE", int(resolved["base_ice"]), 250)
+	t.eq("with its authored ICE", int(resolved["base_ice"]), 350)
 
 	# The same call must still work for an ordinary System.
 	var qm := Session.create_quick_match("SYS_01", "HST_02", 1, Session.default_build())

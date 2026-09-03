@@ -53,7 +53,7 @@ func _test_function_reader(t: TestCase) -> void:
 	loader.read_functions()
 
 	_report_unexpected(t, loader, "Function dataset")
-	t.eq("Function rows read", loader.function_rows.size(), 20)
+	t.eq("Function rows read", loader.function_rows.size(), 22)
 
 	var ids := []
 	for r in loader.function_rows:
@@ -72,7 +72,7 @@ func _test_function_reader(t: TestCase) -> void:
 	t.eq_seq(
 		"zero-cost Functions are the PASSIVE and mechanic payloads",
 		zero_cost,
-		["FNC_016", "FNC_017", "FNC_018", "FNC_019", "FNC_020"],
+		["FNC_016", "FNC_017", "FNC_018", "FNC_019", "FNC_020", "FNC_021", "FNC_022"],
 	)
 
 	# The discrete parameter and axis columns are captured raw; contract
@@ -146,14 +146,14 @@ func _test_identity_datasets(t: TestCase) -> void:
 		printerr("        %s" % DataIssues.format(e))
 
 	t.eq("Programs", loader.program_rows.size(), 14)
-	t.eq("Functions", loader.function_rows.size(), 20)
+	t.eq("Functions", loader.function_rows.size(), 22)
 	t.eq("PASSIVEs", loader.passive_rows.size(), 9)
 	t.eq("HOSTs", loader.host_rows.size(), 5)
 	t.eq("UPGRADEs", loader.upgrade_rows.size(), 4)
 	t.eq("Hackers", loader.hacker_rows.size(), 1)
 	t.eq("Decks", loader.deck_rows.size(), 1)
 	t.eq("Systems", loader.system_rows.size(), 3)
-	t.eq("Bosses", loader.boss_rows.size(), 1)
+	t.eq("Bosses", loader.boss_rows.size(), 4)
 
 	# Every required record is present under its stable ID.
 	loader.check_required_ids(loader.hacker_rows, Vocab.REQUIRED_HAK_IDS, DataIssues.DATASET_HACKERS, "hak.csv")
@@ -317,7 +317,9 @@ func _test_fingerprint_match(t: TestCase, loader: ContentLoader) -> void:
 
 	var actual := loader.compute_fingerprint()
 	var expected := str(fixture["fingerprint"])
-	t.eq("fingerprint matches the alpha", actual, expected)
+	# Beta-authored since 0.4 — see the fixture's comment. It still pins the
+	# content exactly; it just no longer claims the alpha agrees about Bosses.
+	t.eq("fingerprint matches the pinned content", actual, expected)
 
 	if actual != expected:
 		# The suffix is the canonical string's length in base36, so comparing it

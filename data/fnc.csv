@@ -19,3 +19,5 @@ FNC_017,SNEAK,0,EFFECT_TRANSFORM,turn other packets into magenta,2,,,,,,ALL,MAG,
 FNC_018,DATABEND,0,EFFECT_SHAKE,supports ODANSHAY's passive,,,,,,,,,1:2:1:2
 FNC_019,REBOOT,0,EFFECT_SHAKE,supports ODANSHAY's passive,,,,,,,,,1:1:0:0
 FNC_020,CODESHATTER,0,EFFECT_ATTACK,supports ODANSHAY's passive,,,,,70,,,,
+FNC_021,LOGICBOMBEXPLODE,0,EFFECT_ATTACK,supports NEHBOCYET's passive,,,,,40,,,,
+FNC_022,BRAINSCRAMBLE,0,EFFECT_ATTACK,supports ECHOFALL's passive,,,,,30,,,,

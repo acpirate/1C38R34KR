@@ -895,9 +895,10 @@ func read_systems() -> void:
 
 
 ## Structurally close to a System, and deliberately its own reader: a Boss has
-## no PASSIVES column, its ICE is not subject to Run escalation, and its
-## `in_pool` is inert because Boss Selection is explicit. Collapsing the two
-## would make every one of those differences an implicit special case.
+## no PASSIVES column and its ICE is not subject to Run escalation. It also has
+## no `in_pool`: Boss Selection is explicit, so the column had no reader and was
+## dropped from the workbook in Beta 0.4. Collapsing the two readers would make
+## every one of those differences an implicit special case.
 func read_bosses() -> void:
 	var table := DataTable.read(_path("bosses"), DataIssues.DATASET_BOSSES, Vocab.BOSS_HEADER, issues)
 	if table == null:
@@ -920,10 +921,6 @@ func read_bosses() -> void:
 		var programs := DataTable.parse_sized_ref_list(
 			table.get_cell(i, "PRG_SET"), "PRG_S_", Content.SYSTEM_BUILD_SIZE, _field_ctx(ctx, "PRG_SET"), issues
 		)
-		# Parsed for schema completeness and fingerprinting only — deliberately
-		# NOT a selection filter, since Boss Selection lists every valid row.
-		var in_pool := DataTable.parse_in_pool(table.get_cell(i, "in_pool"), _field_ctx(ctx, "in_pool"), issues)
-
 		if not name["ok"] or not base_ice["ok"] or colors.is_empty() or shapes.is_empty() or programs.is_empty():
 			continue
 
@@ -931,7 +928,7 @@ func read_bosses() -> void:
 			"file": table.file, "row": table.line_of(i), "id": ctx["id"],
 			"name": name["value"], "base_ice": base_ice["value"],
 			"strong_colors": colors, "strong_shapes": shapes,
-			"programs": programs, "in_pool": in_pool,
+			"programs": programs,
 			# Presentation only: never mechanic authority and never fingerprinted.
 		})
 
@@ -1988,7 +1985,6 @@ func _fingerprint_bosses() -> Array:
 		e["sc"] = b["strong_colors"]
 		e["ss"] = b["strong_shapes"]
 		e["prg"] = b["programs"]
-		e["pool"] = b["in_pool"]
 		out.append(e)
 	return out
 

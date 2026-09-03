@@ -98,10 +98,14 @@ SPEC = [
     ("overlay/mark_buff",            64,  64,  0, TINT_STATE, "Buff, inside the badge."),
     ("overlay/mark_shield",          64,  64,  0, TINT_STATE, "Shield, inside the badge."),
     ("overlay/mark_override",        64,  64,  0, TINT_STATE, "Boss Override, inside the badge."),
+    ("overlay/mark_capacitor",       64,  64,  0, TINT_STATE, "RAHNDAHL Capacitor, inside the badge. Two plates."),
+    ("overlay/mark_logic_bomb",      64,  64,  0, TINT_STATE, "NEHBOCYET Logic Bomb, inside the badge. Descending chevrons."),
     ("overlay/ring_bomb",           128, 128,  0, TINT_STATE, "SUSPENDED — retained, not drawn. See D-037."),
     ("overlay/ring_buff",           128, 128,  0, TINT_STATE, "SUSPENDED — retained, not drawn."),
     ("overlay/ring_shield",         128, 128,  0, TINT_STATE, "SUSPENDED — retained, not drawn."),
     ("overlay/ring_override",       128, 128,  0, TINT_STATE, "SUSPENDED — retained, not drawn."),
+    ("overlay/ring_capacitor",      128, 128,  0, TINT_STATE, "SUSPENDED — retained, not drawn."),
+    ("overlay/ring_logic_bomb",     128, 128,  0, TINT_STATE, "SUSPENDED — retained, not drawn."),
     ("overlay/digit_0",              96,  96,  0, TINT_STATE, "Countdown numeral, inside the badge."),
     ("overlay/digit_1",              96,  96,  0, TINT_STATE, "Countdown numeral."),
     ("overlay/digit_2",              96,  96,  0, TINT_STATE, "Countdown numeral."),
@@ -329,6 +333,7 @@ def write_readme(bundle, name):
     add("| `bar_fill_link` vs `bar_fill_ice` | They are the two sides' health, side by side in the header. Same colour means you cannot tell who is winning. |")
     add("| `badge_player` vs `badge_enemy` | The ONLY signal of who owns an overlay. One must read light, the other dark. |")
     add("| the four `program_box_*` | Idle, charged, yours-and-charged, armed. Four states of the same control. |")
+    add("| the six `mark_*` | The whole type signal since D-037 suspended the ring. Two that read alike are two Boss mechanics a player cannot tell apart. |")
     add("| `button_selected` vs `button_disabled` | Chosen versus unavailable. Differing only in brightness is what made this ambiguous before. |")
     add("| the six palette colours | Packet identity. Two that read alike make a match ambiguous. |")
     add("")

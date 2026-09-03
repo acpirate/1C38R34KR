@@ -32,7 +32,7 @@ func _test_full_load(t: TestCase) -> void:
 	t.check("authored content loads", result["ok"])
 	for e in loader.issues.errors().slice(0, 8):
 		printerr("        %s" % DataIssues.format(e))
-	t.eq("fingerprint", str(result["fingerprint"]), "49c229cd-8ma")
+	t.eq("fingerprint", str(result["fingerprint"]), "83434613-96w")
 	t.eq("warnings are unchanged", loader.issues.warning_count, 5)
 	t.eq("no errors", loader.issues.error_count, 0)
 

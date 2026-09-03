@@ -1,6 +1,6 @@
 {
-  "_comment": "Generated from the alpha. The fingerprint here must be reproduced byte-for-byte.",
-  "fingerprint": "49c229cd-8ma",
+  "_comment": "Generated from the alpha. The fingerprint here must be reproduced byte-for-byte. Beta 0.4: the fingerprint is now BETA-authored, not alpha-derived \u2014 the alpha has one Boss and twenty Functions, and beta authors four and twenty-two (\u00a716). The issues/error_count below remain alpha-matched.",
+  "fingerprint": "83434613-96w",
   "error_count": 0,
   "warning_count": 5,
   "issues": [

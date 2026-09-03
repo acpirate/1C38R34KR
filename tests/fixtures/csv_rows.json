@@ -1,5 +1,5 @@
 {
-  "_comment": "Alpha parseCsv output. Pins line numbers and empty-row handling.",
+  "_comment": "Alpha parseCsv output. Pins line numbers and empty-row handling. Alpha-derived, EXCEPT `bos` and `fnc`, which beta 0.4 authors beyond the alpha per that build's authorization \u00a716 and which are therefore pinned from the beta's own exported CSVs.",
   "datasets": {
     "bos": {
       "rows": [
@@ -8,14 +8,10 @@
           "fields": [
             "BOS_ID",
             "name",
-            "in_pool",
             "BASE_ICE",
             "STRONG_COLORS",
             "STRONG_SHAPES",
-            "PRG_SET",
-            "BOSS_PASSIVE_DESCRIPTION",
-            "BIO",
-            "GRAPHICS"
+            "PRG_SET"
           ]
         },
         {
@@ -23,14 +19,43 @@
           "fields": [
             "BOS_01",
             "ODANSHAY",
-            "",
-            "250",
+            "350",
             "GRE:BLU:MAG",
             "SQU:CIR:DIA",
-            "PRG_S_004:PRG_S_002:PRG_S_007:PRG_S_003",
-            "boss passive description goes here",
-            "system biography goes here",
-            "system graphics reference goes here"
+            "PRG_S_004:PRG_S_002:PRG_S_007:PRG_S_003"
+          ]
+        },
+        {
+          "line": 3,
+          "fields": [
+            "BOS_02",
+            "RAHNDAHL",
+            "350",
+            "RED:YEL:GRE",
+            "STR:TRI:SQU",
+            "PRG_S_004:PRG_S_002:PRG_S_007:PRG_S_003"
+          ]
+        },
+        {
+          "line": 4,
+          "fields": [
+            "BOS_03",
+            "NEHBOCYET",
+            "350",
+            "CYA:MAG:RED",
+            "SQU:CRO:DIA",
+            "PRG_S_004:PRG_S_002:PRG_S_007:PRG_S_003"
+          ]
+        },
+        {
+          "line": 5,
+          "fields": [
+            "BOS_04",
+            "ECHOFALL",
+            "350",
+            "BLU:GRE:YEL",
+            "DIA:CRO:TRI",
+            "PRG_S_004:PRG_S_002:PRG_S_007:PRG_S_003"
           ]
         }
       ],
@@ -460,6 +485,44 @@
             "",
             "",
             "70",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 22,
+          "fields": [
+            "FNC_021",
+            "LOGICBOMBEXPLODE",
+            "0",
+            "EFFECT_ATTACK",
+            "supports NEHBOCYET's passive",
+            "",
+            "",
+            "",
+            "",
+            "40",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "line": 23,
+          "fields": [
+            "FNC_022",
+            "BRAINSCRAMBLE",
+            "0",
+            "EFFECT_ATTACK",
+            "supports ECHOFALL's passive",
+            "",
+            "",
+            "",
+            "",
+            "30",
             "",
             "",
             "",

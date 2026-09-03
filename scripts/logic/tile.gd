@@ -54,7 +54,10 @@ func has_special() -> bool:
 ## by construction — a Function edited between arming and delivery cannot reach
 ## back and alter what is already in flight.
 class Special extends RefCounted:
-	enum Type { BOMB = 0, BUFF, SHIELD, OVERRIDE }
+	## Beta 0.4 appends CAPACITOR and LOGIC_BOMB. New members go on the END:
+	## the ordinal is the key into `overlay_mark`/`overlay_ring` in every
+	## graphics pack, so inserting one would silently repoint existing art.
+	enum Type { BOMB = 0, BUFF, SHIELD, OVERRIDE, CAPACITOR, LOGIC_BOMB }
 
 	var type := Type.BOMB
 	var owner := Types.Side.PLAYER

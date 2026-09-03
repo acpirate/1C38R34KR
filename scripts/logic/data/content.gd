@@ -49,12 +49,31 @@ const INITIAL_HOST_ID := "HST_01"  ## THRESHOLD
 const MIN_UPGRADE_ROWS := 4
 const PATH_CHOICE_COUNT := 2
 
-## Boss layer — validated in beta 0.1, implemented in 0.3.
-const BOSS_MECHANIC_BOSS_ID := "BOS_01"  ## ODANSHAY
+## Boss layer — validated in beta 0.1, ODANSHAY implemented in 0.3, the other
+## three Bosses in 0.4.
+const BOSS_ODANSHAY := "BOS_01"
+const BOSS_RAHNDAHL := "BOS_02"
+const BOSS_NEHBOCYET := "BOS_03"
+const BOSS_ECHOFALL := "BOS_04"
+
+## Retained under its old name: it is what the ODANSHAY-specific tests and the
+## differential harness ask for, and they mean that Boss rather than "whichever
+## Boss has a mechanic" — which, since 0.4, is all of them.
+const BOSS_MECHANIC_BOSS_ID := BOSS_ODANSHAY
+
 const FN_DATABEND := "FNC_018"
 const FN_REBOOT := "FNC_019"
 const FN_CODESHATTER := "FNC_020"
-const BOSS_MECHANIC_FUNCTION_IDS: Array[String] = [FN_DATABEND, FN_REBOOT, FN_CODESHATTER]
+const FN_LOGICBOMBEXPLODE := "FNC_021"
+const FN_BRAINSCRAMBLE := "FNC_022"
+
+## Zero-cost payloads invoked only from Boss code. Listing them here is what
+## keeps the loader from warning that nothing references them — they are reached
+## through `Game.cast_boss_mechanic`, not through any Program or Deck.
+const BOSS_MECHANIC_FUNCTION_IDS: Array[String] = [
+	FN_DATABEND, FN_REBOOT, FN_CODESHATTER,
+	FN_LOGICBOMBEXPLODE, FN_BRAINSCRAMBLE,
+]
 const OVERRIDE_PLACEMENT_COUNT := 3
 const OVERRIDE_THRESHOLD := 15
 const OVERRIDE_DATABEND_RETRY_LIMIT := 5

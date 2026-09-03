@@ -123,6 +123,11 @@ const OVERLAY_TINT: Array[Color] = [
 	Color("ffd24a"),  ## BUFF
 	Color("6ad0ff"),  ## SHIELD
 	Color("b04aff"),  ## OVERRIDE
+	# Beta 0.4. Both are Boss marks and both had to stay clear of OVERRIDE's
+	# purple as well as of each other — the mark IS the type signal since
+	# D-037 suspended the ring, so a shared tint hides a shared mechanic.
+	Color("4affc8"),  ## CAPACITOR — stored charge, cool green
+	Color("ff7a1f"),  ## LOGIC_BOMB — hazard orange, distinct from BOMB's red
 ]
 
 ## The diagnostic checker a missing graphics asset resolves to (beta 0.3.1).

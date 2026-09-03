@@ -119,8 +119,11 @@ const FALLBACK_FONT_ROLE := "UI_SANS"
 ## `MECHANIC_ID`. A Boss contributes no identity PASSIVEs, and ODANSHAY's
 ## Override mechanic is code keyed to `BOS_01` rather than a data-driven
 ## scripting field, so no column is invented to hold it.
+## No `in_pool`: the column was dropped from the workbook in Beta 0.4 because
+## it never governed anything. Boss Selection lists every authored row, so the
+## flag had no reader — see `read_bosses`.
 const BOSS_HEADER: Array[String] = [
-	"BOS_ID", "name", "in_pool", "BASE_ICE", "STRONG_COLORS", "STRONG_SHAPES",
+	"BOS_ID", "name", "BASE_ICE", "STRONG_COLORS", "STRONG_SHAPES",
 	"PRG_SET",
 ]
 
@@ -137,8 +140,9 @@ const REQUIRED_FNC_IDS: Array[String] = [
 	"FNC_006", "FNC_007", "FNC_008", "FNC_009", "FNC_010",
 	"FNC_011", "FNC_012", "FNC_013", "FNC_014", "FNC_015",
 	"FNC_016", "FNC_017",
-	# Zero-cost ODANSHAY mechanic payloads, never directly assigned.
-	"FNC_018", "FNC_019", "FNC_020",
+	# Zero-cost Boss mechanic payloads, never directly assigned.
+	# 018-020 ODANSHAY, 021 NEHBOCYET, 022 ECHOFALL.
+	"FNC_018", "FNC_019", "FNC_020", "FNC_021", "FNC_022",
 ]
 
 const REQUIRED_PRG_H_IDS: Array[String] = [

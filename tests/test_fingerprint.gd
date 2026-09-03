@@ -2,7 +2,7 @@ extends RefCounted
 
 ## Fingerprint parity, split into its two independent halves.
 ##
-## The end-to-end check — does the loader produce `49c229cd-8ma`? — is the real
+## The end-to-end check — does the loader produce `83434613-96w`? — is the real
 ## gate, but on its own it only ever reports "different", leaving 11,170
 ## characters of canonical string to search. Pinning the hash and the serializer
 ## separately makes a failure say which half is wrong.
@@ -102,5 +102,5 @@ func _test_structures(t: TestCase) -> void:
 	t.group("fingerprint / base36 suffix")
 	t.eq("zero length", Fingerprint.djb2(""), "00001505-0")
 	# 11170 is the canonical length of the current authored content; its base36
-	# form is the '8ma' in the target fingerprint 49c229cd-8ma.
+	# form is the '96w' in the target fingerprint 83434613-96w.
 	t.eq("11170 in base36", Fingerprint.djb2("x".repeat(11170)).split("-")[1], "8ma")
