@@ -175,7 +175,7 @@ func _deliver_countdown(p: Vector2i, events: Array) -> void:
 		return
 
 	# Bombs already carry their own detonation telemetry.
-	Resolve.resolve_detonation(state, p, events)
+	Resolve.resolve_detonation(state, p, events, self)
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ func _resolve_immediate_deployments(owner: Types.Side, actor: Dictionary, op: Di
 		events.append(_targeted_event(owner, actor, op, p, d, ""))
 
 		if d.get("settle", false) and not state.has_winner():
-			Resolve.settle_after_effect(state, owner, d["cause"], str(actor["id"]), events)
+			Resolve.settle_after_effect(state, owner, d["cause"], str(actor["id"]), events, self)
 
 	return resolved
 
@@ -638,7 +638,7 @@ func _cast_shake(owner: Types.Side, actor: Dictionary, op: Dictionary, params: D
 		# Every Sync created by the final Shake board resolves immediately and is
 		# OWNED BY THE INITIATOR — never hardcoded as Hacker-owned — so
 		# owner-scoped damage, charge, triggers, and cascades all apply normally.
-		Resolve.resolve_cascades(state, owner, events, _shake_budget(sp["cascades"]), Types.DamageSource.MATCH, {})
+		Resolve.resolve_cascades(state, owner, events, _shake_budget(sp["cascades"]), Types.DamageSource.MATCH, {}, "", {}, self)
 	# matches PREVENTED: the completed arrangement already satisfies the stable
 	# post-generation invariants, so no Sync wave begins.
 
@@ -835,6 +835,12 @@ func attempt_swap(a: Vector2i, b: Vector2i, think_ms := -1, hint_shown := false)
 		BoardOps.swap(state.board, a, b)
 		events.append({"t": Types.EVT.REVERT, "a": a, "b": b})
 		events.append({"t": Types.EVT.NO_MATCH})
+		# ECHOFALL §8.4: a move made BLIND costs 30 and lifts the concealment.
+		# The swap itself is already reverted and the Hacker's move is already
+		# unconsumed, both of which §8.4 requires — the only thing added is the
+		# punishment, and only for the first attempt, since revealing here means
+		# a later invalid attempt finds nothing hidden.
+		Boss.echofall_punish_blind_move(self, events)
 		return {"matched": false, "events": _collect(events)}
 
 	if think_ms >= 0:
@@ -842,9 +848,13 @@ func attempt_swap(a: Vector2i, b: Vector2i, think_ms := -1, hint_shown := false)
 	if hint_shown:
 		events.append({"t": Types.EVT.HINT_SHOWN})
 
+	# A valid move reveals without penalty (§8.4). Done before resolution so
+	# the Sync the player watches resolve is drawn with the real board.
+	Boss.reveal(state, events)
+
 	# Sync committed — no further Functions this turn.
 	state.phase = Types.Phase.RESOLVING
-	Resolve.resolve_cascades(state, Types.Side.PLAYER, events, _match_budget(), Types.DamageSource.MATCH, {})
+	Resolve.resolve_cascades(state, Types.Side.PLAYER, events, _match_budget(), Types.DamageSource.MATCH, {}, "", {}, self)
 	return {"matched": true, "events": _collect(events)}
 
 
@@ -989,11 +999,13 @@ func run_enemy_phase() -> Array:
 	if state.has_winner():
 		return _collect(events)
 
-	# The ODANSHAY threshold sits HERE — after HOST START_OF_TURN, before
+	# Boss start-of-phase rules sit HERE — after HOST START_OF_TURN, before
 	# countdowns (§12). There is no Boss identity PASSIVE layer between them:
-	# the BOS schema has no PASSIVES column, deliberately.
+	# the BOS schema has no PASSIVES column, deliberately. ODANSHAY's threshold
+	# has always run at this instant and the 0.4 Bosses join it, since "the
+	# beginning of the Boss phase" is the same moment for all four.
 	if Boss.is_boss_battle(state):
-		Boss.resolve_threshold(self, events)
+		Boss.start_of_turn(self, events)
 		if state.has_winner():
 			return _collect(events)
 
@@ -1013,7 +1025,7 @@ func run_enemy_phase() -> Array:
 		if not mv.is_empty():
 			BoardOps.swap(state.board, mv["a"], mv["b"])
 			events.append({"t": Types.EVT.SWAP, "a": mv["a"], "b": mv["b"]})
-			Resolve.resolve_cascades(state, Types.Side.ENEMY, events, _match_budget(), Types.DamageSource.MATCH, {})
+			Resolve.resolve_cascades(state, Types.Side.ENEMY, events, _match_budget(), Types.DamageSource.MATCH, {}, "", {}, self)
 			if state.has_winner():
 				return _collect(events)
 	else:
@@ -1033,7 +1045,7 @@ func run_enemy_phase() -> Array:
 	# The final action of a NON-TERMINAL Boss turn (§10). The winner check above
 	# is what makes it non-terminal: a battle that already ended places nothing.
 	if Boss.is_boss_battle(state):
-		Boss.place_end_of_turn(self, events)
+		Boss.end_of_turn(self, events)
 		if state.has_winner():
 			return _collect(events)
 

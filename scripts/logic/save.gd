@@ -22,13 +22,19 @@ extends RefCounted
 ## RNG state, a dropped countdown, or a lost stamped area pattern. Continuing to
 ## the end and comparing the event stream does not.
 
+## Bumped to 3: the envelope gained the Boss-phase counter and ECHOFALL's hidden
+## axis. A schema-2 save has neither, and resuming an ECHOFALL battle with the
+## concealment silently cleared would change what the next move means — so it is
+## rejected, which is also the standing pre-release policy for saves across a
+## version (D-030).
+##
 ## Bumped to 2: the envelope gained the metrics accumulator and the open turn
 ## log record. A schema-1 save has no accounting to restore and is rejected
 ## rather than resumed with the counters silently starting from zero — the
 ## authorization requires the metrics state needed for consistent continuation
 ## to be part of the save, and a battle that resumes reporting half its damage
 ## is exactly the failure that requirement exists to prevent.
-const SCHEMA := 2
+const SCHEMA := 3
 const SAVE_PATH := "user://save.json"
 
 
@@ -42,6 +48,8 @@ static func to_dict(state: GameState) -> Dictionary:
 		"fingerprint": Content.fingerprint(),
 		"battle_id": state.battle_id,
 		"turn": state.turn,
+		"boss_phase": state.boss_phase,
+		"hidden_axis": state.hidden_axis,
 		"phase": Types.PHASE_NAMES[state.phase],
 		"winner": null if state.winner == -1 else Types.SIDE_NAMES[state.winner],
 		"rng_state": state.rng.get_state(),
@@ -125,6 +133,8 @@ static func from_dict(data: Dictionary) -> Dictionary:
 	var s := GameState.new()
 	s.battle_id = str(data["battle_id"])
 	s.turn = int(data["turn"])
+	s.boss_phase = int(data["boss_phase"])
+	s.hidden_axis = int(data["hidden_axis"])
 	s.phase = Types.value_of(Types.PHASE_NAMES, str(data["phase"]))
 	if s.phase < 0:
 		return _reject("unknown phase '%s'" % data["phase"])

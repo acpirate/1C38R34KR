@@ -35,6 +35,35 @@ var identity := {}
 var phase := Types.Phase.PLAYER_PRE
 var winner: int = -1  ## Types.Side, or -1 while the battle continues
 var turn := 1
+
+## How many Boss phases this battle has run. Beta 0.4.
+##
+## Not derived from `turn`: the two agree today, but a Boss rule that keys off
+## its own phase count should not silently change meaning if turn accounting
+## ever does. ECHOFALL conceals on phases 1, 3, 5 and needs this to survive
+## save/resume (authorization §8.5).
+var boss_phase := 0
+
+## Which Packet axis ECHOFALL is currently hiding, or -1 for none.
+##
+## PRESENTATION state that is nonetheless real battle state: matching,
+## targeting and every Function keep using the true colour and shape (§8.2).
+## It lives here, and serializes, because a save taken mid-concealment must
+## resume hiding the same axis.
+var hidden_axis: int = -1
+
+## True only while NEHBOCYET's Logic Bomb chain is being resolved.
+##
+## The post-settle hook fires at the end of `Resolve.resolve_cascades`, and
+## resolving a bomb settles the board again — so without this the hook would
+## re-enter itself once per link in the chain and the "repeat until stable"
+## loop would be a recursion of unknown depth instead. The outer loop owns the
+## chain; a nested call sees this and returns.
+##
+## Deliberately NOT serialized: it is only ever true partway through resolving
+## an event, and a save is never taken there. A save that somehow captured it
+## as true would resume unable to detonate anything.
+var bomb_chain_active := false
 var config := {}
 
 ## Collision-resistant and stable across save and restore. Normalized out of

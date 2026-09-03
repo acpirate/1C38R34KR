@@ -602,7 +602,13 @@ static func resolve_cascades(
 	cause: Types.DamageSource,
 	fresh_ids: Dictionary,
 	cause_program_id := "",
-	origin: Dictionary = {}
+	origin: Dictionary = {},
+	# Beta 0.4 §14. Threaded rather than reached through a back-reference on
+	# GameState: the post-settle hook has to cast an authored Function, which
+	# lives on Game, and a state->game pointer would be a reference cycle for
+	# the sake of one call. Null is legal and means "no Boss hook" — every
+	# battle path passes it, and the fixtures that do not have no Boss.
+	game = null
 ) -> Dictionary:
 	var steps := 0
 	var stochastic_rounds := 0
@@ -724,6 +730,16 @@ static func resolve_cascades(
 		events.append({"t": Types.EVT.CASCADE_DEPTH, "side": owner, "depth": stochastic_rounds})
 	if not state.has_winner():
 		ensure_no_deadlock(state, events)
+
+	# THE post-settle integration point (§14). Everything that moves Packets
+	# ends here — Sync, cascade, gravity, line slice, Bomb blast, Shake, the
+	# Boss's own row clear — because `settle_after_effect` delegates to this
+	# function and every other mover goes through one of the two. So the Logic
+	# Bomb invariant is stated once, against movement itself, rather than being
+	# re-wired onto each new source that happens to move something.
+	if game != null:
+		Boss.resolve_settled_bombs(game, events)
+
 	return {"steps": steps, "stochastic_rounds": stochastic_rounds}
 
 
@@ -942,7 +958,7 @@ const DEFAULT_BLAST_PATTERN := Areas.SQUARE_3X3
 ## The placing Function's typed selections travel WITH the overlay, so a Bomb
 ## armed three turns ago still resolves under its own contract — a Function
 ## edited in between cannot reach back and change what is already in flight.
-static func resolve_detonation(state: GameState, p: Vector2i, events: Array) -> void:
+static func resolve_detonation(state: GameState, p: Vector2i, events: Array, game = null) -> void:
 	var bomb := state.tile_at(p)
 	if bomb == null or not bomb.has_special() or bomb.special.type != Tile.Special.Type.BOMB:
 		return
@@ -954,7 +970,7 @@ static func resolve_detonation(state: GameState, p: Vector2i, events: Array) -> 
 		"fn_id": sp.fn_id,
 		"deal_damage": sp.deal_damage if sp.deal_damage != -1 else Content.DEAL_DAMAGE_YES,
 		"gain_charge": sp.gain_charge if sp.gain_charge != -1 else GAIN_CHARGE_NO_DEFAULT,
-	}, events)
+	}, events, true, game)
 
 
 ## The ONE Bomb blast implementation, shared by countdown detonations and by
@@ -965,7 +981,7 @@ static func resolve_detonation(state: GameState, p: Vector2i, events: Array) -> 
 ##
 ## `settle` false leaves gravity, refill, and cascades to the caller, so an
 ## immediately resolving Bomb can log its target BEFORE the board moves.
-static func detonate_at(state: GameState, p: Vector2i, spec: Dictionary, events: Array, settle := true) -> void:
+static func detonate_at(state: GameState, p: Vector2i, spec: Dictionary, events: Array, settle := true, game = null) -> void:
 	var owner: Types.Side = spec["owner"]
 	var offsets := Areas.cells(spec["area_pattern"])
 
@@ -1019,7 +1035,7 @@ static func detonate_at(state: GameState, p: Vector2i, spec: Dictionary, events:
 
 	if state.has_winner() or not settle:
 		return
-	settle_after_effect(state, owner, Types.DamageSource.BOMB, str(spec.get("program_id", "")), events)
+	settle_after_effect(state, owner, Types.DamageSource.BOMB, str(spec.get("program_id", "")), events, game)
 
 
 ## An Effect-caused destruction has no "initial Sync", so its entire cascade
@@ -1027,11 +1043,11 @@ static func detonate_at(state: GameState, p: Vector2i, spec: Dictionary, events:
 ##
 ## Everything descended from it carries that Effect's causal bucket and belongs
 ## to the initiator, however many Syncs follow.
-static func settle_after_effect(state: GameState, owner: Types.Side, cause: Types.DamageSource, cause_program_id: String, events: Array) -> void:
+static func settle_after_effect(state: GameState, owner: Types.Side, cause: Types.DamageSource, cause_program_id: String, events: Array, game = null) -> void:
 	var cap = state.config["max_cascade_steps"]
 	var fresh_ids := {}
 	apply_gravity_and_refill(state, events, cap != null and int(cap) <= 0, fresh_ids)
-	resolve_cascades(state, owner, events, cap, cause, fresh_ids, cause_program_id)
+	resolve_cascades(state, owner, events, cap, cause, fresh_ids, cause_program_id, {}, game)
 
 
 # ---------------------------------------------------------------------------

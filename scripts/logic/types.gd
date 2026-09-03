@@ -113,6 +113,10 @@ enum Readiness { READY = 0, CHARGING, EMPTY }
 ## contributions, so these must stay mutually exclusive.
 enum DamageSource { MATCH = 0, ATTACKER, BOMB, LINESLICE, TRANSFORM }
 
+## Which Packet axis ECHOFALL hides. PRESENTATION only — the board's real
+## colour and shape are what every rule keeps reading (beta 0.4 §8.2).
+enum ConcealAxis { COLOR = 0, SHAPE }
+
 ## Where a routed charge stream came from.
 enum ChargeStreamSource { SYNC = 0, CASCADE, PASSIVE_MODIFIED_SYNC, EFFECT_DESTRUCTION, EFFECT_TRANSFORM }
 
@@ -229,6 +233,7 @@ const OWNER_KIND_NAMES := ["program", "deck", "passive", "boss"]
 const PASSIVE_SOURCE_KIND_NAMES := ["HAK", "SYS", "HST", "UPG"]
 const READINESS_NAMES := ["READY", "CHARGING", "EMPTY"]
 const DAMAGE_SOURCE_NAMES := ["match", "attacker", "bomb", "lineslice", "transform"]
+const CONCEAL_AXIS_NAMES := ["color", "shape"]
 const CHARGE_STREAM_SOURCE_NAMES := [
 	"SYNC", "CASCADE", "PASSIVE_MODIFIED_SYNC", "EFFECT_DESTRUCTION", "EFFECT_TRANSFORM",
 ]
