@@ -734,3 +734,58 @@ Each one turned out to cost almost nothing once identified:
 **The uncomfortable part is that each check was obvious in hindsight and none was
 obvious in advance.** The way to find the next one is to ask where an artefact
 changes hands — not to look harder at the code.
+
+---
+
+## Beta 0.4.0 — the same list, written down three times
+
+Seven defects. **Four of them were one list restated somewhere a second time.**
+
+- `PacketView.TYPE_NAMES` was a private copy of the special-type names. Adding
+  two types would have drawn every Capacitor and Logic Bomb as a **Bomb** —
+  `find` returns −1 and the fallback is index 0.
+- `check_assets._check_marks` had a third copy, so neither new mark was
+  examined for tone, coverage or distinctness.
+- `gen_pack_resource.SPECIALS` had a fourth. That one at least failed loudly.
+- The new test file's `_authored_damage` read `fn["ops"]` — a key name recalled
+  rather than checked — and GDScript's abort-on-missing-key meant it returned
+  zero, two assertions compared against zero and PASSED, and everything after
+  them silently stopped running.
+
+The 0.3.2 lesson was that defects live in the seams between environments. This
+build says something narrower and more actionable: **the seam is usually a list
+that exists in more than one place**, and adding a member to an enum is the
+event that finds every copy at once.
+
+### What actually caught them
+
+Not the suite — it was green. Three different things:
+
+1. **The §17.7 rule** — treat any `SCRIPT ERROR` during a nominally green run as
+   a failure until explained. That alone caught two of the four.
+2. **Looking at the generated art.** bzone's hollow mark rendered solid and
+   16bit's capacitor merged into a cross. Every automated check passed on both;
+   a contact sheet took thirty seconds.
+3. **Playing it.** The duplicate, partly false Boss log line (AN-018) is
+   invisible to every test, because a log line is prose and nothing asserts
+   prose.
+
+### The cheap generalisation
+
+Where two lists must agree, make one of them read the other. `TYPE_NAMES` is now
+`Resolve.SPECIAL_TYPE_NAMES`; so is the checker's. That is a smaller change than
+any test that would have caught the drift, and it makes the drift unrepresentable
+rather than detectable.
+
+Where a list cannot be shared — a fixture key, a JSON shape — assert the shape
+before using it. `test_boss.gd`'s `_authored_damage` already did this and was
+right; the new copy did not and was wrong, which is the lesson twice over.
+
+### On the differential losing its grip
+
+Boss parity now fails by design, and the useful move was to make the failure
+*provable* rather than to accept it: restoring the alpha's 250 ICE gave 60/60.
+The alpha can still validate mechanics as long as the one authored difference is
+neutralised first. Worth doing deliberately at each content step, because the
+alternative — "it diverges, but only for the expected reason" — is an assertion
+nobody can check later.

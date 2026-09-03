@@ -10,39 +10,51 @@ intended — see [The differential gate](#the-differential-gate).
 
 ## Status
 
-**`beta-0.3.2` — the gameplay loop, drawn from a replaceable asset pack and
-spoken through an external text framework.**
+**`beta-0.4.0` — four Bosses, three new rule sets, and a mode that gets you to
+them in two taps.**
 
-0.3.0 finished the reference port. 0.3.1 replaced the procedural whitebox with a
-graphics asset layer. 0.3.2 does the same for words: what the game says now
-lives in `text_content.csv`, how it behaves inside a rectangle lives in
-`text_style.csv`, and which bundled typeface a role uses lives in
-`font_refs.csv`.
+0.3.0 finished the reference port; 0.3.1 gave it a replaceable graphics pack and
+0.3.2 an external text framework. 0.4.0 begins content expansion with the
+mechanically densest category, to find out whether that framework can carry
+several materially different Boss behaviours without another rewrite. It can:
+every Boss rule is orchestration in `scripts/logic/boss.gd`, and the only shared
+machinery added is one post-settle hook and one placement primitive.
+
+| Boss | ICE | Mechanic |
+| --- | ---: | --- |
+| ODANSHAY | 350 | Overrides toward a threshold, then CODESHATTER and REBOOT |
+| RAHNDAHL | 350 | Discharges `2^n` for the Capacitors on the board, then places another |
+| NEHBOCYET | 350 | Clears the bottom row each phase; a Logic Bomb that settles there detonates |
+| ECHOFALL | 350 | Hides a Packet axis on alternate phases; a blind mistake costs 30 |
 
 | Phase | State |
 | --- | --- |
-| A — inspection, contract proposal | ✅ Gate A approved |
-| B — v0 CSVs, bundled fonts, title logo, countdown digits | ✅ Gate B approved |
-| C — runtime registries, no migration | ✅ |
-| D — carry-forward assets into the renderer | ✅ |
-| E — literal migration and styles | ✅ |
-| F — obsolete column removal | ✅ landed early, with the data |
-| G — tablet and S25 | ✅ both signed off |
-| H — closeout | ✅ see `staging/1c38r34kr-beta-0.3.2-text-handback.md` |
+| A — ingest and audit | ✅ |
+| B — workbook and text content | ✅ ten rows imported by the director |
+| C — Boss-special identities and art in all six packs | ✅ |
+| D — RAHNDAHL | ✅ |
+| E — NEHBOCYET and the post-settle hook | ✅ |
+| F — ECHOFALL, state and presentation | ✅ |
+| G — Boss Attack | ✅ |
+| H — regression and device | ✅ tablet; S25 carried forward with stated reasoning |
+| I — closeout | ✅ see `staging/1c38r34kr-beta-0.4.0-boss-content-handback.md` |
 
 | Gate | State |
 | --- | --- |
-| Headless logic tests | ✅ 3,340 passing across 24 suites |
-| Font coverage | ✅ 98-character corpus, all three faces |
-| Asset pack structural checks | ✅ including 10 countdown digits |
-| Battle report fidelity | ✅ **44 lines byte-identical** before and after migration |
-| Battle parity (fast, 150 battles) | ✅ 150/150 — no gameplay code changed |
-| Tablet device pass | ✅ every screen, clean log |
-| S25 device pass | ✅ safe area, fit, no clipping, clean log |
+| Headless logic tests | ✅ 3,475 passing across 25 suites |
+| Boss-specific coverage | ✅ 119 assertions in `test_boss_04.gd` |
+| Workbook round-trip | ✅ `export_workbook.py --check` clean |
+| Asset pack structural checks | ✅ now covering all six special marks |
+| Asset bundles | ✅ 59 assets + palette in each of six packs |
+| Texture imports | ✅ 360/360 correct |
+| Battle parity (fast, 150 battles) | ✅ 150/150 — the settle hook is inert off-Boss |
+| Boss parity | ⚠️ diverges by design at 350 ICE — **60/60 with the alpha's 250 restored**, so ODANSHAY's mechanics are bit-identical |
+| Tablet device pass | ✅ all four Bosses played through Boss Attack |
+| S25 device pass | ➖ carried forward — no battle-layout geometry changed |
 
-Deliberately **not** in 0.3.2: localization behaviour, a pluralization engine,
-dialogue, rich text, text animation, final typography, accessibility scaling, a
-CSS-like stylesheet, audio, the graphics jig, and any gameplay change.
+Deliberately **not** in 0.4.0: a Boss scripting language or data-driven passive
+DSL, Boss-specific Program rosters, balance tuning, final art, VFX, audio, and
+any content category other than Bosses.
 
 ### Devices
 
