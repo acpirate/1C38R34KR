@@ -51,6 +51,10 @@ const PATH_CHOICE_COUNT := 2
 
 ## Boss layer — validated in beta 0.1, ODANSHAY implemented in 0.3, the other
 ## three Bosses in 0.4.
+## The HOST Boss Attack always plays (§10.2). THRESHOLD contributes no HOST
+## passive, so a Boss test measures the Boss and not the HOST.
+const BOSS_ATTACK_HOST_ID := "HST_01"
+
 const BOSS_ODANSHAY := "BOS_01"
 const BOSS_RAHNDAHL := "BOS_02"
 const BOSS_NEHBOCYET := "BOS_03"

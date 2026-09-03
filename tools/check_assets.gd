@@ -156,7 +156,11 @@ func _check_palette() -> Array[String]:
 ## out wrong on one of the two owners.
 func _check_marks() -> Array[String]:
 	var out: Array[String] = []
-	var names := ["bomb", "buff", "shield", "override"]
+	# Taken from the logic layer rather than restated. A private list here is a
+	# list that silently stops covering new types: beta 0.4 added CAPACITOR
+	# and LOGIC_BOMB and this checker went on validating four marks while the
+	# packs shipped six.
+	var names := Resolve.SPECIAL_TYPE_NAMES
 	var coverage := {}
 
 	for name in names:

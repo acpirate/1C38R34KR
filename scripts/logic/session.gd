@@ -109,6 +109,51 @@ static func create_quick_match(
 	})
 
 
+## A player-facing Boss battle: the Boss Attack mode (beta 0.4 §10).
+##
+## Deliberately NOT a variant of `create_quick_match` with a Boss substituted.
+## It differs in exactly one respect that matters — the opponent is a Boss and
+## therefore takes its authored ICE with no Run ladder modifier — and sharing a
+## function would have meant a branch on opponent kind inside a Quick Match
+## constructor, which is how the ladder gets applied to a Boss by accident.
+##
+## The Hacker side is the canonical default build (§10.2), reached through
+## `default_build` rather than restated, so Boss Attack cannot drift from what
+## every other default-build path plays.
+##
+## `HST_01` THRESHOLD is the authored choice because it contributes no HOST
+## passive, which keeps a Boss test measuring the Boss.
+static func create_boss_attack(
+	boss_id: String,
+	host_id: String,
+	seed_value: int,
+	build: Array,
+	settings: Dictionary = {},
+	with_accounting := true,
+) -> GameState:
+	return _create_battle({
+		"hacker_id": Content.DEFAULT_HACKER_ID,
+		"deck_id": Content.DEFAULT_DECK_ID,
+		"opponent_kind": Types.OpponentKind.BOS,
+		"opponent_id": boss_id,
+		"opponent_source": Types.SystemSelectionSource.BOSS_ATTACK,
+		"host_id": host_id,
+		# No UPGRADEs: acquisitions belong to the Run layer, and a Boss test
+		# carrying them would measure the UPGRADEs too.
+		"upgrade_ids": [],
+		"build": build,
+		"build_origin": Types.BuildOrigin.DEFAULT,
+		"seed": seed_value,
+		"settings": settings,
+		"battle_id": "ba-%s-%s-%d" % [boss_id, host_id, seed_value],
+		# Resolved from the identities, which for a Boss means its authored
+		# BASE_ICE and nothing else — no step modifier, because there is no Run.
+		"player_hp": -1,
+		"enemy_hp": -1,
+		"with_accounting": with_accounting,
+	})
+
+
 ## A headless BOSS battle for the differential instrument only.
 ##
 ## Beta 0.3 §20 / Alpha 0.7.0 §45 — player-facing Quick Match stays System-only,

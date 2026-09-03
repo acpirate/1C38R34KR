@@ -383,6 +383,7 @@ func _show_title(fingerprint: String) -> void:
 		_run = null
 		_show_system_select())
 	_button_ref("GAME_UI_TITLE_QUICK_RANDOM", _start_random_quick_match)
+	_button_ref("GAME_UI_TITLE_BOSS_ATTACK", _show_boss_attack_select)
 
 	_divider()
 
@@ -798,9 +799,15 @@ func _start_battle() -> void:
 ## the same gameplay seed. Used by both result-screen exits, so neither can
 ## drift from what was actually played.
 func _replay_battle() -> void:
+	if _boss_attack_id != "":
+		_enter_battle(
+			Session.create_boss_attack(_boss_attack_id, _host_id, _gameplay_seed, _qm_build),
+			_ui(Text.UI_STATUS_TEXT, "GAME_UI_CONTEXT_BOSS_ATTACK"),
+		)
+		return
 	_enter_battle(
 		Session.create_quick_match(_system_id, _host_id, _gameplay_seed, _qm_build, {}, true),
-		"Quick Match",
+		_ui(Text.UI_STATUS_TEXT, "GAME_UI_CONTEXT_QUICK_MATCH"),
 	)
 
 
@@ -809,7 +816,7 @@ func _replay_battle() -> void:
 ## — half a battle's figures presented as a whole battle's would be worse than
 ## none at all.
 func _resume(state: GameState) -> void:
-	_enter_battle(state, "Quick Match")
+	_enter_battle(state, _ui(Text.UI_STATUS_TEXT, "GAME_UI_CONTEXT_QUICK_MATCH"))
 
 
 ## `context` is what the pause menu will call this battle.
@@ -893,7 +900,13 @@ func _show_result(winner: int) -> void:
 	# they remain reachable without scrolling past the whole thing.
 	_fresh_screen(_finished_state == null or _finished_state.metrics == null)
 	_heading_ref("GAME_UI_RESULT_VICTORY" if won else "GAME_UI_RESULT_DEFEAT")
-	_subheading_ref("GAME_UI_RESULT_QUICK_WIN" if won else "GAME_UI_RESULT_LOSS")
+	if not won:
+		_subheading_ref("GAME_UI_RESULT_LOSS")
+	elif _boss_attack_id != "":
+		# "System ICE breached" names the wrong kind of opponent here (§10.6).
+		_subheading_ref("GAME_UI_RESULT_BOSS_WIN", {"opponent": Text.name_of(_boss_attack_id)})
+	else:
+		_subheading_ref("GAME_UI_RESULT_QUICK_WIN")
 
 	# The exits sit ABOVE the report, so they stay reachable on a phone without
 	# scrolling past it. When metrics land in Phase 6 the report goes below this
@@ -903,6 +916,12 @@ func _show_result(winner: int) -> void:
 	# reproduce a visual bug: a fresh seed means a fresh board.
 	_button_ref("GAME_UI_RESULT_REPLAY_SEED", _replay_battle)
 	_button_ref("GAME_UI_RESULT_NEW_BATTLE", func():
+		# Boss Attack returns to the roster instead (§10.5). "New battle" there
+		# most often means a different Boss, and routing it through a fresh seed
+		# on the same one would make switching Bosses a trip via the title.
+		if _boss_attack_id != "":
+			_show_boss_attack_select()
+			return
 		# A new battle means a new board. With a seed pinned, step it so the
 		# tester still walks a reproducible sequence instead of replaying one
 		# board forever.
@@ -910,7 +929,12 @@ func _show_result(winner: int) -> void:
 			_seed_override += 1
 		_gameplay_seed = _next_gameplay_seed()
 		_replay_battle())
-	_button_ref("GAME_UI_RESULT_BACK_TO_TITLE", func(): _show_title(Content.fingerprint()))
+	# Leaving the mode, so the flag clears HERE rather than on the next entry: a
+	# stale Boss id would quietly turn the following Quick Match into a Boss
+	# battle.
+	_button_ref("GAME_UI_RESULT_BACK_TO_TITLE", func():
+		_boss_attack_id = ""
+		_show_title(Content.fingerprint()))
 
 	_divider()
 
@@ -1120,7 +1144,12 @@ func _resume_run_screen() -> void:
 
 ## Boss Selection. The DESTRUCTIVE New-Run boundary: confirming here replaces
 ## any existing save, so it is the one selection that discards prior progress.
-func _show_boss_select() -> void:
+## The Boss roster as chooser options, straight from content.
+##
+## Shared by Run Boss Selection and by Boss Attack so neither can list a
+## different set of Bosses than the other — the roster is the data, not a
+## screen's idea of it.
+func _boss_options() -> Array:
 	var options: Array = []
 	for b in Content.all_bosses():
 		options.append({
@@ -1134,6 +1163,11 @@ func _show_boss_select() -> void:
 				],
 			],
 		})
+	return options
+
+
+func _show_boss_select() -> void:
+	var options: Array = _boss_options()
 
 	var offered: Array = []
 	for o in options:
@@ -1486,6 +1520,43 @@ func _advance_run() -> void:
 ##
 ## It acquires no UPGRADEs, involves no Boss, and never writes to Constructed
 ## Quick Match's remembered build — which is why `_build` is left alone here.
+## Which Boss the battle in play is a Boss Attack against, or "" when the battle
+## in play is not one. It is the mode flag as well as the identity: every Boss
+## Attack has a Boss, and no other mode reaches a Boss from this screen.
+var _boss_attack_id := ""
+
+
+# ---- boss attack ----
+
+## §10 — a Boss battle with no Run, no UPGRADEs and no construction screens.
+##
+## Reuses the ordinary chooser and the ordinary default build. The only thing
+## this mode adds is a shorter road to a Boss.
+func _show_boss_attack_select() -> void:
+	_show_chooser(
+		"GAME_UI_BOSS_SELECT_HEADING",
+		# NOT the Run prompt: that one says the Boss is chosen now and fought
+		# last, which is false here and would misdescribe the mode (§11).
+		"GAME_UI_BOSS_ATTACK_PROMPT",
+		_boss_options(),
+		func(id): _start_boss_attack(str(id)),
+		func(): _show_title(Content.fingerprint()),
+	)
+
+
+func _start_boss_attack(boss_id: String) -> void:
+	# No Run and no setup: entering here must not create or advance a session.
+	_run = null
+	_setup = null
+	_boss_attack_id = boss_id
+	_host_id = Content.BOSS_ATTACK_HOST_ID
+	_system_id = ""
+	# The canonical default build, not a mode-private copy (§10.2).
+	_qm_build = Session.default_build()
+	_gameplay_seed = _next_gameplay_seed()
+	_replay_battle()
+
+
 func _start_random_quick_match() -> void:
 	_run = null
 	_setup = null
