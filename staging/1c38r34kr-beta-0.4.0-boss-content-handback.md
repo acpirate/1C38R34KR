@@ -26,7 +26,7 @@ called out below; nothing was descoped.
 | 15 | Save/resume of new Boss state | done, schema 3 |
 | 16 | Alpha/differential position | stated in §11 below |
 | 17 | Automated verification | 3,475 pass, 0 fail |
-| 18 | Device verification | tablet, all four Bosses played |
+| 18 | Device verification | done on both — tablet and S25 |
 | 19–20 | Presentation constraints and out-of-scope | respected |
 
 ---
@@ -329,15 +329,47 @@ Boss Attack.
 
 Screenshots in `staging/design-reference/boss-0.4/`.
 
-**S25: not exercised, and here is the reasoning.** No battle-layout geometry
-changed in this build — no new controls in the battle screen, no change to the
-debug bar's width, no change to the header or the board. The two new marks are
-64px overlay art drawn inside the existing badge rect at the existing scale, and
-the concealment treatment repaints existing Packets without moving anything. The
-0.3.2.2 phone sign-off therefore still covers the layout. **Recommend a batched
-phone window anyway** before 0.5, to confirm the two new marks and the
-concealment treatment at phone density — those are legibility questions, and
-legibility is the one thing the tablet cannot answer for the phone.
+### S25 — exercised, 2026-09-07
+
+Carrying the phone proof forward was the original recommendation, on the grounds
+that no battle-layout geometry changed. The director ran the window anyway, and
+it was worth it: the pass answered a question the tablet could not and produced
+one finding the tablet had hidden entirely.
+
+**Layout — clear.** The battle debug bar was the reason to look. It gained a
+seventh button (`skin`) in 0.3.2.2 and had only ever been measured on the
+tablet's 1200 px. On the phone's 1080 it spans **x 16–1013, leaving ~67 px** —
+tight, nothing clipped, board keeping all eight columns. AN-006's failure mode
+has not returned. Title, chooser, header, Program grid and message stack all fit;
+the punch-hole inset is respected.
+
+**Both new marks read at phone density.** CAPACITOR's plates and LOGIC BOMB's
+chevrons are legible inside the badge at ~50 px and cannot be confused with
+BOMB, BUFF, SHIELD or OVERRIDE. That was the open legibility question and it is
+answered.
+
+**Device log — clean.** Buffer cleared, then ~40 s of cold launch, content load,
+chooser, an ECHOFALL battle with a full Boss phase, and a mid-battle pack swap:
+113 lines accumulated, none from the app and none at error level. No `E/godot`,
+no `SCRIPT ERROR`, no resource or importer failure. *Caveat:* the intent was to
+confirm by filtering on the app's own pid, so "no app lines" could be told apart
+from "looking in the wrong place". The phone disconnected before that ran. The
+clear-then-exercise method is still good evidence — a script error would have
+landed in that window — but it is one step short.
+
+**A case the tablet never reached.** Swapping skin to `16bit` *during* an
+ECHOFALL battle with COLOUR concealed: seed, turn, LINK and ICE all survive the
+view rebuild, and concealment survives the reskin.
+
+**And the finding the tablet had hidden.** The phone rolled the SHAPE axis, which
+the tablet never did across every seed played. As a still image the
+coloured-static board looked poor and was raised as a legibility concern. The
+director then played a shape-scrambled board and judged it working as expected,
+so it ships unchanged. The sequence is the instructive part: an automated check
+proved both axes reachable, a screenshot said one of them was bad, and only play
+settled it.
+
+Screenshots in `staging/design-reference/boss-0.4/phone/`.
 
 ---
 
@@ -402,6 +434,15 @@ director then played a shape-scrambled board and judged it working as expected,
 so it ships unchanged. Recorded because the sequence is instructive: an automated
 check said both axes were reachable, a screenshot said one of them was bad, and
 only play settled it.
+
+**One unreproduced observation.** The frame captured immediately after a
+mid-battle skin swap shows a blank line in the message stack. No other frame in
+either device pass shows a gap, and no `EVT.MSG` emitter in `game.gd` can produce
+an empty string — so an empty message is not the cause. It points at the
+`view_prefs` message restore in the rebuilt screen, which 0.3.2.2 added and this
+build inherited. The phone disconnected before it could be chased, and one
+screenshot cannot name a cause. Cosmetic; worth ten minutes with a device before
+0.5.
 
 **The art phase notes stand:** AN-015 (VFX/audio jig), AN-016 (composition),
 AN-017 (frame geometry), and now AN-019. AN-019 in particular is worth doing
