@@ -29,7 +29,15 @@ inside the badge at ~50 px, and neither can be mistaken for BOMB's circle,
 BUFF's cross, SHIELD or OVERRIDE's slashed ring. That was the open question
 from the tablet pass and it is answered.
 
-## Finding: hidden SHAPE is hard to read
+## ~~Finding~~ RESOLVED: hidden SHAPE reads acceptably in play
+
+**Director, 2026-09-07: played a shape-scrambled board and judged it working as
+expected. Closed — no change to `_draw_static`.**
+
+The original finding is kept below because the reasoning behind it is still
+worth knowing if the treatment is ever revisited during the art phase.
+
+### What was raised
 
 `04` is the first time the RNG chose the SHAPE axis on any device — the tablet
 rolled COLOUR every time.
@@ -49,13 +57,16 @@ for neutrals, where being unreadable *is* the message. Concealed axis Packets
 inherit that unreadability — and then have to carry a colour the player is
 expected to match on. Those two jobs are opposed.
 
-**Cheapest fix that stays inside §8.2:** keep "no shape, real colour" but make
-the colour carry — a solid colour field with a lighter noise overlay, or simply
-a much higher fill density, instead of sparse dots on black. The Packet still
-has no shape; it just stops hiding its colour too.
+**The fix, if it is ever wanted:** keep "no shape, real colour" but make the
+colour carry — a solid colour field with a lighter noise overlay, or a higher
+fill density, instead of sparse dots on black. A few lines in `_draw_static`.
 
-Left for the director: this is a qualitative call, and §19 puts presentation
-redesign outside this build.
+**Why it was not taken.** A screenshot is a still frame of a board nobody was
+playing. In play the axis is known — the Boss announces the concealment, the
+player is already looking for one colour, and the surrounding turn supplies the
+context a screenshot strips out. That is the difference between reading a board
+and scanning an image of one, and it is why this class of call belongs to whoever
+is holding the device.
 
 ## Device log — clean, with one caveat about the method
 

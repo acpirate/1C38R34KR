@@ -395,9 +395,13 @@ eight Capacitors is 256 damage against 150 LINK. Whether that clock is the
 intended difficulty or merely the intended *shape* is a tuning question, and
 §20 puts balancing out of scope. Worth playing before deciding.
 
-**ECHOFALL's shape concealment** was not observed on device — the RNG chose
-COLOUR on every seed played. It is covered by test (both axes reachable across
-40 seeds) but a person should look at coloured static before it is called good.
+**ECHOFALL's shape concealment — resolved 2026-09-07.** It went unobserved
+through the whole tablet pass because the RNG chose COLOUR every time; the phone
+rolled SHAPE once and the coloured-static board looked poor as a still image. The
+director then played a shape-scrambled board and judged it working as expected,
+so it ships unchanged. Recorded because the sequence is instructive: an automated
+check said both axes were reachable, a screenshot said one of them was bad, and
+only play settled it.
 
 **The art phase notes stand:** AN-015 (VFX/audio jig), AN-016 (composition),
 AN-017 (frame geometry), and now AN-019. AN-019 in particular is worth doing
